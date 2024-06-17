@@ -4,7 +4,7 @@ Given a log file "EventLog", the sequence for preprocessing is as follows:
 
 ./geld.py EventLog # Parses the global event log categorized by job id into a JSON.
 
-./filter.py geld_out.json # Filters out jobs that has hold>release state sequence.
+./filter.py geld_out.json # Filters out jobs that does not have hold>release state sequence.
 
 ./label.py filter_out.json # Labels the jobs as transient or non-transient.
 
