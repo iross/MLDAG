@@ -29,7 +29,7 @@ def job_filter(jobs):
 def parse_args():
     parser = argparse.ArgumentParser(description='Geld filtering. Only include jobs that went to hold and idle state.')
     parser.add_argument('geld', type=str, help='Geld relative path.')
-    parser.add_argument('out', type=str, help='Output filename.', default='filter_out.json', nargs='?')
+    parser.add_argument('out', type=str, help='Output filename.')
     return parser.parse_args()
 
 

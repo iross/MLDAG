@@ -27,7 +27,7 @@ def convert_logs(jobs):
     """Turn logs into time series data. Returns a tuple(data, label)"""
 
     logs_data = []
-    max_events = 25
+    max_events = 65
 
     # find job with highest number of events for padding the rest
     """max_events = 0
@@ -59,8 +59,7 @@ def convert_logs(jobs):
 def parse_args():
     parser = argparse.ArgumentParser(description='Convert logs into time-series data.')
     parser.add_argument('geld', type=str, help='Labeled logs json file.')
-    parser.add_argument('out', type=str, help='Name of output file.', 
-            default='logs2ts_out.json', nargs='?')
+    parser.add_argument('out', type=str, help='Name of output file.')
     args = parser.parse_args()
     return args
 

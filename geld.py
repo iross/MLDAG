@@ -68,6 +68,7 @@ def process_logs(event_log_list):
 def parse_args():
     parser = argparse.ArgumentParser(description='Extract individual job data from job event logs and output as CSV.')
     parser.add_argument('logfile', nargs='+', help='job event log file(s)')
+    parser.add_argument('outfile', nargs=1)
     args = parser.parse_args()
     return args
 
@@ -77,7 +78,7 @@ def main():
     jobs = process_logs(args.logfile)
 
     # write to results to a json file
-    with open('geld_out.json', 'w') as out:
+    with open(args.outfile[0], 'w') as out:
         json.dump(jobs, out, cls=JobInfoJSONEncoder)
 
 

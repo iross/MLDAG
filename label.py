@@ -60,7 +60,7 @@ def main():
 
     # label each job
     labeled_jobs = add_label(jobs)
-    with open(f'{args.out}', 'w') as out:
+    with open(args.out, 'w') as out:
         json.dump(labeled_jobs, out)
     
 
