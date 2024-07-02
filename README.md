@@ -29,4 +29,6 @@ In both cases, insert your wand.ai key at model/ml/metadata.yaml
 
 Put your final processed .json file in model/data and update metadata.yaml accordingly
 
-Finally, you can configure your Sweep's search space in model/ml/hyperparameters.yaml
+Finally, you can configure your Sweep's search space in model/ml/sweep_config.yaml
+
+Ignore hyperparameters.yaml for now
