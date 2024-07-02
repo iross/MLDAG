@@ -1,0 +1,9 @@
+# path to data
+DATA_PATHNAME: '../data/ospool-parsed65.json'
+
+# wandb variables
+WANDB_ENABLE: True
+WANDB_API_KEY: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+WANDB_ENTITY: chtc-ospool-error-classification
+WANDB_PROJECT: pytorch-sweeps-demo
+WANDB_SWEEP_RUNS: 50
