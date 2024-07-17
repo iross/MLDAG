@@ -94,6 +94,7 @@ def partition_jobs(jobs):
                 if held_idx is not None: # indicates a cycle is found
                     cycles_idx.append( (held_idx, event_idx) )
                     cycle_detected = True
+                    held_idx = None # reset
                     
         if cycle_detected:
             filtered.append( (job_info, cycles_idx) )
