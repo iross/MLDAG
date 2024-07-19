@@ -62,7 +62,7 @@ def events_within_interval(events, stime, etime):
     
     qualify = []
     for e in events:
-        if stime <= seconds_from_pre_dhhmmss(['EventTime']) <= etime:
+        if stime <= seconds_from_pre_dhhmmss(e['EventTime']) <= etime:
             qualify.append(e)
             
     return qualify
@@ -80,7 +80,7 @@ def partition_jobs(jobs):
         
         The int is the index at which the second partition starts
     """
-    
+
     filtered = [] # jobs with at-least one cycle
     retenate = [] # jobs with no cycles
     for job_id, job_info in jobs.items():
@@ -102,7 +102,7 @@ def partition_jobs(jobs):
             retenate.append(job_info)
     
     labeled_filtered = add_label(filtered)
-    spartition_idx = len(filtered)
+    spartition_idx = len(labeled_filtered)
     return labeled_filtered + retenate, spartition_idx
 
 
@@ -114,59 +114,69 @@ def create_time_series(partitioned_jobs, spartition_idx):
         
     """
     
-    m = 10
-    e = 46
-    j = 10
+    m = 10 # number of timeframes in a job matrix
+    e = 46 # number of defined events
+    j = 10 # number of jobs for context window
     
-    timeframe_len = 10 # duration of a single timeframe in seconds
-    num_timeframes = 10 # number of timeframes in a job matrix
+    timeframe_len = 60 # duration of a single timeframe in seconds
     time_series_stack = []
     
-    def construct_matrix():
+    def construct_matrix(job_info, lastframe_etime):
         """
-        Helper function for constructing a job's matrix
-        
+        Helper function for constructing a job's matrix.
+
+        Parameters:
+            job_info Object represntation of the job
+            lastframe_etime Timestamp in seconds of the last time frame for the filter job.
+
         Returns:
             None if job does not exist across the time frames,
             otherwise the one-hot encoding matrix.
         """
-        event_vector = [] # a condensed form that represents events in the lifecycle of a job up to a cycle
         
         # calculate the time frames given the timestamp of hold event
         timeframes_events = []
-        fcycle_time = job_info['events'][cycles_idx[1][0]] # timestamp of first cycle's hold event
-        for i in range(num_timeframes):
-            stime = fcycle_time - (timeframe_len * (i + 1))
-            etime = fcycle_time - (timeframe_len * i)
+        for i in range(m):
+            stime = lastframe_etime - (timeframe_len * (i + 1))
+            etime = lastframe_etime - (timeframe_len * i)
             qualified_events = events_within_interval(job_info['events'], stime, etime)
             timeframes_events.append(qualified_events)
-            
+           
+        # a condensed form that represents events it its first cycle
+        event_vector = [None for i in range(len(timeframes_events))]  
+
         # populate the event_vector
         emptiness_log = []
         for i, events in enumerate(timeframes_events):
             selected_event = None
-            if events.empty():
+            if len(events) == 0: # empty
                 emptiness_log.append(True)
-                if i > 0 and not (prev_events := timeframes_events[i-1]).empty():
-                    selected_event = prev_events[-1]
+                if i > 0 and len(prev_events := timeframes_events[i-1]) > 0:
+                    selected_event = prev_events[-1] # imputation
+                    
+                    # populates its own timeframe events
+                    # for possible imputation from proceeding timeframes
+                    timeframes_events[i].append(selected_event)  
             else: # not empty
                 if i == 0:
                     selected_event = events[0]
                 else:
                     selected_event = events[-1]
-            event_vector[i] = selected_event['EventTypeNumber']
+            
+            # possible for selected_event to be none in the case that job has yet to exist
+            event_vector[i] = selected_event['EventTypeNumber'] if selected_event is not None else None
         if len(emptiness_log) == len(timeframes_events):
             return None # indicates job did not exist across the entire timeframes
                     
         # expand the event_vector into m*e matrix
-        m_e = [[0 for _ in range(e)] for _ in range(m)] # initialize m*e matrix
+        m_e = [[None for _ in range(e)] for _ in range(m)] # initialize m*e matrix
         for i, event in enumerate(event_vector):
-            m_e[event][i] = 1
+            if event is not None:
+                m_e[i][event] = 1
             
         return m_e
     
-    selected_jobs = {}
-    def job_selection():
+    def job_selection(selected_jobs):
         """
         selects a random job given the partitioned jobs list
         
@@ -174,24 +184,39 @@ def create_time_series(partitioned_jobs, spartition_idx):
             The index of randomly selected job.
         """
     
-        job_idx = random.randrange(len(partitioned_jobs))
-        while selected_jobs[job_idx] is True:
+        while True:
             job_idx = random.randrange(len(partitioned_jobs))
+            if job_idx not in selected_jobs:
+                break
         selected_jobs[job_idx] = True
         return job_idx
         
-    for job_info, cycles_idx in partitioned_jobs[:spartition_idx]:
-    
+    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:spartition_idx]):
+        
+        job_tensor = []
         # filter job (first m*e slice in m*e*j tensor)
-        m_e = construct_matrix(job_info, cycles_idex)
-        time_series_stack.append(m_e)
+        fcycle_time = seconds_from_pre_dhhmmss(job_info['events'][cycles_idx[0][0]]['EventTime']) # timestamp of first cycle's hold event
+        m_e = construct_matrix(job_info, fcycle_time)
+        job_tensor.append(m_e)
         
         # uniformly select j-1 other jobs for context window
-        next_m_e = construct_matrix(partitioned_jobs[job_idx][0], partitioned_jobs[job_idx][1])
-        while next_m_e is None:
-            next_m_e = construct_matrix(partitioned_jobs[job_idx][0], partitioned_jobs[job_idx][1])
-        time_series_stack.append(next_m_e)
-        
+        selected_jobs = {} # keeps track of which jobs had been selected in random selection process
+        m_e_count = 0
+        while m_e_count < j - 1:
+            job_idx = job_selection(selected_jobs) 
+            if type(partitioned_jobs[job_idx]) is tuple: # job is a filter job
+                next_job_info = partitioned_jobs[job_idx][0]
+            else:
+                next_job_info = partitioned_jobs[job_idx]
+            next_m_e = construct_matrix(next_job_info, fcycle_time)
+            if next_m_e is not None: # success
+                job_tensor.append(next_m_e)
+                m_e_count += 1
+
+        job_tensor.append(label) # last elem is the label
+        time_series_stack.append(job_tensor)
+        if i % 10 == 0: print(f'{i} / {spartition_idx}')
+
     return time_series_stack # m*e*j tensor
                     
 
@@ -210,8 +235,9 @@ def main():
         jobs = json.load(f)
 
     # get filtered jobs and write to json
-    global_list = partition_jobs(jobs)
-    ts = create_time_series(global_list)
+    global_list, spartition_idx = partition_jobs(jobs)
+    print(f'size of global list, index of second partition = {len(global_list)}, {spartition_idx}')
+    ts = create_time_series(global_list, spartition_idx)
     with open(args.out, 'w') as out:
         json.dump(ts, out)
     
