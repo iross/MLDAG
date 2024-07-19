@@ -21,7 +21,9 @@ def job_filter(jobs):
             if event['EventTypeNumber'] == htcondor.JobEventType.JOB_HELD:
                 held = True
             elif event['EventTypeNumber'] == htcondor.JobEventType.JOB_RELEASED:
-                if held: filtered[job_id] = job_info
+                if held: 
+                    filtered[job_id] = job_info
+                    break
 
     return filtered
 
@@ -42,6 +44,7 @@ def main():
 
     # get filtered jobs and write to json
     filtered = job_filter(jobs)
+    print(f'# of filtered jobs / total = {len(filtered)} / {len(jobs)}')
     with open(args.out, 'w') as out:
         json.dump(filtered, out)
     
