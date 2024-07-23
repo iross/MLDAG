@@ -1,0 +1,5 @@
+data/EventLog*
+data/gel_timestamp.txt
+data/logs/
+
+preprocessing/*.json

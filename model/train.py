@@ -9,17 +9,17 @@ from torch.utils.data import DataLoader, TensorDataset
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-with open(os.path.join(script_dir, 'metadata.yaml'), 'r') as file:
+with open(os.path.join(script_dir, 'config.yaml'), 'r') as file:
     metadata = yaml.safe_load(file)
 
 # wandb login key
-os.environ['WANDB_API_KEY'] = metadata['WANDB_API_KEY']
+os.environ['WANDB_API_KEY'] = metadata['wandb']['api_key']
 
 # define device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # data splitting
-with open(os.path.join(script_dir, metadata['DATA_PATHNAME']), 'r') as f:
+with open(os.path.join(script_dir, metadata['training']['data_pathname']), 'r') as f:
     logs = json.load(f)
 
 # create training set
@@ -169,20 +169,21 @@ def sweep_model(config=None):
         train(config, checkpoint_pathname)
 
 model_pathname = None
-if metadata['WANDB_ENABLE']:   
+if metadata['wandb']['enable']:   
     wandb.login()
 
     with open(os.path.join(script_dir, 'sweep_config.yaml'), 'r') as file:
         sweep_config = yaml.safe_load(file)
 
     # start the sweep
-    sweep_id = wandb.sweep(sweep_config, project=metadata['WANDB_PROJECT'])
-    wandb.agent(sweep_id, function=sweep_model, count=metadata['WANDB_SWEEP_RUNS'])
+    sweep_config = metadata['sweep'] + metadata['training']['hyperparameters_wandb']
+    sweep_id = wandb.sweep(metadata['wandb']['sweep']sweep_config, project=metadata['wandb']['project'])
+    wandb.agent(sweep_id, function=sweep_model, count=metadata['wandb']['sweep_training_runs'])
     
     # retrieve best run
-    sweep = wandb.Api().sweep(f"{metadata['WANDB_ENTITY']}/{metadata['WANDB_PROJECT']}/{sweep_id}")
+    sweep = wandb.Api().sweep(f"{metadata['wandb']['entity']}/{metadata['wandb']['project']}/{sweep_id}")
     best_run = min(sweep.runs, key=lambda run: run.summary.get('validate_loss', float('inf')))
-    model_pathname = f"checkpoints/{metadata['WANDB_PROJECT']}_{sweep_id}_{best_run.id}.pt"
+    model_pathname = f"checkpoints/{metadata['wandb']['project']}_{sweep_id}_{best_run.id}.pt"
     model = torch.load(os.path.join(script_dir, model_pathname))
 else:
     model_pathname = 'checkpoints/default.pt'
