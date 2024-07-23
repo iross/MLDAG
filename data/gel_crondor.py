@@ -17,6 +17,7 @@ import pathlib
 import shutil
 import sys
 import time
+import traceback
 
 '''
 Determine the location of the configured Global Event Log (GEL) file.
@@ -52,6 +53,26 @@ def grab_gel_logs(gel_loc_old, tstamp):
     except Exception as e:
         print(f"Error copying file: {e}")
         return 1
+
+'''
+Workarounds for HTCondor tomfoolery that results in missing credentials and
+shadow restarts.
+'''
+def get_creds() -> bool:
+    """
+    Get credentials to avoid job going on hold due to lack of credentials
+    """
+    # thanks @tlmiller
+    local_provider_name = htcondor.param.get("LOCAL_CREDMON_PROVIDER_NAME")
+    if local_provider_name is None:
+        return False
+    magic = ("LOCAL:%s" % local_provider_name).encode()
+    credd = htcondor.Credd()
+    credd.add_user_cred(htcondor.CredTypes.Kerberos, magic)
+    return True
+
+class CredsError(Exception):
+    pass
 
 
 '''
@@ -98,12 +119,20 @@ def submitCrondor():
     })
 
     try:
+        have_creds = get_creds()
+        if not have_creds:
+            raise CredsError("Credentials not found for this workflow")
         schedd = htcondor.Schedd()
         submit_result = schedd.submit(submit_description)
         print("Crondor job was submitted with JobID %d.0" % submit_result.cluster())
         return 0
+    except CredsError as ce:
+        traceback.print_exc()
+        print(f"CredsError occurred: {ce}")
+        return 1
     except Exception as e:
         print(f"Error submitting crondor job: {e}")
+        traceback.print_exc()
         return 1
 
 
