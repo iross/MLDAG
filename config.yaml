@@ -32,7 +32,7 @@ preprocessing:
     timeframe_len: 60
 
 training:
-  data_pathname: '../data/ospool-parsed65.json' # with respect to model/ml
+  data_pathname: '../data/ospool-parsed65.json' # with respect to ml/train.py
   parameters:
     lstm_layers: 
       values: [1, 2, 3, 4, 5]
