@@ -2,6 +2,8 @@ data/EventLog*
 data/gel_timestamp.txt
 data/logs/
 
-preproc/raw/EventLog*
-preproc/geldout/*.json
-preproc/parsed/*.json
+pproc/logs
+
+EventLog*
+*.json
+*.h5

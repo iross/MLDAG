@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import textwrap
 import random
 
@@ -15,11 +17,11 @@ def main():
             container_image = docker://tdnguyen25/pytorch-wandb:latest
             universe = container
         
-            executable = preproc.py
+            executable = prepoc/preproc.py
             
-            log = logs/exec_$(Cluster)_$(Process).log
-            error = logs/exec_$(Cluster)_$(Process).err
-            output = logs/exec_$(Cluster)_$(Process).out
+            log = logs/preproc_$(Cluster)_$(Process).log
+            error = logs/preproc_$(Cluster)_$(Process).err
+            output = logs/preproc_$(Cluster)_$(Process).out
             
             should_transfer_files = YES
             when_to_transfer_output = ON_EXIT
@@ -29,7 +31,6 @@ def main():
             request_cpus = 1
             request_memory = 4GB
             request_disk = 2GB
-                    
         }''')
 
     # train.sub
@@ -38,7 +39,7 @@ def main():
             container_image = docker://tdnguyen25/pytorch-wandb:latest
             universe = container
         
-            executable = train.py
+            executable = ml/train.py
             
             log = logs/train_$(Cluster)_$(Process).log
             error = logs/train_$(Cluster)_$(Process).err
@@ -58,7 +59,6 @@ def main():
             request_cpus = 1
             request_memory = 4GB
             request_disk = 2GB
-                    
         }
         ''')
     
@@ -68,7 +68,7 @@ def main():
             container_image = docker://tdnguyen25/pytorch-wandb:latest
             universe = container
         
-            executable = eval.py
+            executable = ml/eval.py
             
             log = logs/eval_$(Cluster)_$(Process).log
             error = logs/eval_$(Cluster)_$(Process).err
@@ -79,16 +79,9 @@ def main():
             transfer_input_files = model/train.py model/data
             transfer_output_files = ml/checkpoints
             
-            requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
-            require_gpus = (DriverVersion >= 11.1)
-            request_gpus = 1
-            +WantGPULab = true
-            +GPUJobLength = "short"
-            
             request_cpus = 1
             request_memory = 4GB
             request_disk = 2GB
-                    
         }   
         ''')
     variances = [] # hyperparameters

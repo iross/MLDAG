@@ -1,48 +1,40 @@
+#!/usr/bin/env python3
+
 import os
 import json
 import yaml
+from functools import reduce
+import operator
+
 import wandb
+import numpy as np
+import h5py
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(script_dir, 'config.yaml'), 'r') as file:
     metadata = yaml.safe_load(file)
 
-# wandb login key
 os.environ['WANDB_API_KEY'] = metadata['wandb']['api_key']
-
-# define device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# data splitting
-with open(os.path.join(script_dir, metadata['training']['data_pathname']), 'r') as f:
-    logs = json.load(f)
+# read data points from HDF5 file
+with h5py.File('ap2002.h5', 'r') as h5f:
+    train_dataset = h5f['train'][:]
+    x_train = torch.as_tensor(train_dataset['timeseries'])
+    y_train = torch.as_tensor(train_dataset['label'])
 
-# create training set
-partition_idx = int(len(logs) * 0.80)
-seqs = [item[0] for item in logs]
-labels = [0 if item[1] == 'transient' else 1 for item in logs] # 0=transient, 1=non-transient
-x_train = torch.tensor(seqs[:partition_idx], dtype=torch.float32)
-y_train = torch.tensor(labels[:partition_idx], dtype=torch.int)
+    validate_dataset = h5f['validate'][:]
+    x_validate = torch.as_tensor(validate_dataset['timeseries'])
+    y_validate = torch.as_tensor(validate_dataset['label'])
 
-# create validate and test set via round robin
-x_validate, y_validate, x_test, y_test = [], [], [], []
-for i, (seq, label) in enumerate(logs[partition_idx + 1:]):
-    label = 0 if label == 'transient' else 1
-    if i % 2 == 0:
-        x_validate.append(seq)
-        y_validate.append(label)
-    else:
-        x_test.append(seq)
-        y_test.append(label)
-x_validate = torch.as_tensor(x_validate, dtype=torch.float32)
-y_validate = torch.as_tensor(y_validate, dtype=torch.int)
-x_test = torch.as_tensor(x_test, dtype=torch.float32)
-y_test = torch.as_tensor(y_test, dtype=torch.int)
+    test_dataset = h5f['test'][:]
+    x_test = torch.as_tensor(test_dataset['timeseries'])
+    y_test = torch.as_tensor(test_dataset['label'])
 
 
 class EarlyStopping:
@@ -97,7 +89,7 @@ class LSTMNet(nn.Module):
 
 def train(config, checkpoint_pathname=None):
     # model hyperparameters
-    input_size = 46      # Number of features
+    input_size = x_train.shape[-1]      # Number of features
     num_classes = 1      # Number of output classes (for binary classification)
     num_layers = config['lstm_layers']      # Number of LSTM layers
     hidden_size = config['hidden_size']     # Number of hidden units
