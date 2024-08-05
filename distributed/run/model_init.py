@@ -4,6 +4,7 @@ import os
 import json
 import yaml
 
+import htcondor
 import wandb
 import numpy as np
 import h5py
@@ -39,5 +40,27 @@ class LSTMNet(nn.Module):
 
 if __name__ == '__main__':
     """Responsible for model creation with specified hyperparameters from wandb."""
+    script_dir = os.path.dirname(os.path.abspth(__file__))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('config', type=str)
+    config_pathname = parser.parse_args()
+    with open(os.path.join(script_dir, config_pathname), 'r') as file:
+        config = yaml.safe_load(file)
 
+    ## get hyperparameters from run to create LSTM model
+    with wandb.init(entity=config['wandb']['entity'], 
+                    project=config['wandb']['project'], 
+                    id=config['wandb']['run_id'], 
+                    resume='must') as run:
+        # input size is slice which does not contain the time axis. (e*j)
+        input_size = len(htcondor.JobEventType.names) * config['wandb']['run_config']['j']
+        model = LSTMNet(input_size,
+                        config['wandb']['run_config']['hidden_size'],
+                        config['wandb']['run_config']['num_layers'],
+                        config['wandb']['run_config']['num_classes']
+        )
+
+        # save model for the run
+        torch.save(model, config['io']['model_name'])
     
+

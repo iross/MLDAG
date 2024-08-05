@@ -1,0 +1,149 @@
+SUBMIT-DESCRIPTION sweep_init.sub {
+        container_image = docker://tdnguyen25/ospool-classification:latest
+        universe = container
+
+        executable = ./prelude/sweep_init.py
+        arguments = config.yaml
+        log = logs/sweep_init_$(Cluster)_$(Process).log
+        error = logs/sweep_init_$(Cluster)_$(Process).err
+        output = logs/sweep_init_$(Cluster)_$(Process).out
+
+        should_transfer_files = YES
+        when_to_transfer_output = ON_EXIT
+        transfer_input_files = config.yaml
+        transfer_output_files = config.yaml
+
+        request_cpus = 1
+        request_memory = 1GB
+        request_disk = 1GB
+}
+
+
+SUBMIT-DESCRIPTION run_init.sub {
+        container_image = docker://tdnguyen25/ospool-classification:latest
+        universe = container
+
+        executable = ./run/run_init.py
+	arguments = config.yaml
+	log = logs/run_init_$(Cluster)_$(Process).log
+	error = logs/run_init_$(Cluster)_$(Process).err
+        output = logs/run_init_$(Cluster)_$(Process).out
+
+        should_transfer_files = YES
+        when_to_transfer_output = ON_EXIT
+        transfer_input_files = config.yaml
+        transfer_output_files = config.yaml 
+
+        request_cpus = 1
+        request_memory = 1GB
+        request_disk = 1GB
+}
+
+
+SUBMIT-DESCRIPTION pproc.sub {
+	container_image = docker://tdnguyen25/ospool-classification:latest
+	universe = container
+
+	executable = run//geldparse.py
+	arguments = ap2002_geld.json ap2002.h5
+	log = logs/preproc_$(Cluster)_$(Process).log
+	error = logs/preproc_$(Cluster)_$(Process).err
+	output = logs/preproc_$(Cluster)_$(Process).out
+
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT
+	transfer_input_files = ../pproc/intermediate/ap2002_geld.json
+	transfer_output_files = ap2002.h5
+
+	request_cpus = 1
+	request_memory = 20GB
+	request_disk = 6GB
+}
+
+
+SUBMIT-DESCRIPTION model_init.sub {
+        container_image = docker://tdnguyen25/ospool-classification:latest
+        universe = container
+
+        executable = ./run/model_init.py
+        arguments = config.yaml
+        log = logs/run_init_$(Cluster)_$(Process).log
+        error = logs/run_init_$(Cluster)_$(Process).err
+        output = logs/run_init_$(Cluster)_$(Process).out
+
+        should_transfer_files = YES
+        when_to_transfer_output = ON_EXIT
+        transfer_input_files = config.yaml
+        transfer_output_files = model.pt
+
+        request_cpus = 1
+        request_memory = 2GB
+        request_disk = 2GB
+}
+
+
+SUBMIT-DESCRIPTION train.sub {
+	container_image = docker://tdnguyen25/pytorch-wandb:latest
+	universe = container
+
+	executable = ./run/ml/train.py 
+	arguments = config.yaml
+	log = logs/train_$(Cluster)_$(Process).log
+	error = logs/train_$(Cluster)_$(Process).err
+	output = logs/train_$(Cluster)_$(Process).out
+
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT
+	transfer_input_files = tensor
+	transfer_output_files = model.pt
+
+	requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
+	require_gpus = (DriverVersion >= 11.1)
+	request_gpus = 1
+	+WantGPULab = true
+	+GPUJobLength = "short"
+
+	request_cpus = 1
+	request_memory = 15GB
+	request_disk = 4GB
+}
+
+
+SUBMIT-DESCRIPTION evaluate.sub {
+        container_image = docker://tdnguyen25/pytorch-wandb:latest
+        universe = container
+
+        executable = ./run/ml/evaluate.py
+        arguments = config.yaml 0
+        log = logs/evaluate_$(Cluster)_$(Process).log
+        error = logs/evaluate_$(Cluster)_$(Process).err
+        output = logs/evaluate_$(Cluster)_$(Process).out
+
+        should_transfer_files = YES
+        when_to_transfer_output = ON_EXIT
+        transfer_input_files = tensor model.pt
+
+        requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
+        require_gpus = (DriverVersion >= 11.1)
+        request_gpus = 1
+        +WantGPULab = true
+        +GPUJobLength = "short"
+
+        request_cpus = 1
+        request_memory = 15GB
+        request_disk = 4GB
+}
+
+JOB sweep_init sweep_init.sub
+JOB run_init run_init.sub
+JOB pproc pproc.sub
+JOB model_init model_init.sub
+JOB train0 train.sub
+JOB evaluate0 evaluate.sub
+
+VARS evaluate0 epoch="0"
+
+PARENT sweep_init CHILD run_init
+PARENT run_init CHILD pproc model_init
+PARENT run_init model_init CHILD train0
+PARENT train0 CHILD evaluate0

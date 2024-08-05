@@ -58,41 +58,29 @@ def train(config, model):
     return model
 
 
-def sweep_model(config=None):
-    """Trains the model with wandb integration"""
-    with wandb.init(config=config) as run:
-        config = run.config
-        checkpoint_pathname = f'checkpoints/{run.project}_{run.sweep_id}_{run.id}.pt'
-        train(config, checkpoint_pathname)
-
-
 if __name__ == '__main__':
 
     # retrieve arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('wandb file', type=str, help='Path to file that specifies sweep id and run id.')
-    parser.add_argument('io file', type=str, help='Path to file that specifies naming conventions for io operations.')
-    wandb_pathname, io_pathname = parser.parse_args()
-
+    parser.add_argument('config file', type=str, help='Path to file that specifies sweep id and run id, and io standards.')
+    config_pathname = parser.parse_args()
+    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # load in wandb info
-    with open(os.path.join(script_dir, wandb_pathname), 'r') as file:
-        wandb_info = yaml.safe_load(file)
-    os.environ['WANDB_API_KEY'] = wandb_info['api_key']
-    project = wandb_info['project']
-    entity = wandb_info['entity']
-    sweep_id = wandb_info['sweep_id']
-    run_id = wandb_info['run_id']
+    with open(os.path.join(script_dir, config_pathname), 'r') as file:
+        config = yaml.safe_load(file)
+    os.environ['WANDB_API_KEY'] = config['api_key']
+    entity = config['wandb']['entity']
+    project = config['wandb']['project']
+    sweep_id = config['wandb']['sweep_id']
+    run_id = config['wandb']['run_id']
     wandb.login()
 
-    # load in io info
-    with open(os.path.join(script_dir, io_pathname), 'r') as file:
-        io_info = yaml.safe_load(file)
-    hyperparameters_pathname = io_info['hyperparameters_pathname']
-    tensor_pathname = io_info['tensor_pathname']
-    model_pathname = io_info['model_pathname']
-    model_out_pathname = io_info['model_out_pathname']
+    # load in i/o info
+    tensor_pathname = config['io']['tensor_pathname']
+    model_pathname = config['io']['model_pathname']
+    model_out_pathname = config['io']['model_out_pathname']
 
     # load in train tensor from HDF5 file
     with h5py.File(tensor_pathname, 'r') as h5f:
@@ -105,7 +93,7 @@ if __name__ == '__main__':
         model = torch.load(model_f)
 
     # resume run in wandb
-    with wandb.init(project=project, entity=entity, id=run_id, resume='must') as run:
+    with wandb.init(entity=entity, project=project, id=run_id, resume='must') as run:
         model = train(run.config, model)
         
     # save new model

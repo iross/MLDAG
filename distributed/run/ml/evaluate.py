@@ -42,29 +42,25 @@ if __name__ == '__main__':
 
     # retrieve arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('wandb file', type=str, help='Path to file that specifies sweep id and run id.')
-    parser.add_argument('io file', type=str, help='Path to file that specifies naming conventions for io operations.')
+    parser.add_argument('config file', type=str, help='Path to file that specifies sweep id and run id.')
     parser.add_argument('epoch', type=int help='Specifies which epoch will be evaluated')
-    wandb_pathname, io_pathname, epoch = parser.parse_args()
+    wandb_pathname, epoch = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # load in wandb info
     with open(os.path.join(script_dir, wandb_pathname), 'r') as file:
-        wandb_info = yaml.safe_load(file)
-    os.environ['WANDB_API_KEY'] = wandb_info['api_key']
-    project = wandb_info['project']
-    entity = wandb_info['entity']
-    sweep_id = wandb_info['sweep_id']
-    run_id = wandb_info['run_id']
+        config = yaml.safe_load(file)
+    os.environ['WANDB_API_KEY'] = config['api_key']
+    entity = config['wandb']['entity']
+    project = config['wandb']['project']
+    sweep_id = config['wandb']['sweep_id']
+    run_id = config['wandb']['run_id']
     wandb.login()
 
     # load in io info
-    with open(os.path.join(script_dir, io_pathname), 'r') as file:
-        io_info = yaml.safe_load(file)
-    hyperparameters_pathname = io_info['hyperparameters_pathname']
-    tensor_pathname = io_info['tensor_pathname']
-    model_pathname = io_info['model_pathname']
+    tensor_pathname = config['tensor_pathname']
+    model_pathname = config['model_pathname']
 
     # load in tensor from HDF5 file
     with h5py.File(tensor_pathname, 'r') as h5f:
@@ -77,7 +73,7 @@ if __name__ == '__main__':
         model = torch.load(model_f)
 
     # resume run in wandb
-    with wandb.init(project=project, entity=entity, id=run_id, resume='must') as run:
+    with wandb.init(entity=entity, project=project, id=run_id, resume='must') as run:
         validate_loss = evaluate(run.config, {'x':x, 'y':y}, model)
         wandb.log({'epoch': epoch, 'validate_loss': validate_loss}) # report to wandb
         

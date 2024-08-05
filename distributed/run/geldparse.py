@@ -13,9 +13,6 @@ import htcondor
 import numpy as np
 import h5py
 
-j = 10 # number of jobs for context window
-m = 10 # number of timeframes in a job matrix
-e = 46 # number of defined events
 
 def add_label(jobs):
     """
@@ -111,15 +108,14 @@ def partition_jobs(jobs):
     return labeled_filtered + retenate, spartition_idx
 
 
-def create_time_series(partitioned_jobs, spartition_idx):
+def create_time_series(partitioned_jobs, spartition_idx, j, m, timeframe_len):
     """
     Provided a partitioned job vector, create the 3D tensor training data.
 
     Returns:
 
     """
-
-    timeframe_len = 60 # duration of a single timeframe in seconds
+    e = 46
     time_series_stack = []
     labels = []
 
@@ -231,6 +227,7 @@ def create_time_series(partitioned_jobs, spartition_idx):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('config', type=str)
     parser.add_argument('geld', type=str, help='Geld file relative path.')
     parser.add_argument('out', type=str, help='Output filename.')
     return parser.parse_args()
@@ -266,8 +263,29 @@ def main():
                         'spartition_idx': spartition_idx}
             json.dump(glf_dict, glf)
     """
+
+    script_dir = os.path.dirname(os.path.abspth(__file__))
+    config_pathname = args.config
+
+    # load in config to get preprocessing hyperparameters
+    with open(os.path.join(script_dir, config_pathname), 'r') as file:
+        config = yaml.safe_load(file)
+
+    # login to wandb to retrieve preprocessing hyperparameters
+    run = wandb.init(
+        entity=config['wandb']['entity'],
+        project=config['wandb']['project'],
+        id=config['wandb']['run_id'],
+        resume='must'
+    )
     global_list, spartition_idx = partition_jobs(jobs)
-    ts, labels = create_time_series(global_list, spartition_idx)
+    ts, labels = create_time_series(
+        global_list, 
+        spartition_idx, 
+        run.config['j'], 
+        run.config['m'], 
+        run.config['timeframe_len']
+    )
     print(f'size of global list, index of second partition = {len(global_list)}, {spartition_idx}')
 
     # partition into train, validate, test sets

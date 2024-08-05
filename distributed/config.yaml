@@ -1,0 +1,62 @@
+wandb:
+  enable: True
+  api_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  entity: chtc-ospool-error-classification
+  project: pytorch-sweeps-demo
+  sweep:
+    name: hello world
+    method: random
+    metric:
+      name: validate_loss
+      goal: minimize
+  sweep_preprocessing_runs: 50
+  sweep_training_runs: 50
+  sweep_id: None
+  run_id: None
+  
+preprocessing:
+  parameters:
+    j: # number of jobs for context window
+      distribution: uniform
+      min: 10
+      max: 100        
+    m: # number of timeframes in a job matrix
+      distribution: uniform
+      min: 10
+      max: 100
+    timeframe_len: # duration of a single timeframe in seconds
+      distribution: uniform
+      min: 60
+      max: 300  
+  parameters_default: # used when wandb is disabled
+    m: 10
+    j: 10
+    timeframe_len: 60
+
+training:
+  parameters:
+    lstm_layers: 
+      values: [1, 2, 3, 4, 5]
+    hidden_size:
+      values: [16, 32, 64, 128]
+    learning_rate:
+      distribution: uniform
+      min: 0.0
+      max: 0.1
+    batch_size:
+      distribution: q_log_uniform_values
+      q: 8
+      min: 32
+      max: 256
+    epochs:
+      value: 25
+  parameters_default: # used when wandb is disabled
+    lstm_layers: 2
+    hidden_size: 50
+    epochs: 25
+    batch_size: 256
+    learning_rate: 0.001
+
+io:
+  model_name: 'model.pt'
+
