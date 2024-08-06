@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from datetime import datetime, timedelta
+from pprint import pprint
 import random
 import argparse
 import csv
@@ -9,9 +10,12 @@ import os
 import re
 import json
 import sys
+import yaml
+
 import htcondor
 import numpy as np
 import h5py
+import wandb
 
 
 def add_label(jobs):
@@ -194,7 +198,7 @@ def create_time_series(partitioned_jobs, spartition_idx, j, m, timeframe_len):
     # for each filtered job
     # create the job tensor j * m * e
     # new shape is (m, j*e)
-    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:50]):
+    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:spartition_idx]):
 
         job_tensor = []
 
@@ -264,28 +268,32 @@ def main():
             json.dump(glf_dict, glf)
     """
 
-    script_dir = os.path.dirname(os.path.abspth(__file__))
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     config_pathname = args.config
 
     # load in config to get preprocessing hyperparameters
     with open(os.path.join(script_dir, config_pathname), 'r') as file:
         config = yaml.safe_load(file)
 
-    # login to wandb to retrieve preprocessing hyperparameters
-    run = wandb.init(
-        entity=config['wandb']['entity'],
-        project=config['wandb']['project'],
-        id=config['wandb']['run_id'],
-        resume='must'
-    )
+    # login to wandb
+    os.environ['WANDB_API_KEY'] = config['wandb']['api_key']
+    os.environ['WANDB_ENTITY'] = config['wandb']['entity']
+    os.environ['WANDB_PROJECT'] = config['wandb']['project']
+    os.environ['WANDB_RUN_ID'] = config['wandb']['run_id']
+    wandb.login()
+
+    # retrieve preprocessing hyperparameters
+    run = wandb.init(resume='must')
+    pprint(run.config)
+
     global_list, spartition_idx = partition_jobs(jobs)
     ts, labels = create_time_series(
-        global_list, 
-        spartition_idx, 
-        run.config['j'], 
-        run.config['m'], 
-        run.config['timeframe_len']
-    )
+            global_list,
+            spartition_idx,
+            run.config['j'],
+            run.config['m'],
+            run.config['timeframe_len']
+            )
     print(f'size of global list, index of second partition = {len(global_list)}, {spartition_idx}')
 
     # partition into train, validate, test sets
@@ -299,7 +307,7 @@ def main():
             dtype = np.dtype([
                 ('timeseries', np.float32, (m, j*e)),
                 ('label', np.int8),
-            ])
+                ])
             dataset = np.zeros(len(partition), dtype=dtype)
             for i, (v, l) in enumerate(partition):
                 dataset[i]['timeseries'] = v

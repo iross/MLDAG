@@ -3,6 +3,7 @@
 import os
 import json
 import yaml
+import argparse
 
 import htcondor
 import wandb
@@ -40,27 +41,31 @@ class LSTMNet(nn.Module):
 
 if __name__ == '__main__':
     """Responsible for model creation with specified hyperparameters from wandb."""
-    script_dir = os.path.dirname(os.path.abspth(__file__))
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser()
-    parser.add_argument('config', type=str)
-    config_pathname = parser.parse_args()
-    with open(os.path.join(script_dir, config_pathname), 'r') as file:
+    parser.add_argument('config_pathname', type=str)
+    parser.add_argument('output_model_pathname', type=str)
+    args = parser.parse_args()
+    with open(os.path.join(script_dir, args.config_pathname), 'r') as file:
         config = yaml.safe_load(file)
 
+    # wandb login
+    os.environ['WANDB_API_KEY'] = config['wandb']['api_key']
+    os.environ['WANDB_ENTITY'] = config['wandb']['entity']
+    os.environ['WANDB_PROJECT'] = config['wandb']['project']
+    wandb.login()
+
     ## get hyperparameters from run to create LSTM model
-    with wandb.init(entity=config['wandb']['entity'], 
-                    project=config['wandb']['project'], 
-                    id=config['wandb']['run_id'], 
-                    resume='must') as run:
+    with wandb.init(id=config['wandb']['run_id'], resume='must') as run:
         # input size is slice which does not contain the time axis. (e*j)
-        input_size = len(htcondor.JobEventType.names) * config['wandb']['run_config']['j']
+        input_size = len(htcondor.JobEventType.names) * run.config['j']
+        num_classes = 1 # a constant
         model = LSTMNet(input_size,
-                        config['wandb']['run_config']['hidden_size'],
-                        config['wandb']['run_config']['num_layers'],
-                        config['wandb']['run_config']['num_classes']
-        )
+                        run.config['hidden_size'],
+                        run.config['lstm_layers'],
+                        num_classes
+                )
 
         # save model for the run
-        torch.save(model, config['io']['model_name'])
-    
-
+        scripted_model = torch.jit.script(model)
+        scripted_model.save(args.output_model_pathname)

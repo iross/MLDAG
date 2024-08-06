@@ -22,6 +22,9 @@ def evaluate(config, validate, model):
     # set to eval mode
     model.eval()
 
+    # set device (cuda or cpu)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # validation
     validate_dataset = TensorDataset(validate['x'], validate['y'])
     validate_loader = DataLoader(dataset=validate_dataset, batch_size=256)
@@ -34,7 +37,7 @@ def evaluate(config, validate, model):
             outputs = model(sequences)
             validate_loss += validation_criterion(outputs.squeeze(), target)
         validate_loss /= len(validate_loader.dataset)
-        print(f'Validate Loss: {validate_loss}\n')
+        print(f'Validate loss: {validate_loss}\n')
 
     return validate_loss
 
@@ -42,39 +45,34 @@ if __name__ == '__main__':
 
     # retrieve arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('config file', type=str, help='Path to file that specifies sweep id and run id.')
-    parser.add_argument('epoch', type=int help='Specifies which epoch will be evaluated')
-    wandb_pathname, epoch = parser.parse_args()
-
+    parser.add_argument('config_pathname', type=str)
+    parser.add_argument('tensor_pathname', type=str)
+    parser.add_argument('model_pathname', type=str)
+    parser.add_argument('epoch', type=int)
+    args = parser.parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     # load in wandb info
-    with open(os.path.join(script_dir, wandb_pathname), 'r') as file:
+    with open(os.path.join(script_dir, args.config_pathname), 'r') as file:
         config = yaml.safe_load(file)
-    os.environ['WANDB_API_KEY'] = config['api_key']
-    entity = config['wandb']['entity']
-    project = config['wandb']['project']
-    sweep_id = config['wandb']['sweep_id']
-    run_id = config['wandb']['run_id']
+
+    # login to wandb
+    os.environ['WANDB_API_KEY'] = config['wandb']['api_key']
+    os.environ['WANDB_ENTITY'] = config['wandb']['entity']
+    os.environ['WANDB_PROJECT'] = config['wandb']['project']
+    os.environ['WANDB_RUN_ID'] = config['wandb']['run_id']
     wandb.login()
 
-    # load in io info
-    tensor_pathname = config['tensor_pathname']
-    model_pathname = config['model_pathname']
-
     # load in tensor from HDF5 file
-    with h5py.File(tensor_pathname, 'r') as h5f:
+    with h5py.File(args.tensor_pathname, 'r') as h5f:
         dataset = h5f['validate'][:]
         x = torch.as_tensor(dataset['timeseries'].copy())
         y = torch.as_tensor(dataset['label'].copy())
 
     # load in model object to train
-    with open(model_pathname, 'r') as model_f
-        model = torch.load(model_f)
+    model = torch.jit.load(args.model_pathname)
 
     # resume run in wandb
-    with wandb.init(entity=entity, project=project, id=run_id, resume='must') as run:
+    with wandb.init(resume='must') as run:
         validate_loss = evaluate(run.config, {'x':x, 'y':y}, model)
-        wandb.log({'epoch': epoch, 'validate_loss': validate_loss}) # report to wandb
-        
-    print(f'epoch: {epoch}, validate_loss: {validate_loss}')
+        wandb.log({'epoch': args.epoch, 'validate_loss': validate_loss}) # report to wandb

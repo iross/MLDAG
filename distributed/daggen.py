@@ -13,77 +13,143 @@ def main():
     
     # preproc.sub
     dag_text += textwrap.dedent('''\n
-        SUBMIT-DESCRIPTION preproc.sub {
-            container_image = docker://tdnguyen25/pytorch-wandb:latest
+    SUBMIT-DESCRIPTION sweep_init.sub {
+            container_image = docker://tdnguyen25/ospool-classification:latest
             universe = container
-        
-            executable = prepoc/preproc.py
-            
-            log = logs/preproc_$(Cluster)_$(Process).log
-            error = logs/preproc_$(Cluster)_$(Process).err
-            output = logs/preproc_$(Cluster)_$(Process).out
-            
+
+            executable = ./prelude/sweep_init.py
+            arguments = $(config_pathname) $(output_config_pathname)
+            log = logs/sweep_init_$(Cluster)_$(Process).log
+            error = logs/sweep_init_$(Cluster)_$(Process).err
+            output = logs/sweep_init_$(Cluster)_$(Process).out
+
             should_transfer_files = YES
             when_to_transfer_output = ON_EXIT
-            transfer_input_files = preproc/geldparse.py preproc/raw preproc/parsed
-            transfer_output_files = preproc/parsed
-            
+            transfer_input_files = $(config_pathname)
+            transfer_output_files = $(output_config_pathname)
+
             request_cpus = 1
             request_memory = 4GB
-            request_disk = 2GB
-        }''')
+            request_disk = 4GB
+    }
 
-    # train.sub
-    dag_text += textwrap.dedent('''\n
-        SUBMIT-DESCRIPTION train.sub {
+
+    SUBMIT-DESCRIPTION run_init.sub {
+            container_image = docker://tdnguyen25/ospool-classification:latest
+            universe = container
+
+            executable = ./run/run_init.py
+            arguments = $(config_pathname) $(output_config_pathname)
+            log = logs/run_init_$(Cluster)_$(Process).log
+            error = logs/run_init_$(Cluster)_$(Process).err
+            output = logs/run_init_$(Cluster)_$(Process).out
+
+            should_transfer_files = YES
+            when_to_transfer_output = ON_EXIT
+            transfer_input_files = $(config_pathname)
+            transfer_output_files = $(output_config_pathname)
+
+            request_cpus = 1
+            request_memory = 4GB
+            request_disk = 4GB
+    }
+
+
+    SUBMIT-DESCRIPTION pproc.sub {
+            container_image = docker://tdnguyen25/ospool-classification:latest
+            universe = container
+
+            executable = ./run/geldparse.py
+            arguments = $(config_pathname) $(geld_pathname) $(output_tensor_pathname)
+            log = logs/pproc_$(Cluster)_$(Process).log
+            error = logs/pproc_$(Cluster)_$(Process).err
+            output = logs/pproc_$(Cluster)_$(Process).out
+
+            should_transfer_files = YES
+            when_to_transfer_output = ON_EXIT
+            transfer_input_files = $(config_pathname), ../pproc/intermediate/$(geld_pathname)
+            transfer_output_files = $(output_tensor_pathname)
+
+            request_cpus = 1
+            request_memory = 20GB
+            request_disk = 6GB
+    }
+
+
+    SUBMIT-DESCRIPTION model_init.sub {
+            container_image = docker://tdnguyen25/ospool-classification:latest
+            universe = container
+
+            executable = ./run/model_init.py
+            arguments = $(config_pathname) $(output_model_pathname)
+            log = logs/model_init_$(Cluster)_$(Process).log
+            error = logs/model_init_$(Cluster)_$(Process).err
+            output = logs/model_init_$(Cluster)_$(Process).out
+
+            should_transfer_files = YES
+            when_to_transfer_output = ON_EXIT
+            transfer_input_files = $(config_pathname)
+            transfer_output_files = $(output_model_pathname)
+
+            request_cpus = 1
+            request_memory = 4GB
+            request_disk = 4GB
+    }
+
+
+    SUBMIT-DESCRIPTION train.sub {
             container_image = docker://tdnguyen25/pytorch-wandb:latest
             universe = container
-        
-            executable = ml/train.py
-            
+
+            executable = ./run/ml/train.py
+            arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(output_model_pathname)
             log = logs/train_$(Cluster)_$(Process).log
             error = logs/train_$(Cluster)_$(Process).err
             output = logs/train_$(Cluster)_$(Process).out
-            
+
             should_transfer_files = YES
             when_to_transfer_output = ON_EXIT
-            transfer_input_files = ml/train.py, ml/data/
-            transfer_output_files = ml/checkpoints/
-            
+            transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
+            transfer_output_files = $(output_model_pathname)
+
             requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
             require_gpus = (DriverVersion >= 11.1)
             request_gpus = 1
             +WantGPULab = true
             +GPUJobLength = "short"
-            
+
             request_cpus = 1
-            request_memory = 4GB
-            request_disk = 2GB
-        }
-        ''')
-    
-    # eval.sub
-    dag_text += textwrap.dedent('''\n
-         SUBMIT-DESCRIPTION train.sub {
+            request_memory = 15GB
+            request_disk = 4GB
+    }
+
+
+    SUBMIT-DESCRIPTION evaluate.sub {
             container_image = docker://tdnguyen25/pytorch-wandb:latest
             universe = container
-        
-            executable = ml/eval.py
-            
-            log = logs/eval_$(Cluster)_$(Process).log
-            error = logs/eval_$(Cluster)_$(Process).err
-            output = logs/eval_$(Cluster)_$(Process).out
-            
+
+            executable = ./run/ml/evaluate.py
+            arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(epoch)
+            log = logs/evaluate_$(Cluster)_$(Process).log
+            error = logs/evaluate_$(Cluster)_$(Process).err
+            output = logs/evaluate_$(Cluster)_$(Process).out
+
             should_transfer_files = YES
             when_to_transfer_output = ON_EXIT
-            transfer_input_files = model/train.py model/data
-            transfer_output_files = ml/checkpoints
-            
+            transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
+
+            requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
+            require_gpus = (DriverVersion >= 11.1)
+            request_gpus = 1
+            +WantGPULab = true
+            +GPUJobLength = "short"
+
             request_cpus = 1
-            request_memory = 4GB
-            request_disk = 2GB
-        }   
-        ''')
+            request_memory = 15GB
+            request_disk = 4GB
+    }
+    ''')
+
     variances = [] # hyperparameters
     num_epochs = 10 # number of epochs to train for in each shiskabob
     num_shiskabobs = 10

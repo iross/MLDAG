@@ -8,27 +8,31 @@ import wandb
 
 
 def main():
-    script_dir = os.path.dirname(os.path.abspth(__file__))
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser()
-    parser.add_argument('config file', type=str)
-    config_pathname = parser.parse_args()
-    with open(os.path.join(script_dir, config_pathname), 'r') as file:
+    parser.add_argument('config_pathname', type=str)
+    parser.add_argument('output_config_pathname', type=str)
+    args = parser.parse_args()
+    with open(os.path.join(script_dir, args.config_pathname), 'r') as file:
         config = yaml.safe_load(file)
-    
-    # login login
-    os.environ['WANDB_API_KEY'] = config['api_key']
+
+    # wandb login
+    os.environ['WANDB_API_KEY'] = config['wandb']['api_key']
+    os.environ['WANDB_ENTITY'] = config['wandb']['entity']
+    os.environ['WANDB_PROJECT'] = config['wandb']['project']
     wandb.login()
 
     # create sweep
     sweep_config = {
         **config['wandb']['sweep'],
         'parameters': {**config['preprocessing']['parameters'], **config['training']['parameters']}
-    } 
-    config['wandb']['sweep_id'] = wandb.sweep(sweep_config, project=config['project'])
-    
+    }
+    config['wandb']['sweep_id'] = wandb.sweep(sweep_config)
+
     # write back updated config
-    with open(os.path.join(script_dir, config_pathname), 'w') as file:
+    with open(os.path.join(script_dir, args.output_config_pathname), 'w') as file:
         yaml.dump(config, file)
 
-if __name__ == '__main__': 
+
+if __name__ == '__main__':
     main()

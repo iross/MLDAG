@@ -8,25 +8,27 @@ import wandb
 
 
 def run_init():
-    with wandb.init() as run:
+    with wandb.init(resume='never') as run:
         config['wandb']['run_id'] = run.id
-        
 
 if __name__ == '__main__':
-    script_dir = os.path.dirname(os.path.abspth(__file__))
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser()
-    parser.add_argument('config file', type=str)
-    config_pathname = parser.parse_args()
-    with open(os.path.join(script_dir, config_pathname), 'r') as file:
+    parser.add_argument('config_pathname', type=str)
+    parser.add_argument('output_config_pathname', type=str)
+    args = parser.parse_args()
+    with open(os.path.join(script_dir, args.config_pathname), 'r') as file:
         config = yaml.safe_load(file)
 
     # wandb login
-    os.environ['WANDB_API_KEY'] = config['api_key']
+    os.environ['WANDB_API_KEY'] = config['wandb']['api_key']
+    os.environ['WANDB_ENTITY'] = config['wandb']['entity']
+    os.environ['WANDB_PROJECT'] = config['wandb']['project']
     wandb.login()
 
     # initialize run
-    wandb.agent(config['wandb']['sweep_id'], run_init)
+    wandb.agent(config['wandb']['sweep_id'], run_init, count=1)
 
     # write back updated config
-    with open(os.path.join(script_dir, config_pathname), 'w') as file:
+    with open(os.path.join(script_dir, args.output_config_pathname), 'w') as file:
         yaml.dump(config, file)

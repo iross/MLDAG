@@ -3,19 +3,19 @@ SUBMIT-DESCRIPTION sweep_init.sub {
         universe = container
 
         executable = ./prelude/sweep_init.py
-        arguments = config.yaml
+        arguments = $(config_pathname) $(output_config_pathname)
         log = logs/sweep_init_$(Cluster)_$(Process).log
         error = logs/sweep_init_$(Cluster)_$(Process).err
         output = logs/sweep_init_$(Cluster)_$(Process).out
 
         should_transfer_files = YES
         when_to_transfer_output = ON_EXIT
-        transfer_input_files = config.yaml
-        transfer_output_files = config.yaml
+        transfer_input_files = $(config_pathname)
+        transfer_output_files = $(output_config_pathname)
 
         request_cpus = 1
-        request_memory = 1GB
-        request_disk = 1GB
+        request_memory = 4GB
+        request_disk = 4GB
 }
 
 
@@ -24,19 +24,19 @@ SUBMIT-DESCRIPTION run_init.sub {
         universe = container
 
         executable = ./run/run_init.py
-	arguments = config.yaml
+	arguments = $(config_pathname) $(output_config_pathname)
 	log = logs/run_init_$(Cluster)_$(Process).log
 	error = logs/run_init_$(Cluster)_$(Process).err
         output = logs/run_init_$(Cluster)_$(Process).out
 
         should_transfer_files = YES
         when_to_transfer_output = ON_EXIT
-        transfer_input_files = config.yaml
-        transfer_output_files = config.yaml 
+        transfer_input_files = $(config_pathname)
+        transfer_output_files = $(output_config_pathname)
 
         request_cpus = 1
-        request_memory = 1GB
-        request_disk = 1GB
+        request_memory = 4GB
+        request_disk = 4GB
 }
 
 
@@ -44,16 +44,16 @@ SUBMIT-DESCRIPTION pproc.sub {
 	container_image = docker://tdnguyen25/ospool-classification:latest
 	universe = container
 
-	executable = run//geldparse.py
-	arguments = ap2002_geld.json ap2002.h5
-	log = logs/preproc_$(Cluster)_$(Process).log
-	error = logs/preproc_$(Cluster)_$(Process).err
-	output = logs/preproc_$(Cluster)_$(Process).out
+	executable = ./run/geldparse.py
+	arguments = $(config_pathname) $(geld_pathname) $(output_tensor_pathname)
+	log = logs/pproc_$(Cluster)_$(Process).log
+	error = logs/pproc_$(Cluster)_$(Process).err
+	output = logs/pproc_$(Cluster)_$(Process).out
 
 	should_transfer_files = YES
 	when_to_transfer_output = ON_EXIT
-	transfer_input_files = ../pproc/intermediate/ap2002_geld.json
-	transfer_output_files = ap2002.h5
+	transfer_input_files = $(config_pathname), ../pproc/intermediate/$(geld_pathname)
+	transfer_output_files = $(output_tensor_pathname)
 
 	request_cpus = 1
 	request_memory = 20GB
@@ -66,19 +66,19 @@ SUBMIT-DESCRIPTION model_init.sub {
         universe = container
 
         executable = ./run/model_init.py
-        arguments = config.yaml
-        log = logs/run_init_$(Cluster)_$(Process).log
-        error = logs/run_init_$(Cluster)_$(Process).err
-        output = logs/run_init_$(Cluster)_$(Process).out
+        arguments = $(config_pathname) $(output_model_pathname)
+        log = logs/model_init_$(Cluster)_$(Process).log
+        error = logs/model_init_$(Cluster)_$(Process).err
+        output = logs/model_init_$(Cluster)_$(Process).out
 
         should_transfer_files = YES
         when_to_transfer_output = ON_EXIT
-        transfer_input_files = config.yaml
-        transfer_output_files = model.pt
+        transfer_input_files = $(config_pathname)
+        transfer_output_files = $(output_model_pathname)
 
         request_cpus = 1
-        request_memory = 2GB
-        request_disk = 2GB
+        request_memory = 4GB
+        request_disk = 4GB
 }
 
 
@@ -87,15 +87,15 @@ SUBMIT-DESCRIPTION train.sub {
 	universe = container
 
 	executable = ./run/ml/train.py 
-	arguments = config.yaml
+	arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(output_model_pathname)
 	log = logs/train_$(Cluster)_$(Process).log
 	error = logs/train_$(Cluster)_$(Process).err
 	output = logs/train_$(Cluster)_$(Process).out
 
 	should_transfer_files = YES
 	when_to_transfer_output = ON_EXIT
-	transfer_input_files = tensor
-	transfer_output_files = model.pt
+	transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
+	transfer_output_files = $(output_model_pathname)
 
 	requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
 	require_gpus = (DriverVersion >= 11.1)
@@ -114,14 +114,14 @@ SUBMIT-DESCRIPTION evaluate.sub {
         universe = container
 
         executable = ./run/ml/evaluate.py
-        arguments = config.yaml 0
+        arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(epoch)
         log = logs/evaluate_$(Cluster)_$(Process).log
         error = logs/evaluate_$(Cluster)_$(Process).err
         output = logs/evaluate_$(Cluster)_$(Process).out
 
         should_transfer_files = YES
         when_to_transfer_output = ON_EXIT
-        transfer_input_files = tensor model.pt
+        transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
 
         requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
         require_gpus = (DriverVersion >= 11.1)
@@ -135,15 +135,20 @@ SUBMIT-DESCRIPTION evaluate.sub {
 }
 
 JOB sweep_init sweep_init.sub
-JOB run_init run_init.sub
-JOB pproc pproc.sub
-JOB model_init model_init.sub
-JOB train0 train.sub
-JOB evaluate0 evaluate.sub
+VARS sweep_init config_pathname="config.yaml" output_config_pathname="sweep.yaml"
 
-VARS evaluate0 epoch="0"
+JOB run0_run_init run_init.sub
+JOB run0_pproc pproc.sub
+JOB run0_model_init model_init.sub
+JOB run0_train_epoch0 train.sub
+JOB run0_evaluate_epoch0 evaluate.sub
+VARS run0_run_init config_pathname="sweep.yaml" output_config_pathname="run0.yaml"
+VARS run0_pproc config_pathname="run0.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="ap2002.h5"
+VARS run0_model_init config_pathname="run0.yaml" output_model_pathname="model_run0_init.pt"
+VARS run0_train_epoch0 config_pathname="run0.yaml" tensor_pathname="ap2002.h5" model_pathname="model_run0_init.pt" output_model_pathname="model_run0_epoch0.pt" 
+VARS run0_evaluate_epoch0 config_pathname="run0.yaml" tensor_pathname="ap2002.h5" model_pathname="model_run0_epoch0.pt" epoch="0"
 
-PARENT sweep_init CHILD run_init
-PARENT run_init CHILD pproc model_init
-PARENT run_init model_init CHILD train0
-PARENT train0 CHILD evaluate0
+PARENT sweep_init CHILD run0_run_init
+PARENT run0_run_init CHILD run0_pproc run0_model_init
+PARENT run0_pproc run0_model_init CHILD run0_train_epoch0
+PARENT run0_train_epoch0 CHILD run0_evaluate_epoch0
