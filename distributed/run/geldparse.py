@@ -198,7 +198,7 @@ def create_time_series(partitioned_jobs, spartition_idx, j, m, timeframe_len):
     # for each filtered job
     # create the job tensor j * m * e
     # new shape is (m, j*e)
-    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:spartition_idx]):
+    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:50]):
 
         job_tensor = []
 
@@ -303,6 +303,9 @@ def main():
 
     with h5py.File(args.out, 'w') as h5f:
         # convert each partition into a structured ndarray
+        j = run.config['j']
+        m = run.config['m']
+        e = len(htcondor.JobEventType.names)
         for pname, partition in partition_dict.items():
             dtype = np.dtype([
                 ('timeseries', np.float32, (m, j*e)),

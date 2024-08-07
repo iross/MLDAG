@@ -1,6 +1,6 @@
 wandb:
   enable: True
-  api_key: None
+  api_key: 10fd308beb114f4db7cd37b13cc74e953bf48b68
   entity: chtc-ospool-error-classification
   project: distributed-ml
   sweep:
@@ -48,11 +48,11 @@ training:
       q: 8
       min: 32
       max: 256
-    epochs:
+    max_epoch:
       value: 25
   parameters_default: # used when wandb is disabled
     lstm_layers: 2
     hidden_size: 50
-    epochs: 25
+    max_epoch: 25
     batch_size: 256
     learning_rate: 0.001

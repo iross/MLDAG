@@ -24,9 +24,9 @@ SUBMIT-DESCRIPTION run_init.sub {
         universe = container
 
         executable = ./run/run_init.py
-	arguments = $(config_pathname) $(output_config_pathname)
-	log = logs/run_init_$(Cluster)_$(Process).log
-	error = logs/run_init_$(Cluster)_$(Process).err
+        arguments = $(config_pathname) $(output_config_pathname)
+        log = logs/run_init_$(Cluster)_$(Process).log
+        error = logs/run_init_$(Cluster)_$(Process).err
         output = logs/run_init_$(Cluster)_$(Process).out
 
         should_transfer_files = YES
@@ -41,23 +41,23 @@ SUBMIT-DESCRIPTION run_init.sub {
 
 
 SUBMIT-DESCRIPTION pproc.sub {
-	container_image = docker://tdnguyen25/ospool-classification:latest
-	universe = container
+        container_image = docker://tdnguyen25/ospool-classification:latest
+        universe = container
 
-	executable = ./run/geldparse.py
-	arguments = $(config_pathname) $(geld_pathname) $(output_tensor_pathname)
-	log = logs/pproc_$(Cluster)_$(Process).log
-	error = logs/pproc_$(Cluster)_$(Process).err
-	output = logs/pproc_$(Cluster)_$(Process).out
+        executable = ./run/geldparse.py
+        arguments = $(config_pathname) $(geld_pathname) $(output_tensor_pathname)
+        log = logs/pproc_$(Cluster)_$(Process).log
+        error = logs/pproc_$(Cluster)_$(Process).err
+        output = logs/pproc_$(Cluster)_$(Process).out
 
-	should_transfer_files = YES
-	when_to_transfer_output = ON_EXIT
-	transfer_input_files = $(config_pathname), ../pproc/intermediate/$(geld_pathname)
-	transfer_output_files = $(output_tensor_pathname)
+        should_transfer_files = YES
+        when_to_transfer_output = ON_EXIT
+        transfer_input_files = $(config_pathname), ../pproc/intermediate/$(geld_pathname)
+        transfer_output_files = $(output_tensor_pathname)
 
-	request_cpus = 1
-	request_memory = 20GB
-	request_disk = 6GB
+        request_cpus = 1
+        request_memory = 20GB
+        request_disk = 6GB
 }
 
 
@@ -83,29 +83,29 @@ SUBMIT-DESCRIPTION model_init.sub {
 
 
 SUBMIT-DESCRIPTION train.sub {
-	container_image = docker://tdnguyen25/ospool-classification:latest
-	universe = container
+        container_image = docker://tdnguyen25/ospool-classification:latest
+        universe = container
 
-	executable = ./run/ml/train.py 
-	arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(output_model_pathname)
-	log = logs/train_$(Cluster)_$(Process).log
-	error = logs/train_$(Cluster)_$(Process).err
-	output = logs/train_$(Cluster)_$(Process).out
+        executable = ./run/ml/train.py
+        arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(output_model_pathname)
+        log = logs/train_$(Cluster)_$(Process).log
+        error = logs/train_$(Cluster)_$(Process).err
+        output = logs/train_$(Cluster)_$(Process).out
 
-	should_transfer_files = YES
-	when_to_transfer_output = ON_EXIT
-	transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
-	transfer_output_files = $(output_model_pathname)
+        should_transfer_files = YES
+        when_to_transfer_output = ON_EXIT
+        transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
+        transfer_output_files = $(output_model_pathname)
 
-	requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
-	require_gpus = (DriverVersion >= 11.1)
-	request_gpus = 1
-	+WantGPULab = true
-	+GPUJobLength = "short"
+        requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
+        require_gpus = (DriverVersion >= 11.1)
+        request_gpus = 1
+        +WantGPULab = true
+        +GPUJobLength = "short"
 
-	request_cpus = 1
-	request_memory = 15GB
-	request_disk = 4GB
+        request_cpus = 1
+        request_memory = 15GB
+        request_disk = 4GB
 }
 
 
@@ -134,21 +134,21 @@ SUBMIT-DESCRIPTION evaluate.sub {
         request_disk = 4GB
 }
 
+
 JOB sweep_init sweep_init.sub
 VARS sweep_init config_pathname="config.yaml" output_config_pathname="sweep.yaml"
 
-JOB run0_run_init run_init.sub
-JOB run0_pproc pproc.sub
-JOB run0_model_init model_init.sub
-JOB run0_train_epoch0 train.sub
-JOB run0_evaluate_epoch0 evaluate.sub
-VARS run0_run_init config_pathname="sweep.yaml" output_config_pathname="run0.yaml"
-VARS run0_pproc config_pathname="run0.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="ap2002.h5"
-VARS run0_model_init config_pathname="run0.yaml" output_model_pathname="model_run0_init.pt"
-VARS run0_train_epoch0 config_pathname="run0.yaml" tensor_pathname="ap2002.h5" model_pathname="model_run0_init.pt" output_model_pathname="model_run0_epoch0.pt" 
-VARS run0_evaluate_epoch0 config_pathname="run0.yaml" tensor_pathname="ap2002.h5" model_pathname="model_run0_epoch0.pt" epoch="0"
-
-PARENT sweep_init CHILD run0_run_init
-PARENT run0_run_init CHILD run0_pproc run0_model_init
-PARENT run0_pproc run0_model_init CHILD run0_train_epoch0
-PARENT run0_train_epoch0 CHILD run0_evaluate_epoch0
+JOB run0-run_init run_init.sub
+JOB run0-pproc pproc.sub
+JOB run0-model_init model_init.sub
+JOB run0-train_epoch0 train.sub
+JOB run0-evaluate_epoch0 evaluate.sub
+VARS run0-run_init config_pathname="sweep.yaml" output_config_pathname="run0-config.yaml"
+VARS run0-pproc config_pathname="run0-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="ap2002.h5"
+VARS run0-model_init config_pathname="run0-config.yaml" output_model_pathname="run0-model_init.pt"
+VARS run0-train_epoch0 config_pathname="run0-config.yaml" tensor_pathname="ap2002.h5" model_pathname="run0-model_init.pt" output_model_pathname="run0-model_epoch0.pt"
+VARS run0-evaluate_epoch0 config_pathname="run0-config.yaml" tensor_pathname="ap2002.h5" model_pathname="run0-model_epoch0.pt" epoch="0"
+PARENT sweep_init CHILD run0-run_init
+PARENT run0-run_init CHILD run0-pproc run0-model_init
+PARENT run0-pproc run0-model_init CHILD run0-train_epoch0
+PARENT run0-train_epoch0 CHILD run0-evaluate_epoch0

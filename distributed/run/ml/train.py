@@ -32,6 +32,8 @@ def train(config, model):
 
     # set device (cuda or cpu)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    criterion.to(device)
 
     # train the model for a single epoch
     training_loss = 0.0

@@ -22,13 +22,16 @@ def evaluate(config, validate, model):
     # set to eval mode
     model.eval()
 
-    # set device (cuda or cpu)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     # validation
     validate_dataset = TensorDataset(validate['x'], validate['y'])
     validate_loader = DataLoader(dataset=validate_dataset, batch_size=256)
     validation_criterion = nn.BCELoss()
+ 
+    # set device (cuda or cpu)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    validation_criterion.to(device)
+
     with torch.no_grad():
         validate_loss = 0.0
         for sequences, target in validate_loader:
@@ -75,4 +78,9 @@ if __name__ == '__main__':
     # resume run in wandb
     with wandb.init(resume='must') as run:
         validate_loss = evaluate(run.config, {'x':x, 'y':y}, model)
-        wandb.log({'epoch': args.epoch, 'validate_loss': validate_loss}) # report to wandb
+        run.log({'epoch': args.epoch, 'validate_loss': validate_loss}) # report to wandb
+        print(f'logged to run: {run.id}')
+
+        # save best model if last epoch
+        if args.epoch == run.config['max_epoch'] - 1: # zero based
+            torch.jit.save(model, f'{sweep_id}_{run_id}-bestmodel.pt')
