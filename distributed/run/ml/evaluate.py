@@ -54,6 +54,11 @@ if __name__ == '__main__':
     parser.add_argument('epoch', type=int)
     args = parser.parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # create output directory
+    output_dir = os.path.join(script_dir, 'output')
+    os.mkdir(output_dir)
+    print(f'created: {output_dir}')
 
     # load in wandb info
     with open(os.path.join(script_dir, args.config_pathname), 'r') as file:
@@ -78,9 +83,9 @@ if __name__ == '__main__':
     # resume run in wandb
     with wandb.init(resume='must') as run:
         validate_loss = evaluate(run.config, {'x':x, 'y':y}, model)
-        run.log({'epoch': args.epoch, 'validate_loss': validate_loss}) # report to wandb
+        run.log({'validate_loss': validate_loss}, step=args.epoch) # report to wandb
         print(f'logged to run: {run.id}')
 
         # save best model if last epoch
         if args.epoch == run.config['max_epoch'] - 1: # zero based
-            torch.jit.save(model, f'{sweep_id}_{run_id}-bestmodel.pt')
+            torch.jit.save(model, os.path.join(output_dir, f'{sweep_id}_{run_id}-bestmodel.pt'))

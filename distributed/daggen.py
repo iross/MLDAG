@@ -136,7 +136,8 @@ def main():
 
                 should_transfer_files = YES
                 when_to_transfer_output = ON_EXIT
-                transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
+                transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname), 
+                transfer_output_files = output/
 
                 requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
                 require_gpus = (DriverVersion >= 11.1)
@@ -153,7 +154,7 @@ def main():
     ''')
 
     num_shishkabob = 1
-    num_epoch = 5
+    num_epoch = 25
     
     jobs_txt = ''
     vars_txt = ''
@@ -170,28 +171,40 @@ def main():
                 JOB {run_prefix}-model_init model_init.sub\n''')
         vars_txt += textwrap.dedent(f'''\
                 VARS {run_prefix}-run_init config_pathname="sweep.yaml" output_config_pathname="{run_prefix}-config.yaml"
-                VARS {run_prefix}-pproc config_pathname="{run_prefix}-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="ap2002.h5"
+                VARS {run_prefix}-pproc config_pathname="{run_prefix}-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="{run_prefix}-ap2002.h5"
                 VARS {run_prefix}-model_init config_pathname="{run_prefix}-config.yaml" output_model_pathname="{run_prefix}-model_init.pt"\n''')
-        edges_txt += f'PARENT sweep_init CHILD {run_prefix}-run_init\n'
+        edges_txt += textwrap.dedent(f'''\
+                PARENT sweep_init CHILD {run_prefix}-run_init
+                PARENT {run_prefix}-run_init CHILD {run_prefix}-pproc {run_prefix}-model_init
+                PARENT {run_prefix}-pproc {run_prefix}-model_init CHILD {run_prefix}-train_epoch0\n''')
 
         for j in range(num_epoch): # for each epoch
+            input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
             jobs_txt += textwrap.dedent(f'''\
                     JOB {run_prefix}-train_epoch{j} train.sub
                     JOB {run_prefix}-evaluate_epoch{j} evaluate.sub''')
             vars_txt += textwrap.dedent(f'''\
-                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="ap2002.h5" model_pathname="{run_prefix}-model_init.pt" output_model_pathname="{run_prefix}-model_epoch{j}.pt"
-                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="ap2002.h5" model_pathname="{run_prefix}-model_epoch{j}.pt" epoch="{j}"''')
+                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="{run_prefix}-ap2002.h5" model_pathname="{run_prefix}-model_{input_model_postfix}.pt" output_model_pathname="{run_prefix}-model_epoch{j}.pt"
+                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="{run_prefix}-ap2002.h5" model_pathname="{run_prefix}-model_epoch{j}.pt" epoch="{j}"''')
             edges_txt += textwrap.dedent(f'''\
-                    PARENT {run_prefix}-run_init CHILD {run_prefix}-pproc {run_prefix}-model_init
-                    PARENT {run_prefix}-pproc {run_prefix}-model_init CHILD {run_prefix}-train_epoch{j}
                     PARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-evaluate_epoch{j}''')
 
-            if j < num_epoch-1:
+            # connect to successor train node
+            if j < num_epoch - 2:
+                edges_txt += f'\nPARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-train_epoch{j + 1}'
+
+            # create newlines (pretty view)
+            if j < num_epoch - 1:
                 jobs_txt += '\n'
                 vars_txt += '\n'
                 edges_txt += '\n'
 
         dag_txt += '\n' + jobs_txt + '\n' + vars_txt + '\n' + edges_txt + '\n'        
+        
+        # flush out each shishkabob
+        jobs_txt = ''
+        vars_txt = ''
+        edges_txt = ''
 
 
     with open('pipeline.dag', 'w') as f:

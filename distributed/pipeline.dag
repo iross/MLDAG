@@ -121,7 +121,8 @@ SUBMIT-DESCRIPTION evaluate.sub {
 
         should_transfer_files = YES
         when_to_transfer_output = ON_EXIT
-        transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname)
+        transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname), 
+        transfer_output_files = output/
 
         requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
         require_gpus = (DriverVersion >= 11.1)
@@ -143,12 +144,155 @@ JOB run0-pproc pproc.sub
 JOB run0-model_init model_init.sub
 JOB run0-train_epoch0 train.sub
 JOB run0-evaluate_epoch0 evaluate.sub
+JOB run0-train_epoch1 train.sub
+JOB run0-evaluate_epoch1 evaluate.sub
+JOB run0-train_epoch2 train.sub
+JOB run0-evaluate_epoch2 evaluate.sub
+JOB run0-train_epoch3 train.sub
+JOB run0-evaluate_epoch3 evaluate.sub
+JOB run0-train_epoch4 train.sub
+JOB run0-evaluate_epoch4 evaluate.sub
+JOB run0-train_epoch5 train.sub
+JOB run0-evaluate_epoch5 evaluate.sub
+JOB run0-train_epoch6 train.sub
+JOB run0-evaluate_epoch6 evaluate.sub
+JOB run0-train_epoch7 train.sub
+JOB run0-evaluate_epoch7 evaluate.sub
+JOB run0-train_epoch8 train.sub
+JOB run0-evaluate_epoch8 evaluate.sub
+JOB run0-train_epoch9 train.sub
+JOB run0-evaluate_epoch9 evaluate.sub
+JOB run0-train_epoch10 train.sub
+JOB run0-evaluate_epoch10 evaluate.sub
+JOB run0-train_epoch11 train.sub
+JOB run0-evaluate_epoch11 evaluate.sub
+JOB run0-train_epoch12 train.sub
+JOB run0-evaluate_epoch12 evaluate.sub
+JOB run0-train_epoch13 train.sub
+JOB run0-evaluate_epoch13 evaluate.sub
+JOB run0-train_epoch14 train.sub
+JOB run0-evaluate_epoch14 evaluate.sub
+JOB run0-train_epoch15 train.sub
+JOB run0-evaluate_epoch15 evaluate.sub
+JOB run0-train_epoch16 train.sub
+JOB run0-evaluate_epoch16 evaluate.sub
+JOB run0-train_epoch17 train.sub
+JOB run0-evaluate_epoch17 evaluate.sub
+JOB run0-train_epoch18 train.sub
+JOB run0-evaluate_epoch18 evaluate.sub
+JOB run0-train_epoch19 train.sub
+JOB run0-evaluate_epoch19 evaluate.sub
+JOB run0-train_epoch20 train.sub
+JOB run0-evaluate_epoch20 evaluate.sub
+JOB run0-train_epoch21 train.sub
+JOB run0-evaluate_epoch21 evaluate.sub
+JOB run0-train_epoch22 train.sub
+JOB run0-evaluate_epoch22 evaluate.sub
+JOB run0-train_epoch23 train.sub
+JOB run0-evaluate_epoch23 evaluate.sub
+JOB run0-train_epoch24 train.sub
+JOB run0-evaluate_epoch24 evaluate.sub
 VARS run0-run_init config_pathname="sweep.yaml" output_config_pathname="run0-config.yaml"
-VARS run0-pproc config_pathname="run0-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="ap2002.h5"
+VARS run0-pproc config_pathname="run0-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="run0-ap2002.h5"
 VARS run0-model_init config_pathname="run0-config.yaml" output_model_pathname="run0-model_init.pt"
-VARS run0-train_epoch0 config_pathname="run0-config.yaml" tensor_pathname="ap2002.h5" model_pathname="run0-model_init.pt" output_model_pathname="run0-model_epoch0.pt"
-VARS run0-evaluate_epoch0 config_pathname="run0-config.yaml" tensor_pathname="ap2002.h5" model_pathname="run0-model_epoch0.pt" epoch="0"
+VARS run0-train_epoch0 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_init.pt" output_model_pathname="run0-model_epoch0.pt"
+VARS run0-evaluate_epoch0 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch0.pt" epoch="0"
+VARS run0-train_epoch1 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch0.pt" output_model_pathname="run0-model_epoch1.pt"
+VARS run0-evaluate_epoch1 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch1.pt" epoch="1"
+VARS run0-train_epoch2 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch1.pt" output_model_pathname="run0-model_epoch2.pt"
+VARS run0-evaluate_epoch2 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch2.pt" epoch="2"
+VARS run0-train_epoch3 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch2.pt" output_model_pathname="run0-model_epoch3.pt"
+VARS run0-evaluate_epoch3 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch3.pt" epoch="3"
+VARS run0-train_epoch4 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch3.pt" output_model_pathname="run0-model_epoch4.pt"
+VARS run0-evaluate_epoch4 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch4.pt" epoch="4"
+VARS run0-train_epoch5 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch4.pt" output_model_pathname="run0-model_epoch5.pt"
+VARS run0-evaluate_epoch5 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch5.pt" epoch="5"
+VARS run0-train_epoch6 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch5.pt" output_model_pathname="run0-model_epoch6.pt"
+VARS run0-evaluate_epoch6 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch6.pt" epoch="6"
+VARS run0-train_epoch7 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch6.pt" output_model_pathname="run0-model_epoch7.pt"
+VARS run0-evaluate_epoch7 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch7.pt" epoch="7"
+VARS run0-train_epoch8 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch7.pt" output_model_pathname="run0-model_epoch8.pt"
+VARS run0-evaluate_epoch8 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch8.pt" epoch="8"
+VARS run0-train_epoch9 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch8.pt" output_model_pathname="run0-model_epoch9.pt"
+VARS run0-evaluate_epoch9 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch9.pt" epoch="9"
+VARS run0-train_epoch10 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch9.pt" output_model_pathname="run0-model_epoch10.pt"
+VARS run0-evaluate_epoch10 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch10.pt" epoch="10"
+VARS run0-train_epoch11 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch10.pt" output_model_pathname="run0-model_epoch11.pt"
+VARS run0-evaluate_epoch11 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch11.pt" epoch="11"
+VARS run0-train_epoch12 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch11.pt" output_model_pathname="run0-model_epoch12.pt"
+VARS run0-evaluate_epoch12 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch12.pt" epoch="12"
+VARS run0-train_epoch13 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch12.pt" output_model_pathname="run0-model_epoch13.pt"
+VARS run0-evaluate_epoch13 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch13.pt" epoch="13"
+VARS run0-train_epoch14 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch13.pt" output_model_pathname="run0-model_epoch14.pt"
+VARS run0-evaluate_epoch14 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch14.pt" epoch="14"
+VARS run0-train_epoch15 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch14.pt" output_model_pathname="run0-model_epoch15.pt"
+VARS run0-evaluate_epoch15 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch15.pt" epoch="15"
+VARS run0-train_epoch16 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch15.pt" output_model_pathname="run0-model_epoch16.pt"
+VARS run0-evaluate_epoch16 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch16.pt" epoch="16"
+VARS run0-train_epoch17 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch16.pt" output_model_pathname="run0-model_epoch17.pt"
+VARS run0-evaluate_epoch17 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch17.pt" epoch="17"
+VARS run0-train_epoch18 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch17.pt" output_model_pathname="run0-model_epoch18.pt"
+VARS run0-evaluate_epoch18 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch18.pt" epoch="18"
+VARS run0-train_epoch19 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch18.pt" output_model_pathname="run0-model_epoch19.pt"
+VARS run0-evaluate_epoch19 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch19.pt" epoch="19"
+VARS run0-train_epoch20 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch19.pt" output_model_pathname="run0-model_epoch20.pt"
+VARS run0-evaluate_epoch20 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch20.pt" epoch="20"
+VARS run0-train_epoch21 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch20.pt" output_model_pathname="run0-model_epoch21.pt"
+VARS run0-evaluate_epoch21 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch21.pt" epoch="21"
+VARS run0-train_epoch22 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch21.pt" output_model_pathname="run0-model_epoch22.pt"
+VARS run0-evaluate_epoch22 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch22.pt" epoch="22"
+VARS run0-train_epoch23 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch22.pt" output_model_pathname="run0-model_epoch23.pt"
+VARS run0-evaluate_epoch23 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch23.pt" epoch="23"
+VARS run0-train_epoch24 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch23.pt" output_model_pathname="run0-model_epoch24.pt"
+VARS run0-evaluate_epoch24 config_pathname="run0-config.yaml" tensor_pathname="run0-ap2002.h5" model_pathname="run0-model_epoch24.pt" epoch="24"
 PARENT sweep_init CHILD run0-run_init
 PARENT run0-run_init CHILD run0-pproc run0-model_init
 PARENT run0-pproc run0-model_init CHILD run0-train_epoch0
 PARENT run0-train_epoch0 CHILD run0-evaluate_epoch0
+PARENT run0-train_epoch0 CHILD run0-train_epoch1
+PARENT run0-train_epoch1 CHILD run0-evaluate_epoch1
+PARENT run0-train_epoch1 CHILD run0-train_epoch2
+PARENT run0-train_epoch2 CHILD run0-evaluate_epoch2
+PARENT run0-train_epoch2 CHILD run0-train_epoch3
+PARENT run0-train_epoch3 CHILD run0-evaluate_epoch3
+PARENT run0-train_epoch3 CHILD run0-train_epoch4
+PARENT run0-train_epoch4 CHILD run0-evaluate_epoch4
+PARENT run0-train_epoch4 CHILD run0-train_epoch5
+PARENT run0-train_epoch5 CHILD run0-evaluate_epoch5
+PARENT run0-train_epoch5 CHILD run0-train_epoch6
+PARENT run0-train_epoch6 CHILD run0-evaluate_epoch6
+PARENT run0-train_epoch6 CHILD run0-train_epoch7
+PARENT run0-train_epoch7 CHILD run0-evaluate_epoch7
+PARENT run0-train_epoch7 CHILD run0-train_epoch8
+PARENT run0-train_epoch8 CHILD run0-evaluate_epoch8
+PARENT run0-train_epoch8 CHILD run0-train_epoch9
+PARENT run0-train_epoch9 CHILD run0-evaluate_epoch9
+PARENT run0-train_epoch9 CHILD run0-train_epoch10
+PARENT run0-train_epoch10 CHILD run0-evaluate_epoch10
+PARENT run0-train_epoch10 CHILD run0-train_epoch11
+PARENT run0-train_epoch11 CHILD run0-evaluate_epoch11
+PARENT run0-train_epoch11 CHILD run0-train_epoch12
+PARENT run0-train_epoch12 CHILD run0-evaluate_epoch12
+PARENT run0-train_epoch12 CHILD run0-train_epoch13
+PARENT run0-train_epoch13 CHILD run0-evaluate_epoch13
+PARENT run0-train_epoch13 CHILD run0-train_epoch14
+PARENT run0-train_epoch14 CHILD run0-evaluate_epoch14
+PARENT run0-train_epoch14 CHILD run0-train_epoch15
+PARENT run0-train_epoch15 CHILD run0-evaluate_epoch15
+PARENT run0-train_epoch15 CHILD run0-train_epoch16
+PARENT run0-train_epoch16 CHILD run0-evaluate_epoch16
+PARENT run0-train_epoch16 CHILD run0-train_epoch17
+PARENT run0-train_epoch17 CHILD run0-evaluate_epoch17
+PARENT run0-train_epoch17 CHILD run0-train_epoch18
+PARENT run0-train_epoch18 CHILD run0-evaluate_epoch18
+PARENT run0-train_epoch18 CHILD run0-train_epoch19
+PARENT run0-train_epoch19 CHILD run0-evaluate_epoch19
+PARENT run0-train_epoch19 CHILD run0-train_epoch20
+PARENT run0-train_epoch20 CHILD run0-evaluate_epoch20
+PARENT run0-train_epoch20 CHILD run0-train_epoch21
+PARENT run0-train_epoch21 CHILD run0-evaluate_epoch21
+PARENT run0-train_epoch21 CHILD run0-train_epoch22
+PARENT run0-train_epoch22 CHILD run0-evaluate_epoch22
+PARENT run0-train_epoch22 CHILD run0-train_epoch23
+PARENT run0-train_epoch23 CHILD run0-evaluate_epoch23
+PARENT run0-train_epoch24 CHILD run0-evaluate_epoch24
