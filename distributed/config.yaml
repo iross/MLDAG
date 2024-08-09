@@ -4,7 +4,7 @@ wandb:
   entity: chtc-ospool-error-classification
   project: distributed-ml
   sweep:
-    name: shiskabob eaters
+    name: shiskabob lovers
     method: random
     metric:
       name: validate_loss
@@ -18,20 +18,16 @@ preprocessing:
   parameters:
     j: # number of jobs for context window
       distribution: int_uniform
-      min: 10
-      max: 100
+      min: 7
+      max: 13
     m: # number of timeframes in a job matrix
       distribution: int_uniform
-      min: 10
-      max: 100
+      min: 7
+      max: 13
     timeframe_len: # duration of a single timeframe in seconds
       distribution: int_uniform
       min: 60
       max: 300
-  parameters_default: # used when wandb is disabled
-    m: 10
-    j: 10
-    timeframe_len: 60
 
 training:
   parameters:
@@ -48,11 +44,7 @@ training:
       q: 8
       min: 32
       max: 256
+    shishkabob:
+      value: 5
     max_epoch:
-      value: 25
-  parameters_default: # used when wandb is disabled
-    lstm_layers: 2
-    hidden_size: 50
-    max_epoch: 25
-    batch_size: 256
-    learning_rate: 0.001
+      value: 5

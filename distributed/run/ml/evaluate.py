@@ -88,4 +88,4 @@ if __name__ == '__main__':
 
         # save best model if last epoch
         if args.epoch == run.config['max_epoch'] - 1: # zero based
-            torch.jit.save(model, os.path.join(output_dir, f'{sweep_id}_{run_id}-bestmodel.pt'))
+            torch.jit.save(model, os.path.join(output_dir, f'{config["wandb"]["sweep_id"]}_{config["wandb"]["run_id"]}-bestmodel.pt'))

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import argparse
+import os
 import textwrap
-import random
+import yaml
 
 def main():
 
@@ -29,8 +31,8 @@ def main():
                 transfer_output_files = $(output_config_pathname)
 
                 request_cpus = 1
-                request_memory = 4GB
-                request_disk = 4GB
+                request_memory = 2GB
+                request_disk = 2GB
         }
 
 
@@ -50,8 +52,8 @@ def main():
                 transfer_output_files = $(output_config_pathname)
 
                 request_cpus = 1
-                request_memory = 4GB
-                request_disk = 4GB
+                request_memory = 2GB
+                request_disk = 2GB
         }
 
 
@@ -153,8 +155,8 @@ def main():
 
     ''')
 
-    num_shishkabob = 1
-    num_epoch = 25
+    num_shishkabob = 200
+    num_epoch = 20
     
     jobs_txt = ''
     vars_txt = ''
@@ -190,7 +192,7 @@ def main():
                     PARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-evaluate_epoch{j}''')
 
             # connect to successor train node
-            if j < num_epoch - 2:
+            if j < num_epoch - 1:
                 edges_txt += f'\nPARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-train_epoch{j + 1}'
 
             # create newlines (pretty view)
@@ -206,6 +208,8 @@ def main():
         vars_txt = ''
         edges_txt = ''
 
+    dag_txt += '\n RETRY ALL_NODES 3\n'
+    dag_txt += '\nNODE_STATUS_FILE example.dag.status 30\n'
 
     with open('pipeline.dag', 'w') as f:
         f.write(dag_txt)
@@ -213,4 +217,11 @@ def main():
 
 
 if __name__ == "__main__":
+   
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('config', type=str)
+    args = parser.parse_args()
+    # with open()
+
     main()
