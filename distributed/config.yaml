@@ -4,7 +4,7 @@ wandb:
   entity: chtc-ospool-error-classification
   project: distributed-ml
   sweep:
-    name: shiskabob lovers
+    name: megatron
     method: random
     metric:
       name: validate_loss

@@ -73,8 +73,8 @@ def main():
                 transfer_output_files = $(output_tensor_pathname)
 
                 request_cpus = 1
-                request_memory = 20GB
-                request_disk = 6GB
+                request_memory = 30GB
+                request_disk = 20GB
         }
 
 
@@ -138,8 +138,35 @@ def main():
 
                 should_transfer_files = YES
                 when_to_transfer_output = ON_EXIT
-                transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname), 
+                transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname) 
                 transfer_output_files = output/
+
+                requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
+                require_gpus = (DriverVersion >= 11.1)
+                request_gpus = 1
+                +WantGPULab = true
+                +GPUJobLength = "short"
+
+                request_cpus = 1
+                request_memory = 15GB
+                request_disk = 4GB
+        }
+
+
+        SUBMIT-DESCRIPTION getbestmodel.sub {
+                container_image = docker://tdnguyen25/ospool-classification:latest
+                universe = container
+
+                executable = ./getbestmodel.py
+                arguments = $(config_pathname) $(tensor_pathname)
+                log = logs/getbestmodel_$(Cluster)_$(Process).log
+                error = logs/getbestmodel_$(Cluster)_$(Process).err
+                output = logs/getbestmodel_$(Cluster)_$(Process).out
+
+                should_transfer_files = YES
+                when_to_transfer_output = ON_EXIT
+                transfer_input_files = $(config_pathname), $(tensor_pathname)
+                transfer_output_files = bestmodel.stats
 
                 requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
                 require_gpus = (DriverVersion >= 11.1)
@@ -155,7 +182,7 @@ def main():
 
     ''')
 
-    num_shishkabob = 200
+    num_shishkabob = 3
     num_epoch = 20
     
     jobs_txt = ''
@@ -208,8 +235,12 @@ def main():
         vars_txt = ''
         edges_txt = ''
 
+    # final node
+    dag_txt += 'FINAL getbestmodel getbestmodel.sub\n'
+
+    # misc directives
     dag_txt += '\n RETRY ALL_NODES 3\n'
-    dag_txt += '\nNODE_STATUS_FILE example.dag.status 30\n'
+    dag_txt += '\nNODE_STATUS_FILE nodes.dag.status 30\n'
 
     with open('pipeline.dag', 'w') as f:
         f.write(dag_txt)
