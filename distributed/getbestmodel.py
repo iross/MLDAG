@@ -49,14 +49,9 @@ if __name__ == '__main__':
     # retrieve arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('config_pathname', type=str)
-    parser.add_argument('tensor_pathname', type=str)
+    parser.add_argument('output_pathname', type=str)
     args = parser.parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # create output directory
-    output_dir = os.path.join(script_dir, 'output')
-    os.mkdir(output_dir)
-    print(f'created: {output_dir}')
 
     # load in wandb info
     with open(os.path.join(script_dir, args.config_pathname), 'r') as file:
@@ -66,27 +61,27 @@ if __name__ == '__main__':
     os.environ['WANDB_API_KEY'] = config['wandb']['api_key']
     os.environ['WANDB_ENTITY'] = config['wandb']['entity']
     os.environ['WANDB_PROJECT'] = config['wandb']['project']
-    os.environ['WANDB_RUN_ID'] = config['wandb']['run_id']
     wandb.login()
 
-    # load in tensor from HDF5 file
-    with h5py.File(args.tensor_pathname, 'r') as h5f:
+    # retrieve best run_id
+    sweep = wandb.Api().sweep(f"{config['wandb']['entity']}/{config['wandb']['project']}/{config['wandb']['sweep_id']}")
+    best_run = min(sweep.runs, key=lambda run: run.summary.get('validate_loss', float('inf')))
+    model_pathname = f"{config['wandb']['sweep_id']}_{best_run.id}-bestmodel.pt"
+    model = torch.jit.load(os.path.join(script_dir, model_pathname))
+
+    # load in tensor from HDF5 file based on sweep_id and best run_id
+    # with h5py.File('run0-ap2002.h5', 'r') as h5f:
+    with h5py.File(f"{config['wandb']['sweep_id']}_{best_run.id}.h5", 'r') as h5f:
         dataset = h5f['test'][:]
         x = torch.as_tensor(dataset['timeseries'].copy())
         y = torch.as_tensor(dataset['label'].copy())
 
-    # retrieve best model
-    sweep = wandb.Api().sweep(f"{config['wandb']['entity']}/{config['wandb']['project']}/{sweep_id}")
-    best_run = min(sweep.runs, key=lambda run: run.summary.get('validate_loss', float('inf')))
-    model_pathname = f"{sweep_id}-{best_run.id}-bestmodel.pt"
+    # load in best model
     model = torch.jit.load(os.path.join(script_dir, model_pathname))
 
     # resume run in wandb to fetch training hyperparameters for test evaluation
-    with wandb.init(resume='must') as run:
+    with wandb.init(resume='must', id=best_run.id) as run:
         test_loss = test(run.config, {'x':x, 'y':y}, model)
-        with open('bestmodel.stats', 'w') as outf:
-            outf.write(model_pathname)
+        with open(os.path.join(script_dir, args.output_pathname), 'w') as outf:
+            outf.write(model_pathname + '\n')
             outf.write(f'test_loss: {test_loss}' + '\n')
-
-
-
