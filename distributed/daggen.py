@@ -182,15 +182,17 @@ def main():
 
     ''')
 
-    num_shishkabob = 3
-    num_epoch = 20
+    sweep_config_name = 'sweep.yaml'
+
+    num_shishkabob = config['runs']
+    num_epoch = config['epochs']
     
     jobs_txt = ''
     vars_txt = ''
     edges_txt = ''
 
     dag_txt += 'JOB sweep_init sweep_init.sub\n'
-    dag_txt += 'VARS sweep_init config_pathname="config.yaml" output_config_pathname="sweep.yaml"\n'
+    dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
     for i in range(num_shishkabob): # for each shishkabob
         run_prefix = f'run{i}'
@@ -199,7 +201,7 @@ def main():
                 JOB {run_prefix}-pproc pproc.sub
                 JOB {run_prefix}-model_init model_init.sub\n''')
         vars_txt += textwrap.dedent(f'''\
-                VARS {run_prefix}-run_init config_pathname="sweep.yaml" output_config_pathname="{run_prefix}-config.yaml"
+                VARS {run_prefix}-run_init config_pathname="{sweep_config_name}" output_config_pathname="{run_prefix}-config.yaml"
                 VARS {run_prefix}-pproc config_pathname="{run_prefix}-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="{run_prefix}-ap2002.h5"
                 VARS {run_prefix}-model_init config_pathname="{run_prefix}-config.yaml" output_model_pathname="{run_prefix}-model_init.pt"\n''')
         edges_txt += textwrap.dedent(f'''\
@@ -237,6 +239,7 @@ def main():
 
     # final node
     dag_txt += 'FINAL getbestmodel getbestmodel.sub\n'
+    dag_txt += f'SCRIPT POST getbestmodel cleanup.py {sweep_config_name}\n' 
 
     # misc directives
     dag_txt += '\n RETRY ALL_NODES 3\n'
@@ -253,6 +256,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('config', type=str)
     args = parser.parse_args()
-    # with open()
+    with open(args.config, 'r') as config:
+        main(yaml.safe_load(config))
 
-    main()

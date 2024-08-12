@@ -1,3 +1,6 @@
+runs: 50
+epochs: 50
+
 wandb:
   enable: True
   api_key: 10fd308beb114f4db7cd37b13cc74e953bf48b68
@@ -9,8 +12,6 @@ wandb:
     metric:
       name: validate_loss
       goal: minimize
-  sweep_preprocessing_runs: 50
-  sweep_training_runs: 50
   sweep_id: None
   run_id: None
 
@@ -44,7 +45,3 @@ training:
       q: 8
       min: 32
       max: 256
-    shishkabob:
-      value: 5
-    max_epoch:
-      value: 5
