@@ -158,15 +158,15 @@ def main():
                 universe = container
 
                 executable = ./getbestmodel.py
-                arguments = $(config_pathname) $(tensor_pathname)
+                arguments = $(config_pathname) bestmodel.info
                 log = logs/getbestmodel_$(Cluster)_$(Process).log
                 error = logs/getbestmodel_$(Cluster)_$(Process).err
                 output = logs/getbestmodel_$(Cluster)_$(Process).out
 
                 should_transfer_files = YES
                 when_to_transfer_output = ON_EXIT
-                transfer_input_files = $(config_pathname), $(tensor_pathname)
-                transfer_output_files = bestmodel.stats
+                transfer_input_files = $(config_pathname), *.h5, *bestmodel.pt
+                transfer_output_files = bestmodel.info
 
                 requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
                 require_gpus = (DriverVersion >= 11.1)
@@ -239,6 +239,7 @@ def main():
 
     # final node
     dag_txt += 'FINAL getbestmodel getbestmodel.sub\n'
+    dag_txt += 'VARS getbestmodel config_pathname="sweep.yaml"'
     dag_txt += f'SCRIPT POST getbestmodel cleanup.py {sweep_config_name}\n' 
 
     # misc directives

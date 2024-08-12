@@ -11,7 +11,12 @@ output = logs/preproc_$(Cluster)_$(Process).out
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
 transfer_input_files = s4k9o53g/
-# transfer_input_files = config.yaml, ../pproc/intermediate/ap2002_geld.json, ../pproc/parsed/ap2002.h5
+
+requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
+require_gpus = (DriverVersion >= 11.1)
+request_gpus = 1
++WantGPULab = true
++GPUJobLength = "short"
 
 request_cpus = 1
 request_memory = 5GB
