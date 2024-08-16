@@ -1,5 +1,6 @@
-runs: 50
-epochs: 50
+runs: 1
+epochs: 1
+earlystop_threshold: 5
 
 wandb:
   enable: True

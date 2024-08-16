@@ -104,7 +104,7 @@ def main():
                 universe = container
 
                 executable = ./run/ml/train.py
-                arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(output_model_pathname)
+                arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(output_model_pathname) $(epoch)
                 log = logs/train_$(Cluster)_$(Process).log
                 error = logs/train_$(Cluster)_$(Process).err
                 output = logs/train_$(Cluster)_$(Process).out
@@ -131,7 +131,7 @@ def main():
                 universe = container
 
                 executable = ./run/ml/evaluate.py
-                arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(epoch)
+                arguments = $(config_pathname) $(tensor_pathname) $(model_pathname) $(epoch) $(earlystop_marker_pathname)
                 log = logs/evaluate_$(Cluster)_$(Process).log
                 error = logs/evaluate_$(Cluster)_$(Process).err
                 output = logs/evaluate_$(Cluster)_$(Process).out
@@ -215,10 +215,14 @@ def main():
                     JOB {run_prefix}-train_epoch{j} train.sub
                     JOB {run_prefix}-evaluate_epoch{j} evaluate.sub''')
             vars_txt += textwrap.dedent(f'''\
-                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="{run_prefix}-ap2002.h5" model_pathname="{run_prefix}-model_{input_model_postfix}.pt" output_model_pathname="{run_prefix}-model_epoch{j}.pt"
-                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="{run_prefix}-ap2002.h5" model_pathname="{run_prefix}-model_epoch{j}.pt" epoch="{j}"''')
+                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="{run_prefix}-ap2002.h5" model_pathname="{run_prefix}-model_{input_model_postfix}.pt" output_model_pathname="{run_prefix}-model_epoch{j}.pt" epoch="{j}"
+                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" tensor_pathname="{run_prefix}-ap2002.h5" model_pathname="{run_prefix}-model_epoch{j}.pt" epoch="{j}" earlystop_marker_pathname="{run_prefix}.esm"''')
+            
+            # includes pre and post scripts for early stopping mechanism
             edges_txt += textwrap.dedent(f'''\
-                    PARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-evaluate_epoch{j}''')
+                    PARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-evaluate_epoch{j}
+                    SCRIPT PRE {run_prefix}-train_epoch{j} earlystopdetector.py {run_prefix}.esm
+                    SCRIPT POST {run_prefix}-train_epoch{j} earlystopdetector.py {run_prefix}.esm''')
 
             # connect to successor train node
             if j < num_epoch - 1:

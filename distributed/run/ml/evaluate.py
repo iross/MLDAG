@@ -32,17 +32,40 @@ def evaluate(config, validate, model):
     model.to(device)
     validation_criterion.to(device)
 
+    metrics = {}
     with torch.no_grad():
-        validate_loss = 0.0
+        loss = 0.0
         for sequences, target in validate_loader:
             sequences = sequences.to(device)
             target = target.to(device).float()
             outputs = model(sequences)
-            validate_loss += validation_criterion(outputs.squeeze(), target)
-        validate_loss /= len(validate_loader.dataset)
-        print(f'Validate loss: {validate_loss}\n')
+            loss += validation_criterion(outputs.squeeze(), target)
 
-    return validate_loss
+            # compute confusion matrix
+            tp, fp, tn, fn = 0, 0, 0, 0
+            predicted = (outputs > 0.5).float().squeeze()
+            for i in range(len(predicted)):
+                if predicted[i] == target[i] == True:
+                    tp += 1 # true positive
+                elif predicted[i] == True and target[i] == False:
+                    fp += 1 # false positive
+                elif predicted[i] == target[i] == False:
+                    tn += 1 # true negative
+                elif predicted[i] == False and target[i] == True:
+                    fn += 1 # false negative
+
+            # metrics
+            epsilon = 1e-10 # prevents ZeroDivisionError
+            metrics['precision'] = tp / (tp + fp + epsilon)
+            metrics['recall'] = tp / (tp + fn + epsilon)
+            metrics['f-measure'] = (2 * metrics['precision'] * metrics['recall']) / (metrics['precision'] + metrics['recall'] + epsilon)
+
+
+        loss /= len(validate_loader.dataset)
+        metrics['validation_loss'] = loss.item()
+
+
+    return metrics
 
 if __name__ == '__main__':
 
@@ -52,6 +75,7 @@ if __name__ == '__main__':
     parser.add_argument('tensor_pathname', type=str)
     parser.add_argument('model_pathname', type=str)
     parser.add_argument('epoch', type=int)
+    parser.add_argument('earlystop_marker_pathname', type=str)
     args = parser.parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -82,10 +106,30 @@ if __name__ == '__main__':
 
     # resume run in wandb
     with wandb.init(resume='must') as run:
-        validate_loss = evaluate(run.config, {'x':x, 'y':y}, model)
-        run.log({'validate_loss': validate_loss}, step=args.epoch) # report to wandb
-        print(f'logged to run: {run.id}')
+        metrics = evaluate(run.config, {'x':x, 'y':y}, model)
+        run.log({'validation_loss': metrics['validation_loss'],
+                 'precision': metrics['precision'],
+                 'recall': metrics['recall'],
+                 'f-measure': metrics['f-measure'], 
+                 'epoch': args.epoch}) # report to wandb
+        print(f'evaluation epoch={args.epoch} node logged to run: {run.id}')
 
-        # save best model if last epoch
-        if args.epoch == run.config['max_epoch'] - 1: # zero based
-            torch.jit.save(model, os.path.join(output_dir, f'{config["wandb"]["sweep_id"]}_{config["wandb"]["run_id"]}-bestmodel.pt'))
+        # early stopping condition
+        history = wandb.Api().run(f"{config['wandb']['entity']}/{config['wandb']['project']}/{config['wandb']['run_id']}").history()
+        counter = 0
+        delta = 0
+        for i, h in enumerate(history[np.max([0, args.epoch - 5]) : (args.epoch + 1)]): # previous 5 runs
+            # checks for monontically increases
+            vl = metrics['validation_loss'] if i == args.epoch else h['validation_loss']
+            new_delta = vl - h['training_loss']
+            if new_delta > delta:
+                counter += 1
+            else:
+                counter = 0
+            delta = new_delta
+
+            # create file marker if threshold is reached
+            if counter >= config['earlystop_threshold']:
+                with open(args.earlystop_marker_pathname, 'w'):
+                    pass
+

@@ -54,7 +54,7 @@ def train(config, model):
     training_loss /= len(train_loader.dataset) # normalize loss
     print(f'Training loss: {training_loss}')
 
-    return model
+    return model, training_loss
 
 
 if __name__ == '__main__':
@@ -66,6 +66,7 @@ if __name__ == '__main__':
     parser.add_argument('tensor_pathname', type=str)
     parser.add_argument('model_pathname', type=str)
     parser.add_argument('output_model_pathname', type=str)
+    parser.add_argument('epoch', type=int)
     args = parser.parse_args()
 
     # load config
@@ -90,7 +91,9 @@ if __name__ == '__main__':
 
     # resume run in wandb
     with wandb.init(resume='must') as run:
-        model = train(run.config, model)
+        model, loss = train(run.config, model)
+        run.log({'training_loss': loss, 'epoch': args.epoch})
+        print(f'training node logged to run: {run.id}')
 
     # save new model
     torch.jit.save(model, args.output_model_pathname)
