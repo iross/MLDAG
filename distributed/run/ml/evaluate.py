@@ -4,6 +4,7 @@ import os
 import json
 import yaml
 import argparse
+import shutil
 
 import wandb
 import numpy as np
@@ -78,11 +79,6 @@ if __name__ == '__main__':
     parser.add_argument('earlystop_marker_pathname', type=str)
     args = parser.parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # create output directory
-    output_dir = os.path.join(script_dir, 'output')
-    os.mkdir(output_dir)
-    print(f'created: {output_dir}')
 
     # load in wandb info
     with open(os.path.join(script_dir, args.config_pathname), 'r') as file:
@@ -130,6 +126,6 @@ if __name__ == '__main__':
 
             # create file marker if threshold is reached
             if counter >= config['earlystop_threshold']:
-                with open(args.earlystop_marker_pathname, 'w'):
-                    pass
+                with open(args.earlystop_marker_pathname, 'w'): pass
+
 

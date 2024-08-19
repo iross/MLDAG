@@ -5,7 +5,7 @@ import os
 import textwrap
 import yaml
 
-def main():
+def main(config):
 
     dag_txt = ''
 
@@ -41,7 +41,7 @@ def main():
                 universe = container
 
                 executable = ./run/run_init.py
-                arguments = $(config_pathname) $(output_config_pathname)
+                arguments = $(config_pathname) $(run_prefix) $(output_config_pathname)
                 log = logs/run_init_$(Cluster)_$(Process).log
                 error = logs/run_init_$(Cluster)_$(Process).err
                 output = logs/run_init_$(Cluster)_$(Process).out
@@ -139,7 +139,6 @@ def main():
                 should_transfer_files = YES
                 when_to_transfer_output = ON_EXIT
                 transfer_input_files = $(config_pathname), $(tensor_pathname), $(model_pathname) 
-                transfer_output_files = output/
 
                 requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
                 require_gpus = (DriverVersion >= 11.1)
@@ -165,7 +164,7 @@ def main():
 
                 should_transfer_files = YES
                 when_to_transfer_output = ON_EXIT
-                transfer_input_files = $(config_pathname), *.h5, *bestmodel.pt
+                transfer_input_files = $(config_pathname), final_input_dir/
                 transfer_output_files = bestmodel.info
 
                 requirements = (OpSysMajorVer == 8) || (OpSysMajorVer == 9)
@@ -201,7 +200,7 @@ def main():
                 JOB {run_prefix}-pproc pproc.sub
                 JOB {run_prefix}-model_init model_init.sub\n''')
         vars_txt += textwrap.dedent(f'''\
-                VARS {run_prefix}-run_init config_pathname="{sweep_config_name}" output_config_pathname="{run_prefix}-config.yaml"
+                VARS {run_prefix}-run_init config_pathname="{sweep_config_name}" run_prefix="{run_prefix}" output_config_pathname="{run_prefix}-config.yaml"
                 VARS {run_prefix}-pproc config_pathname="{run_prefix}-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="{run_prefix}-ap2002.h5"
                 VARS {run_prefix}-model_init config_pathname="{run_prefix}-config.yaml" output_model_pathname="{run_prefix}-model_init.pt"\n''')
         edges_txt += textwrap.dedent(f'''\
@@ -243,12 +242,13 @@ def main():
 
     # final node
     dag_txt += 'FINAL getbestmodel getbestmodel.sub\n'
-    dag_txt += 'VARS getbestmodel config_pathname="sweep.yaml"'
+    dag_txt += 'VARS getbestmodel config_pathname="sweep.yaml"\n'
+    dag_txt += 'SCRIPT PRE getbestmodel prefinal.py sweep.yaml final_input_dir\n'
     dag_txt += f'SCRIPT POST getbestmodel cleanup.py {sweep_config_name}\n' 
 
     # misc directives
-    dag_txt += '\n RETRY ALL_NODES 3\n'
-    dag_txt += '\nNODE_STATUS_FILE nodes.dag.status 30\n'
+    dag_txt += '\nRETRY ALL_NODES 3\n'
+    dag_txt += 'NODE_STATUS_FILE nodes.dag.status 30\n'
 
     with open('pipeline.dag', 'w') as f:
         f.write(dag_txt)

@@ -4,6 +4,7 @@ import os
 import json
 import yaml
 import argparse
+import glob
 
 import wandb
 import numpy as np
@@ -65,19 +66,20 @@ if __name__ == '__main__':
 
     # retrieve best run_id
     sweep = wandb.Api().sweep(f"{config['wandb']['entity']}/{config['wandb']['project']}/{config['wandb']['sweep_id']}")
-    best_run = min(sweep.runs, key=lambda run: run.summary.get('validate_loss', float('inf')))
-    model_pathname = f"{config['wandb']['sweep_id']}_{best_run.id}-bestmodel.pt"
-    model = torch.jit.load(os.path.join(script_dir, model_pathname))
+    best_run = min(sweep.runs, key=lambda run: run.summary.get('f-measure', float('inf')))
 
-    # load in tensor from HDF5 file based on sweep_id and best run_id
-    # with h5py.File('run0-ap2002.h5', 'r') as h5f:
-    with h5py.File(f"{config['wandb']['sweep_id']}_{best_run.id}.h5", 'r') as h5f:
+    # copy HDF5 file to input directory of FINAL NODE
+    file_pattern = os.path.join(script_dir, f"{best_run.config['run_prefix']}-*.h5")
+    h5_pathname = matching_files = glob.glob(file_pattern)[0]
+    with h5py.File(h5_pathname, 'r') as h5f:
         dataset = h5f['test'][:]
         x = torch.as_tensor(dataset['timeseries'].copy())
         y = torch.as_tensor(dataset['label'].copy())
 
     # load in best model
-    model = torch.jit.load(os.path.join(script_dir, model_pathname))
+    matching_files = glob.glob(os.path.join(script_dir, f"{best_run.config['run_prefix']}-*.pt"))
+    model_pathname = matching_files[0]
+    model = torch.jit.load(model_pathname)
 
     # resume run in wandb to fetch training hyperparameters for test evaluation
     with wandb.init(resume='must', id=best_run.id) as run:

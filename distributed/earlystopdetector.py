@@ -15,7 +15,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('marker_filename', str=type)
-    args = parser.parse()
+    parser.add_argument('marker_filename', type=str)
+    args = parser.parse_args()
 
     main(args)

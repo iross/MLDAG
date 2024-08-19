@@ -22,14 +22,14 @@ def main():
 
     # move all related sweep files to the directory
     files = [f for f in os.listdir(script_dir) if os.path.isfile(os.path.join(script_dir, f))]
-    pattern = re.compile(r'pipeline\..*|sweep.yaml|.*-config.yaml|.*\.h5|.*\.pt')
+    pattern = re.compile(r'pipeline\..*|sweep.yaml|.*-config.yaml|.*\.h5|.*\.pt|bestmodel.info')
     for file in files:
         if pattern.match(file):
             shutil.move(file, sweep_dir_pathname)
 
     # move the logs directory
-    logs_dir_pathname = os.path.join(script_dir, 'logs')
-    shutil.move(logs_dir_pathname, sweep_dir_pathname)
+    shutil.move(os.path.join(script_dir, 'logs'), sweep_dir_pathname)
+    shutil.move(os.path.join(script_dir, 'final_input_dir'), sweep_dir_pathname)
 
 
 if __name__ == '__main__':

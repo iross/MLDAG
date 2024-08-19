@@ -198,7 +198,7 @@ def create_time_series(partitioned_jobs, spartition_idx, j, m, timeframe_len):
     # for each filtered job
     # create the job tensor j * m * e
     # new shape is (m, j*e)
-    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:spartition_idx]):
+    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:50]):
 
         job_tensor = []
 
