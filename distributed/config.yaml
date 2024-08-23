@@ -1,5 +1,5 @@
-runs: 1
-epochs: 1
+runs: 100
+epochs: 20
 earlystop_threshold: 5
 
 wandb:
@@ -8,11 +8,11 @@ wandb:
   entity: chtc-ospool-error-classification
   project: distributed-ml
   sweep:
-    name: megatron
+    name: Osiris
     method: random
     metric:
-      name: validate_loss
-      goal: minimize
+      name: f-measure
+      goal: maximize
   sweep_id: None
   run_id: None
 
@@ -20,21 +20,21 @@ preprocessing:
   parameters:
     j: # number of jobs for context window
       distribution: int_uniform
-      min: 7
-      max: 13
+      min: 10
+      max: 100
     m: # number of timeframes in a job matrix
       distribution: int_uniform
-      min: 7
-      max: 13
+      min: 10
+      max: 100
     timeframe_len: # duration of a single timeframe in seconds
       distribution: int_uniform
       min: 60
-      max: 300
+      max: 400
 
 training:
   parameters:
     lstm_layers:
-      values: [1, 2, 3, 4, 5]
+      values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     hidden_size:
       values: [16, 32, 64, 128]
     learning_rate:

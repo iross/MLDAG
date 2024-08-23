@@ -175,7 +175,7 @@ def main(config):
 
                 request_cpus = 1
                 request_memory = 15GB
-                request_disk = 4GB
+                request_disk = 10GB
         }
 
 
@@ -244,7 +244,7 @@ def main(config):
     dag_txt += 'FINAL getbestmodel getbestmodel.sub\n'
     dag_txt += 'VARS getbestmodel config_pathname="sweep.yaml"\n'
     dag_txt += 'SCRIPT PRE getbestmodel prefinal.py sweep.yaml final_input_dir\n'
-    dag_txt += f'SCRIPT POST getbestmodel cleanup.py {sweep_config_name}\n' 
+    # dag_txt += f'SCRIPT POST getbestmodel cleanup.py {sweep_config_name}\n' 
 
     # misc directives
     dag_txt += '\nRETRY ALL_NODES 3\n'

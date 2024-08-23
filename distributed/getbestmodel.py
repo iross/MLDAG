@@ -33,6 +33,7 @@ def test(config, test, model):
     model.to(device)
     criterion.to(device)
 
+    metrics = {}
     with torch.no_grad():
         loss = 0.0
         for sequences, target in loader:
@@ -40,10 +41,31 @@ def test(config, test, model):
             target = target.to(device).float()
             outputs = model(sequences)
             loss += criterion(outputs.squeeze(), target)
-        loss /= len(loader.dataset)
-        print(f'test loss: {loss}\n')
+        
+            # compute confusion matrix
+            tp, fp, tn, fn = 0, 0, 0, 0
+            predicted = (outputs > 0.5).float().squeeze()
+            for i in range(len(predicted)):
+                if predicted[i] == target[i] == True:
+                    tp += 1 # true positive
+                elif predicted[i] == True and target[i] == False:
+                    fp += 1 # false positive
+                elif predicted[i] == target[i] == False:
+                    tn += 1 # true negative
+                elif predicted[i] == False and target[i] == True:
+                    fn += 1 # false negative
 
-    return loss
+            # metrics
+            epsilon = 1e-10 # prevents ZeroDivisionError
+            metrics['accuracy'] = (tp + tn) / (tp + fp + tn + fn + epsilon)
+            metrics['precision'] = tp / (tp + fp + epsilon)
+            metrics['recall'] = tp / (tp + fn + epsilon)
+            metrics['f-measure'] = (2 * metrics['precision'] * metrics['recall']) / (metrics['precision'] + metrics['recall'] + epsilon)
+
+        loss /= len(loader.dataset)
+        metrics['test_loss'] = loss.item()
+
+    return metrics
 
 if __name__ == '__main__':
 
@@ -83,7 +105,7 @@ if __name__ == '__main__':
 
     # resume run in wandb to fetch training hyperparameters for test evaluation
     with wandb.init(resume='must', id=best_run.id) as run:
-        test_loss = test(run.config, {'x':x, 'y':y}, model)
+        metrics = test(run.config, {'x':x, 'y':y}, model)
         with open(os.path.join(script_dir, args.output_pathname), 'w') as outf:
             outf.write(model_pathname + '\n')
-            outf.write(f'test_loss: {test_loss}' + '\n')
+            outf.write(str(metrics) + '\n')

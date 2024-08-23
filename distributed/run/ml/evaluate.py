@@ -57,6 +57,7 @@ def evaluate(config, validate, model):
 
             # metrics
             epsilon = 1e-10 # prevents ZeroDivisionError
+            metrics['accuracy'] = (tp + tn) / (tp + fp + tn + fn)
             metrics['precision'] = tp / (tp + fp + epsilon)
             metrics['recall'] = tp / (tp + fn + epsilon)
             metrics['f-measure'] = (2 * metrics['precision'] * metrics['recall']) / (metrics['precision'] + metrics['recall'] + epsilon)
@@ -103,10 +104,7 @@ if __name__ == '__main__':
     # resume run in wandb
     with wandb.init(resume='must') as run:
         metrics = evaluate(run.config, {'x':x, 'y':y}, model)
-        run.log({'validation_loss': metrics['validation_loss'],
-                 'precision': metrics['precision'],
-                 'recall': metrics['recall'],
-                 'f-measure': metrics['f-measure'], 
+        run.log({**metrics,
                  'epoch': args.epoch}) # report to wandb
         print(f'evaluation epoch={args.epoch} node logged to run: {run.id}')
 

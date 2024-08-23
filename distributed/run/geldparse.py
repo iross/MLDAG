@@ -198,7 +198,7 @@ def create_time_series(partitioned_jobs, spartition_idx, j, m, timeframe_len):
     # for each filtered job
     # create the job tensor j * m * e
     # new shape is (m, j*e)
-    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:50]):
+    for i, (job_info, cycles_idx, label) in enumerate(partitioned_jobs[:spartition_idx]):
 
         job_tensor = []
 
@@ -253,20 +253,6 @@ def main():
     except Exception as ex:
         print(f"An unexpected error occurred: {e}")
 
-    # get filtered jobs and write to json
-    """
-    try:
-        with open('global_list.json', 'r') as glf:
-            glf_load = json.load(glf)
-            global_list = glf_load['global_list']
-            spartition_idx = glf_load['spartition_idx']
-    except FileNotFoundError:
-        with open('global_list.json', 'w') as glf:
-            global_list, spartition_idx = partition_jobs(jobs)
-            glf_dict = {'global_list': global_list,
-                        'spartition_idx': spartition_idx}
-            json.dump(glf_dict, glf)
-    """
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_pathname = args.config
