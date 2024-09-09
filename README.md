@@ -11,15 +11,43 @@ The goal is to parse job event logs into tensors that incorporates temporal info
 
 The actual shape of the tensor is ```e * m * j``` 
  
- ```e```: the events that Condor records (https://htcondor.readthedocs.io/en/latest/codes-other-values/job-event-log-codes.html). 
+ ```e```: the events that Condor records [(official docs)](https://htcondor.readthedocs.io/en/latest/codes-other-values/job-event-log-codes.html). 
 
  ```m```: the number of time frames where the length of each frame in seconds is by ```timeframe_len``` in ```/distributed/config.yaml```.
 
  ```j```: number of jobs sampled in which the first job is the primary job and j-1 other jobs exists in the timeframe of the primary job.
 
- The e * m slices (historical records) are a one-hot encoding of the event logs respectively.
+The e * m slices (historical records) are a series of one-hot encoding of the event logs. Think of each historical records as a finite-state machine and its transitions across time. For the sake of an example, let's have five categorical events, so 0=job submitted, 1=input file transfer, 2=job execute, 3=job on hold, 4=ouput file transfer, 5=terminated, so e=6.
+The primary job has the sequence of events in its event log: 
+```
+                                                           0 (time=00:01:00)
+                                                           1 (time=00:03:00)
+                                                           2 (time=00:04:00)
+                                                           3 (time=00:05:00)
+                                                           4 (time=00:07:00)
+                                                           2 (time=00:10:00)
+                                                           5 (time=00:13:00)
+```
+Let m=14, timeframe_len=60, j=2. These means that the state of the job is checked every 60 seconds, with a maximum of 14 samples, and imputation is used to fill in the blanks. After parsing, the tensor of the primary job looks like:  
 
- All e, m, j, and timeframe_len are all configruable hyperparamters in ```/distributed/config.yaml```.
+                                                           | 0 | 1 | 2 | 3 | 4 | 5 |
+                                                           | - | - | - | - | - | - |
+                                                           | 1 | 0 | 0 | 0 | 0 | 0 |
+                                                           | 1 | 0 | 0 | 0 | 0 | 0 |
+                                                           | 0 | 1 | 0 | 0 | 0 | 0 |
+                                                           | 0 | 0 | 1 | 0 | 0 | 0 |
+                                                           | 0 | 0 | 0 | 1 | 0 | 0 |
+                                                           | 0 | 0 | 0 | 1 | 0 | 0 |
+                                                           | 0 | 0 | 0 | 0 | 1 | 0 |
+                                                           | 0 | 0 | 0 | 0 | 1 | 0 |
+                                                           | 0 | 0 | 0 | 0 | 1 | 0 |
+                                                           | 0 | 0 | 1 | 0 | 0 | 0 |
+                                                           | 0 | 0 | 1 | 0 | 0 | 0 |
+                                                           | 0 | 0 | 1 | 0 | 0 | 0 |
+                                                           | 0 | 0 | 0 | 0 | 0 | 1 |
+                                                           | 0 | 0 | 0 | 0 | 0 | 1 |
+
+This process is repeated for j-1 jobs. As mentioned, the first historical record is the job that had gone on hold.
 
 ### Creation
 Tensors are parsed from global event logs. In CHTC or the OSPool, gather the global event logs using ```condor_config_val EVENT_LOG``` to find the path
@@ -41,7 +69,7 @@ Do not touch ```sweep_id``` nor ```run_id``` as they are helper runtime variable
 
 See wandb documentation for more details.
 
-See ```preprocessing``` and ```training``` to define sweep parameters.
+See ```preprocessing``` and ```training``` in ```config.yaml``` to define sweep parameters.
 
 
 # Distributed Training
@@ -60,5 +88,10 @@ Configure the hyperparameters search space in ```/distributed/config.yaml```
 4) After the workflow is complete, ```distributed/cleanup.py``` will organize the output files
 5) Look for ```bestmodel.info``` file to see best performing model according to f-measure. If desired, it is possible to change the metric to evaluate for in ```distributed/config.yaml```
 
-
 Training has early stopping in which the run is terminated after a certain number of epochs in which the model performance does not improve. See ```earlystop_threshold``` in ```distributed/config.yaml```.
+
+### Modularity
+The LSTM neural network model is not unique to the workflow. To change the model architecture, visit ```distributed/run/model_init.py```, and change the class construction of the neural network to what is desired.
+
+# Attributions
+Thanks to Tim Cartwright's initial [job-event-log-to-csv](https://github.com/osg-htc/job-event-log-to-csv) script for the motivation behind converting text files into tensors. In addition, Igor Sfiligoi and his student Immanuel Bareket [(repo)](https://github.com/emanbareket/HTCondor_Immanuel) for the idea behind representing jobs as a finite-state machine, and this inspired our tensor design. 
