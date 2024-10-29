@@ -1,10 +1,10 @@
-runs: 100
-epochs: 20
+runs: 1
+epochs: 5
 earlystop_threshold: 5
 
 wandb:
   enable: True
-  api_key: 10fd308beb114f4db7cd37b13cc74e953bf48b68
+  api_key: 123
   entity: chtc-ospool-error-classification
   project: distributed-ml
   sweep:
