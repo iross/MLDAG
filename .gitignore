@@ -5,5 +5,4 @@ data/logs/
 pproc/logs
 
 EventLog*
-*.json
 *.h5
