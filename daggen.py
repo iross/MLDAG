@@ -87,7 +87,7 @@ def main(config):
 
                 {'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"' if SHUFFLE else ''}
 
-                environment = "WANDB_API_KEY=123"
+                {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
 
                 +is_resumable = true
 
