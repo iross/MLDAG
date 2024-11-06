@@ -1,41 +1,40 @@
+runs: 1
+epochs: 5
+earlystop_threshold: 5
+
 wandb:
   enable: True
-  api_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  api_key: 123
   entity: chtc-ospool-error-classification
-  project: pytorch-sweeps-demo
+  project: distributed-ml
   sweep:
-    name: hello world
+    name: Osiris
     method: random
     metric:
-      name: validate_loss
-      goal: minimize
-  sweep_preprocessing_runs: 50
-  sweep_training_runs: 50
-  
+      name: f-measure
+      goal: maximize
+  sweep_id: None
+  run_id: None
+
 preprocessing:
   parameters:
-    m: # number of timeframes in a job matrix
-      distribution: uniform
+    j: # number of jobs for context window
+      distribution: int_uniform
       min: 10
       max: 100
-    j: # number of jobs for context window
-      distribution: uniform
+    m: # number of timeframes in a job matrix
+      distribution: int_uniform
       min: 10
-      max: 100    
+      max: 100
     timeframe_len: # duration of a single timeframe in seconds
-      distribution: uniform
+      distribution: int_uniform
       min: 60
-      max: 300  
-  parameters_default: # used when wandb is disabled
-    m: 10
-    j: 10
-    timeframe_len: 60
+      max: 400
 
 training:
-  data_pathname: '../data/ospool-parsed65.json' # with respect to ml/train.py
   parameters:
-    lstm_layers: 
-      values: [1, 2, 3, 4, 5]
+    lstm_layers:
+      values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     hidden_size:
       values: [16, 32, 64, 128]
     learning_rate:
@@ -47,11 +46,3 @@ training:
       q: 8
       min: 32
       max: 256
-    epochs:
-      value: 25
-  parameters_default: # used when wandb is disabled
-    lstm_layers: 2
-    hidden_size: 50,
-    epochs: 25
-    batch_size: 256
-    learning_rate: 0.001

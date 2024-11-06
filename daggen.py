@@ -69,7 +69,6 @@ def main(config):
     
     # preproc.sub
     # TODO: read descriptions from templates and sub in values as needed
-    # TODO: resource-choosing variable
     # TODO: Use $(epoch) to pass in the max number of epochs 
     dag_txt += textwrap.dedent(f'''\
         SUBMIT-DESCRIPTION metl_pretrain.sub {{
@@ -94,7 +93,7 @@ def main(config):
 
                 executable = /bin/bash
                 transfer_executable = false
-                arguments = pretrain.sh
+                arguments = pretrain.sh $1
 
                 transfer_input_files = pretrain.sh
                 transfer_output_files = output
