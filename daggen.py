@@ -121,6 +121,7 @@ def main(config):
     num_shishkabob = config['runs']
     # TODO: This is set in the metl runtime options, so we'll  need to update that to pull it in from config or read it from the METL run config
     num_epoch = config['epochs']
+    epochs_per_job = config['epochs_per_job']
     
     jobs_txt = ''
     vars_txt = ''
@@ -132,7 +133,7 @@ def main(config):
     dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
     # Create resource permutations
-    permutations = get_permutations(get_resources(), num_shishkabob, num_epoch)
+    permutations = get_permutations(get_resources(), num_shishkabob, num_epoch/epochs_per_job)
 
     # The shishkebabs (permutations)
     for i in range(num_shishkabob): # for each shishkabob
@@ -155,14 +156,14 @@ def main(config):
         # TODO: train for a given epoch range, then exit. With evaluation sidecare + short-circuiting
         # TODO: use resource list to generate shuffles (via VARS->ResourceName)
 
-        for j in range(num_epoch): # for each epoch
+        for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
             jobs_txt += textwrap.dedent(f'''\
                     JOB {run_prefix}-train_epoch{j} metl_pretrain.sub
                     JOB {run_prefix}-evaluate_epoch{j} evaluate.sub''')
             vars_txt += textwrap.dedent(f'''\
-                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{j} ResourceName="{permutations[i][j]}"
-                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{j}" earlystop_marker_pathname="{run_prefix}.esm"''')
+                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" ResourceName="{permutations[i][j]}"
+                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" earlystop_marker_pathname="{run_prefix}.esm"''')
             
             # includes pre and post scripts for early stopping mechanism
             # TODO: why is earlystopdetector.py being called in both a pre and post?
