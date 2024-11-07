@@ -7,6 +7,7 @@ import htcondor
 import random
 import sys
 import yaml
+import uuid
 
 SHUFFLE=True
 
@@ -93,9 +94,13 @@ def main(config):
 
                 executable = /bin/bash
                 transfer_executable = false
-                arguments = pretrain.sh $1
+                arguments = finetune.sh $(epoch) $(run_uuid)
 
-                transfer_input_files = pretrain.sh
+                transfer_input_files = finetune.sh
+                if defined $(continue_from_checkpoint) then
+                then 
+                    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+                endif
                 transfer_output_files = output
                 should_transfer_files = YES
                 when_to_transfer_output = ON_EXIT_OR_EVICT
@@ -117,6 +122,7 @@ def main(config):
 
     sweep_config_name = 'sweep.yaml'
 
+    run_uuid = str(uuid.uuid4()).split("-")[0]
     # TODO: specify resources within config
     num_shishkabob = config['runs']
     # TODO: This is set in the metl runtime options, so we'll  need to update that to pull it in from config or read it from the METL run config
@@ -129,8 +135,8 @@ def main(config):
 
     # TODO: add flexibility in this structure?
     # Provisioning node
-    dag_txt += 'JOB sweep_init sweep_init.sub\n'
-    dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
+    # dag_txt += 'JOB sweep_init sweep_init.sub\n'
+    # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
     # Create resource permutations
     permutations = get_permutations(get_resources(), num_shishkabob, num_epoch/epochs_per_job)
@@ -162,8 +168,8 @@ def main(config):
                     JOB {run_prefix}-train_epoch{j} metl_pretrain.sub
                     JOB {run_prefix}-evaluate_epoch{j} evaluate.sub''')
             vars_txt += textwrap.dedent(f'''\
-                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" ResourceName="{permutations[i][j]}"
-                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" earlystop_marker_pathname="{run_prefix}.esm"''')
+                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" run_uuid="{run_uuid}" ResourceName="{permutations[i][j]}" {'continue_from_checkpoint="true"' if j > 0 else ""}
+                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" run_uuid="{run_uuid}" earlystop_marker_pathname="{run_prefix}.esm"''')
             
             # includes pre and post scripts for early stopping mechanism
             # TODO: why is earlystopdetector.py being called in both a pre and post?
