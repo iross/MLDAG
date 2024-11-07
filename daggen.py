@@ -169,15 +169,14 @@ def main(config):
             # TODO: why is earlystopdetector.py being called in both a pre and post?
             edges_txt += textwrap.dedent(f'''\
                     PARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-evaluate_epoch{j}
-                    SCRIPT PRE {run_prefix}-train_epoch{j} earlystopdetector.py {run_prefix}.esm
-                    SCRIPT POST {run_prefix}-train_epoch{j} earlystopdetector.py {run_prefix}.esm''')
+                    ''')
 
             # connect to successor train node
-            if j < num_epoch - 1:
+            if j < num_epoch/epoch - 1:
                 edges_txt += f'\nPARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-train_epoch{j + 1}'
 
             # create newlines (pretty view)
-            if j < num_epoch - 1:
+            if j < num_epoch/epoch - 1:
                 jobs_txt += '\n'
                 vars_txt += '\n'
                 edges_txt += '\n'
