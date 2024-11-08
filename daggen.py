@@ -71,7 +71,7 @@ def main(config):
     # preproc.sub
     # TODO: read descriptions from templates and sub in values as needed
     # TODO: Use $(epoch) to pass in the max number of epochs 
-    dag_txt += textwrap.dedent(f'''\
+    dag_txt += textwrap.dedent(f"""\
         SUBMIT-DESCRIPTION metl_pretrain.sub {{
                 universe = container
                 container_image = osdf:///ospool/ap40/data/ian.ross/metl.sif
@@ -97,8 +97,7 @@ def main(config):
                 arguments = finetune.sh $(epoch) $(run_uuid)
 
                 transfer_input_files = finetune.sh
-                if defined $(continue_from_checkpoint) then
-                then 
+                if defined continue_from_checkpoint 
                     transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
                 endif
                 transfer_output_files = output
@@ -118,7 +117,7 @@ def main(config):
                 arguments = "TODO: Evaluation"
                 queue
         }}
-    ''')
+    """)
 
     sweep_config_name = 'sweep.yaml'
 
