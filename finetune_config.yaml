@@ -1,0 +1,10 @@
+runs: 1
+epochs: 50
+epochs_per_job: 25
+earlystop_threshold: 5
+
+wandb:
+  enable: True
+  api_key: 0713980c153b1601f06370cb13f67b1182ff0221
+  entity: chtcml-org
+  project: distributed-metl-finetuning-tests
