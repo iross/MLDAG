@@ -6,3 +6,4 @@ pproc/logs
 
 EventLog*
 *.h5
+pipeline.dag
