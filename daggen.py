@@ -74,6 +74,44 @@ def main(config):
     dag_txt += textwrap.dedent(f"""\
         SUBMIT-DESCRIPTION metl_pretrain.sub {{
                 universe = container
+                container_image = osdf:///ospool/ap40/data/ian.ross/metl_w_unzip.sif
+
+                # request_disk should be at least 10x the size of the input files
+                # processing propose typically uses about 3.5 GB of CPU memory and 8GB of GPU memory
+                # add cpus=xx disk=yy memory=zz on the submit command line to override these defaults
+                request_disk = $(disk:15GB)
+                request_memory = $(memory:32GB)
+                request_cpus = $(cpus:4)
+                request_gpus = 1
+                gpus_minimum_capability = 7.5
+                gpus_minimum_memory = 8192
+
+                {'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"' if SHUFFLE else ''}
+
+                {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
+
+                +is_resumable = true
+
+                executable = /bin/bash
+                transfer_executable = false
+                arguments = pretrain.sh $(epoch) $(run_uuid)
+
+                transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/cleaned_data_test.zip
+                if defined continue_from_checkpoint 
+                    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+                endif
+                transfer_output_files = output
+                should_transfer_files = YES
+                when_to_transfer_output = ON_EXIT_OR_EVICT
+
+                output = $(CLUSTERID).out
+                error = $(CLUSTERID).err
+                log = metl.log
+
+                queue
+        }}
+        SUBMIT-DESCRIPTION metl_finetune.sub {{
+                universe = container
                 container_image = osdf:///ospool/ap40/data/ian.ross/metl.sif
 
                 # request_disk should be at least 10x the size of the input files
@@ -109,7 +147,7 @@ def main(config):
                 log = metl.log
 
                 queue
-        }}
+
         
         SUBMIT-DESCRIPTION evaluate.sub {{
                 universe = local
