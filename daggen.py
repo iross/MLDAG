@@ -9,7 +9,8 @@ import sys
 import yaml
 import uuid
 
-SHUFFLE=True
+SHUFFLE=False
+EVAL=False
 
 def get_resources() -> dict:
     """
@@ -74,12 +75,13 @@ def main(config):
     dag_txt += textwrap.dedent(f"""\
         SUBMIT-DESCRIPTION metl_pretrain.sub {{
                 universe = container
-                container_image = osdf:///ospool/ap40/data/ian.ross/metl_w_unzip.sif
+                container_image = file:///staging/iaross/metl_global.sif
+                # container_image = osdf:///ospool/ap40/data/ian.ross/metl_global.sif
 
                 # request_disk should be at least 10x the size of the input files
                 # processing propose typically uses about 3.5 GB of CPU memory and 8GB of GPU memory
                 # add cpus=xx disk=yy memory=zz on the submit command line to override these defaults
-                request_disk = $(disk:15GB)
+                request_disk = $(disk:40GB)
                 request_memory = $(memory:32GB)
                 request_cpus = $(cpus:4)
                 request_gpus = 1
@@ -96,7 +98,7 @@ def main(config):
                 transfer_executable = false
                 arguments = pretrain.sh $(epoch) $(run_uuid)
 
-                transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/cleaned_data_test.zip
+                transfer_input_files = pretrain.sh
                 if defined continue_from_checkpoint 
                     transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
                 endif
@@ -147,7 +149,7 @@ def main(config):
                 log = metl.log
 
                 queue
-
+        }}
         
         SUBMIT-DESCRIPTION evaluate.sub {{
                 universe = local
@@ -203,19 +205,21 @@ def main(config):
             input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
             jobs_txt += textwrap.dedent(f'''\
                     JOB {run_prefix}-train_epoch{j} metl_pretrain.sub
-                    JOB {run_prefix}-evaluate_epoch{j} evaluate.sub''')
+                    {'JOB {run_prefix}-evaluate_epoch{j} evaluate.sub' if EVAL else ''}''')
             vars_txt += textwrap.dedent(f'''\
                     VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" run_uuid="{run_uuid}" ResourceName="{permutations[i][j]}" {'continue_from_checkpoint="true"' if j > 0 else ""}
-                    VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" run_uuid="{run_uuid}" earlystop_marker_pathname="{run_prefix}.esm"''')
+                    {'VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" run_uuid="{run_uuid}" earlystop_marker_pathname="{run_prefix}.esm"' if EVAL else ''}''')
             
             # includes pre and post scripts for early stopping mechanism
             # TODO: why is earlystopdetector.py being called in both a pre and post?
-            edges_txt += textwrap.dedent(f'''\
-                    PARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-evaluate_epoch{j}
-                    ''')
+            if EVAL:
+                edges_txt += textwrap.dedent(f'''\
+                        PARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-evaluate_epoch{j}
+                        ''')
 
             # connect to successor train node
-            if j < num_epoch/epoch - 1:
+            if epoch < num_epoch:
+            # if j < num_epoch/epoch - 1:
                 edges_txt += f'\nPARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-train_epoch{j + 1}'
 
             # create newlines (pretty view)
