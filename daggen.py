@@ -98,7 +98,7 @@ def main(config):
                 transfer_executable = false
                 arguments = pretrain.sh $(epoch) $(run_uuid)
 
-                transfer_input_files = pretrain.sh
+                transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
                 if defined continue_from_checkpoint 
                     transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
                 endif
