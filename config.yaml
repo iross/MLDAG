@@ -1,10 +1,10 @@
 runs: 1
-epochs: 50
-epochs_per_job: 25
+epochs: 30
+epochs_per_job: 1
 earlystop_threshold: 5
 
 wandb:
   enable: True
   api_key: 123
   entity: chtc-ml
-  project: distributed-metl-finetuning-tests
+  project: metl-global-tests
