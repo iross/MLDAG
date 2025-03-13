@@ -1,9 +1,14 @@
 data/EventLog*
 data/gel_timestamp.txt
 data/logs/
+output/
+*.err
+*.out
 
 pproc/logs
+*log
 
 EventLog*
 *.h5
-pipeline.dag
+pipeline.dag*
+nodes.dag.status
