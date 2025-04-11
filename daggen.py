@@ -128,6 +128,7 @@ class EvaluationRun:
     def __init__(self):
         raise NotImplementedError("EvaluationRun is not implemented")
 
+# TODO: SUBMIT-DESCRIPTION for each job/resource combination of a TrainingRun, but with VARS to handle certain throughline variables
 
 # TODO : oof, what does the submit workflow really look like when we're using a
 # DAG? We need to specify annex name which might require `htcondor job create
@@ -136,13 +137,10 @@ class EvaluationRun:
 
 def main(config):
     dag_txt = ''
-    #
-    # submit descriptions
-    #
     
-    # preproc.sub
     # TODO: submit description should be handled via a Job class
     # TODO: Use $(epoch) to pass in the max number of epochs 
+    # TODO: Maybe a SUBMIT-DESCRIPTION for each resource?
     dag_txt += textwrap.dedent(f"""\
         SUBMIT-DESCRIPTION metl_pretrain.sub {{
                 universe = container
