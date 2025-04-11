@@ -1,2 +1,4 @@
 htcondor
+pydantic
 pyyaml
+ruff
