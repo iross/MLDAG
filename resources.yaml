@@ -1,0 +1,8 @@
+bridges-2:
+    username: "jdoe"
+    disk: 1000
+    memory: 1000
+    gpu_count: 1
+    gpu_memory: 1000
+    two_factor_auth: false
+    login_node: "bridges-2.sdsc.edu"

@@ -5,6 +5,7 @@ import os
 import textwrap
 import htcondor
 import random
+from pydantic import BaseModel
 import sys
 import yaml
 import uuid
@@ -12,6 +13,7 @@ import uuid
 SHUFFLE=False
 EVAL=False
 
+# TODO: this should return a list of Resource objects
 def get_resources() -> dict:
     """
     Usage: query the collector for a list of resources currently in the OSPool
@@ -37,8 +39,10 @@ def get_resources() -> dict:
             unique_resources[resource["GLIDEIN_ResourceName"]] = 1
 
     print(f"{len(unique_resources)} resources found.")
+    # TODO: these will need to be cast as Resource objects with some OSPool-specific defaults
     return unique_resources
 
+# TODO: This should return a list of TrainingRuns
 def get_permutations(resources: dict, permutations: int, sites_per_permutation: int) -> list:
     """
     Usage: generate a list of permutations of resources
@@ -63,6 +67,67 @@ def get_permutations(resources: dict, permutations: int, sites_per_permutation: 
             permutations_list.append(permutation)
     return permutations_list
 
+
+class Job:
+    submit_template: str
+
+    def get_submit_description(self, **template_vars) -> str:
+        """
+        Generate HTCondor submit description by filling in template variables.
+        
+        Args:
+            **template_vars: Key-value pairs to substitute in the template
+            
+        Returns:
+            Completed submit description string
+        """
+        return self.submit_template.format(**template_vars)
+
+# TODO: how to handle OSPool-specific defaults?
+class Resource(BaseModel):
+    name: str
+    username: str 
+    disk: int
+    memory: int
+    gpu_count: int
+    gpu_memory: int
+    two_factor_auth: bool
+    login_node: str
+
+def get_resource_names(yaml_path: str) -> list[str]:
+    with open(yaml_path, 'r') as f:
+        resource_defs = yaml.safe_load(f)
+        return list(resource_defs.keys())
+
+def get_resources_from_yaml(yaml_path: str) -> list[Resource]:
+    resource_names = get_resource_names(yaml_path)
+    return [get_resource_from_yaml(yaml_path, resource_name) for resource_name in resource_names]
+
+def get_resource_from_yaml(yaml_path: str, resource_name: str) -> Resource:
+    with open(yaml_path, 'r') as f:
+        resource_defs = yaml.safe_load(f)[resource_name]
+        resource_defs['name'] = resource_name
+        return Resource(**resource_defs)
+
+# A DAG is created from a spread of TrainingRuns, so this will need a get_subdag method
+class TrainingRun:
+    uuid: str
+    random_seed: int
+    epochs: int
+    epochs_per_job: int
+    jobs: list[Job]
+    resources: list[Resource]
+
+class EvaluationRun:
+    def __init__(self):
+        raise NotImplementedError("EvaluationRun is not implemented")
+
+
+# TODO : oof, what does the submit workflow really look like when we're using a
+# DAG? We need to specify annex name which might require `htcondor job create
+# --annex-name`... Can a DAG do this for us (in a way more elegant than the node
+# being a shell command)? Surely I can just set the annex name within the submit file?
+
 def main(config):
     dag_txt = ''
     #
@@ -70,7 +135,7 @@ def main(config):
     #
     
     # preproc.sub
-    # TODO: read descriptions from templates and sub in values as needed
+    # TODO: submit description should be handled via a Job class
     # TODO: Use $(epoch) to pass in the max number of epochs 
     dag_txt += textwrap.dedent(f"""\
         SUBMIT-DESCRIPTION metl_pretrain.sub {{
@@ -159,10 +224,9 @@ def main(config):
         }}
     """)
 
-    sweep_config_name = 'sweep.yaml'
-
+    # TODO: run_uuid (and to-be-implemented random seed) should be handled via a TrainingRun class
     run_uuid = str(uuid.uuid4()).split("-")[0]
-    # TODO: specify resources within config
+    # TODO: optionally specify resources within config
     num_shishkabob = config['runs']
     # TODO: This is set in the metl runtime options, so we'll  need to update that to pull it in from config or read it from the METL run config
     num_epoch = config['epochs']
