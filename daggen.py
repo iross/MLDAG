@@ -5,6 +5,7 @@ import os
 import textwrap
 import htcondor
 import random
+from enum import Enum
 from pydantic import BaseModel
 import sys
 import yaml
@@ -83,16 +84,21 @@ class Job:
         """
         return self.submit_template.format(**template_vars)
 
-# TODO: how to handle OSPool-specific defaults?
+# Creat an enum for resource types: OSPool or annex
+class ResourceType(Enum):
+    OSPOOL = 1
+    ANNEX = 2
+
 class Resource(BaseModel):
     name: str
     username: str 
-    disk: int
-    memory: int
-    gpu_count: int
-    gpu_memory: int
-    two_factor_auth: bool
-    login_node: str
+    disk: int = "5GB"
+    memory: int = "32GB"
+    gpu_count: int = 1
+    gpu_memory: int = 8192
+    two_factor_auth: bool = False
+    login_node: str = "login.ospool.osg-htc.org"
+    resource_type: ResourceType = ResourceType.OSPOOL
 
 def get_resource_names(yaml_path: str) -> list[str]:
     with open(yaml_path, 'r') as f:
