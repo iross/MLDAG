@@ -97,7 +97,7 @@ class Resource(BaseModel):
     gpu_count: int = 1
     gpu_memory: int = 8192
     two_factor_auth: bool = False
-    login_node: str = "login.ospool.osg-htc.org"
+    login_node: str 
     resource_type: ResourceType = ResourceType.OSPOOL
 
 def get_resource_names(yaml_path: str) -> list[str]:
@@ -128,28 +128,16 @@ class EvaluationRun:
     def __init__(self):
         raise NotImplementedError("EvaluationRun is not implemented")
 
-# TODO: SUBMIT-DESCRIPTION for each job/resource combination of a TrainingRun, but with VARS to handle certain throughline variables
 
-# TODO : oof, what does the submit workflow really look like when we're using a
-# DAG? We need to specify annex name which might require `htcondor job create
-# --annex-name`... Can a DAG do this for us (in a way more elegant than the node
-# being a shell command)? Surely I can just set the annex name within the submit file?
-
-def main(config):
-    dag_txt = ''
-    
-    # TODO: submit description should be handled via a Job class
-    # TODO: Use $(epoch) to pass in the max number of epochs 
-    # TODO: Maybe a SUBMIT-DESCRIPTION for each resource?
-    dag_txt += textwrap.dedent(f"""\
+def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
+    # TODO this should be built based as needed from the job and resource. Need to think about how much gets done via VARS vs templating -- most probably winds up in VARS
+    dag_txt = textwrap.dedent(f"""\
         SUBMIT-DESCRIPTION metl_pretrain.sub {{
                 universe = container
                 container_image = file:///staging/iaross/metl_global.sif
                 # container_image = osdf:///ospool/ap40/data/ian.ross/metl_global.sif
 
-                # request_disk should be at least 10x the size of the input files
-                # processing propose typically uses about 3.5 GB of CPU memory and 8GB of GPU memory
-                # add cpus=xx disk=yy memory=zz on the submit command line to override these defaults
+                # TODO: These are resource and job dependent
                 request_disk = $(disk:40GB)
                 request_memory = $(memory:32GB)
                 request_cpus = $(cpus:4)
@@ -157,7 +145,9 @@ def main(config):
                 gpus_minimum_capability = 7.5
                 gpus_minimum_memory = 8192
 
-                {'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"' if SHUFFLE else ''}
+                {'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"' if resource.resource_type == ResourceType.OSPOOL else ''}
+
+                # TODO: target an annex? Can I do that within a submit description? Looks like I might be able to -- https://github.com/htcondor/htcondor/blob/a2d2d2b11f47d318b29dca0ca65b49a6da058cad/src/condor_tools/htcondor_cli/job.py#L113
 
                 {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
 
@@ -227,6 +217,24 @@ def main(config):
                 queue
         }}
     """)
+    return dag_txt
+
+# TODO: SUBMIT-DESCRIPTION for each job/resource combination of a TrainingRun,
+# but with VARS to handle certain throughline variables? Or just stuff it all
+# into some VARS?  The latter actually seems nice.. then we just have to create
+# VARS lines for each job/resource combination. And we can do it "cleanly" by
+# adding if statements within theh submit description
+
+# TODO : oof, what does the submit workflow really look like when we're using a
+# DAG? We need to specify annex name which might require `htcondor job create
+# --annex-name`... Can a DAG do this for us (in a way more elegant than the node
+# being a shell command)? Surely I can just set the annex name within the submit file?
+
+def main(config):
+    dag_txt = ''
+    
+    # TODO: This will be job/resource dependent 
+    dag_txt += get_submit_description(None, None, config)
 
     # TODO: run_uuid (and to-be-implemented random seed) should be handled via a TrainingRun class
     run_uuid = str(uuid.uuid4()).split("-")[0]
