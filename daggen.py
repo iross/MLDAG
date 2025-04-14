@@ -15,7 +15,51 @@ import uuid
 SHUFFLE=False
 EVAL=False
 
-# TODO: this should return a list of Resource objects
+class ResourceType(Enum):
+    OSPOOL = 1
+    ANNEX = 2
+class Resource(BaseModel):
+    name: str
+    username: Optional[str] = None
+    disk: int = "5GB"
+    memory: int = "32GB"
+    cpu_count: int = 1
+    gpu_count: int = 1
+    gpu_memory: int = 8192
+    two_factor_auth: bool = False
+    login_node: Optional[str] = None
+    resource_type: ResourceType = ResourceType.OSPOOL
+class Job(BaseModel):
+    name: str # combination of epoch and type
+    submit: str
+    epoch: int
+    run_uuid: str
+    tr_id: int
+
+    def get_submit_description(self, **template_vars) -> str:
+        """
+        Generate HTCondor submit description by filling in template variables.
+        
+        Args:
+            **template_vars: Key-value pairs to substitute in the template
+            
+        Returns:
+            Completed submit description string
+        """
+        return self.submit_template.format(**template_vars)
+
+class TrainingRun(BaseModel):
+    run_uuid: Optional[str] = None
+    random_seed: int = random.randint(0, 1000000)
+    epochs: int
+    epochs_per_job: int
+    # jobs: list[Job]
+    resources: Optional[list[Resource]] = []
+
+    def __init__(self, **data) -> None:
+      super().__init__(**data)
+      self.run_uuid = str(uuid.uuid4()).split("-")[0]
+
 def get_resources() -> dict:
     """
     Usage: query the collector for a list of resources currently in the OSPool
@@ -44,8 +88,7 @@ def get_resources() -> dict:
     resources = [Resource(name=name, resource_type=ResourceType.OSPOOL) for name in unique_resources.keys()]
     return resources
 
-# TODO: This should return a list of TrainingRuns
-def get_permutations(resources: dict, permutations: int, sites_per_permutation: int) -> list:
+def get_permutations(resources: list[Resource], config) -> list:
     """
     Usage: generate a list of permutations of resources
     @param resources: dictionary whose keys are the names of all unique GLIDEIN_ResourceName s
@@ -54,56 +97,22 @@ def get_permutations(resources: dict, permutations: int, sites_per_permutation: 
     @return: list of lists of permutations of resources
     """
     permutations_list = []
-    if sites_per_permutation > len(resources):
+    if config['epochs']/config['epochs_per_job'] > len(resources):
         print("Requested number of sites is incompatible than available. No re-use of sites is allowed (yet) so this experiment cannot be run. Exiting.")
         sys.exit(1)
-    while len(permutations_list) < permutations:
-        print(len(permutations_list))
+    while len(permutations_list) < config['runs']:
+        print("Generating training run")
+        tr = TrainingRun(epochs=config['epochs'], epochs_per_job=config['epochs_per_job'])
         permutation = []
-        while len(permutation) < sites_per_permutation:
+        while len(permutation) < config['epochs']/config['epochs_per_job']:
+            print("...")
             resource = random.choice(resources)
             if resource not in permutation:
                 permutation.append(resource)
-        if permutation not in permutations_list:
-            permutations_list.append(permutation)
+        tr.resources += permutation
+        permutations_list.append(tr)
     return permutations_list
 
-
-class Job(BaseModel):
-    name: str # combination of epoch and type
-    submit: str
-    epoch: int
-    run_uuid: str
-    tr_id: int
-
-    def get_submit_description(self, **template_vars) -> str:
-        """
-        Generate HTCondor submit description by filling in template variables.
-        
-        Args:
-            **template_vars: Key-value pairs to substitute in the template
-            
-        Returns:
-            Completed submit description string
-        """
-        return self.submit_template.format(**template_vars)
-
-# Creat an enum for resource types: OSPool or annex
-class ResourceType(Enum):
-    OSPOOL = 1
-    ANNEX = 2
-
-class Resource(BaseModel):
-    name: str
-    username: Optional[str] = None
-    disk: int = "5GB"
-    memory: int = "32GB"
-    cpu_count: int = 1
-    gpu_count: int = 1
-    gpu_memory: int = 8192
-    two_factor_auth: bool = False
-    login_node: Optional[str] = None
-    resource_type: ResourceType = ResourceType.OSPOOL
 
 def get_resource_names(yaml_path: str) -> list[str]:
     with open(yaml_path, 'r') as f:
@@ -125,14 +134,6 @@ def get_vars(job: Job, resource: Resource, config: dict) -> str:
         VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
         {'VARS {job.eval_name} epoch="{job.epoch}" run_uuid="{job.training_run.run_uuid}" earlystop_marker_pathname="{job.training_run.run_prefix}.esm"' if EVAL else ''}""")
 
-# A DAG is created from a spread of TrainingRuns, so this will need a get_subdag method
-class TrainingRun:
-    uuid: str
-    random_seed: int
-    epochs: int
-    epochs_per_job: int
-    jobs: list[Job]
-    resources: list[Resource]
 
 class EvaluationRun:
     def __init__(self):
@@ -229,11 +230,6 @@ def get_initialization(run_prefix: str, sweep_config_name: str) -> tuple[str, st
 def main(config):
     dag_txt = ''
     
-
-    # TODO: run_uuid (and to-be-implemented random seed) should be handled via a TrainingRun class
-    run_uuid = str(uuid.uuid4()).split("-")[0]
-    # TODO: optionally specify resources within config
-    num_shishkabob = config['runs']
     # TODO: This is set in the metl runtime options, so we'll  need to update that to pull it in from config or read it from the METL run config
     num_epoch = config['epochs']
     epochs_per_job = config['epochs_per_job']
@@ -253,12 +249,12 @@ def main(config):
         # TODO: one for OSPool and one for each annex.
         dag_txt += get_submit_description(None, resource, config)
 
+
+
     # Create resource permutations
-    permutations = get_permutations(resources, num_shishkabob, num_epoch/epochs_per_job)
-    
+    permutations = get_permutations(resources, config)
     i = 0
     for tr in permutations: # for each shishkabob
-        run_uuid = str(uuid.uuid4()).split("-")[0]
         print(tr)
         print(i)
         # Initialize the run
@@ -266,11 +262,11 @@ def main(config):
         # dag_txt += get_initialization(run_prefix, sweep_config_name)
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
-            resource = tr[j]
+            resource = tr.resources[j]
             # input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
             job = Job(name=f'{run_prefix}-train_epoch{j}', 
                       submit=f"{resource.name}_pretrain.sub", epoch=epoch, 
-                      run_uuid=run_uuid, tr_id=j)
+                      run_uuid=tr.run_uuid, tr_id=j)
 
             jobs_txt += textwrap.dedent(f'''\
                     JOB {job.name} {job.submit}
