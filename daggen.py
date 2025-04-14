@@ -41,8 +41,8 @@ def get_resources() -> dict:
             unique_resources[resource["GLIDEIN_ResourceName"]] = 1
 
     print(f"{len(unique_resources)} resources found.")
-    # TODO: these will need to be cast as Resource objects with some OSPool-specific defaults
-    return unique_resources
+    resources = [Resource(name=name, resource_type=ResourceType.OSPOOL) for name in unique_resources.keys()]
+    return resources
 
 # TODO: This should return a list of TrainingRuns
 def get_permutations(resources: dict, permutations: int, sites_per_permutation: int) -> list:
@@ -53,16 +53,15 @@ def get_permutations(resources: dict, permutations: int, sites_per_permutation: 
     @param permutations: number of permutations to generate
     @return: list of lists of permutations of resources
     """
-    resource_list = list(resources.keys())
     permutations_list = []
-    if sites_per_permutation > len(resource_list):
+    if sites_per_permutation > len(resources):
         print("Requested number of sites is incompatible than available. No re-use of sites is allowed (yet) so this experiment cannot be run. Exiting.")
         sys.exit(1)
     while len(permutations_list) < permutations:
         print(len(permutations_list))
         permutation = []
         while len(permutation) < sites_per_permutation:
-            resource = random.choice(resource_list)
+            resource = random.choice(resources)
             if resource not in permutation:
                 permutation.append(resource)
         if permutation not in permutations_list:
@@ -121,6 +120,11 @@ def get_resource_from_yaml(yaml_path: str, resource_name: str) -> Resource:
         resource_defs['name'] = resource_name
         return Resource(**resource_defs)
 
+def get_vars(job: Job, resource: Resource, config: dict) -> str:
+    return textwrap.dedent(f"""\
+        VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
+        {'VARS {job.eval_name} epoch="{job.epoch}" run_uuid="{job.training_run.run_uuid}" earlystop_marker_pathname="{job.training_run.run_prefix}.esm"' if EVAL else ''}""")
+
 # A DAG is created from a spread of TrainingRuns, so this will need a get_subdag method
 class TrainingRun:
     uuid: str
@@ -138,22 +142,20 @@ class EvaluationRun:
 def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
     # TODO this should be built based as needed from the job and resource. Need to think about how much gets done via VARS vs templating -- most probably winds up in VARS
     dag_txt = textwrap.dedent(f"""\
-        SUBMIT-DESCRIPTION metl_pretrain.sub {{
+        SUBMIT-DESCRIPTION {resource.name}_pretrain.sub {{
                 universe = container
                 container_image = file:///staging/iaross/metl_global.sif
-                # container_image = osdf:///ospool/ap40/data/ian.ross/metl_global.sif
 
-                # TODO: These are resource and job dependent
-                request_disk = $(disk:40GB)
-                request_memory = $(memory:32GB)
-                request_cpus = $(cpus:4)
-                request_gpus = 1
+                request_disk = {resource.disk}
+                request_memory = {resource.memory}
+                request_cpus = {resource.cpu_count}
+                request_gpus = {resource.gpu_count}
+                gpus_minimum_memory = {resource.gpu_memory}
                 gpus_minimum_capability = 7.5
-                gpus_minimum_memory = 8192
 
-                {'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"' if resource.resource_type == ResourceType.OSPOOL else ''}
-
-                # TODO: target an annex? Can I do that within a submit description? Looks like I might be able to -- https://github.com/htcondor/htcondor/blob/a2d2d2b11f47d318b29dca0ca65b49a6da058cad/src/condor_tools/htcondor_cli/job.py#L113
+                {f'TARGET.GLIDEIN_ResourceName == "{resource.name}"' if resource.resource_type == ResourceType.OSPOOL else ''}
+                # TODO: annex name should be more flexible
+                {f'MY.TargetAnnexName == "{resource.name}_annex"' if resource.resource_type == ResourceType.ANNEX else ''}
 
                 {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
 
@@ -186,6 +188,33 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
     """)
     return dag_txt
 
+def get_initialization(run_prefix: str, sweep_config_name: str) -> tuple[str, str, str]:
+    """Get the initialization jobs, vars and edges for a training run
+    
+    Args:
+        run_prefix: Prefix for the run (e.g. 'run0')
+        sweep_config_name: Name of the sweep config file
+        
+    Returns:
+        Tuple of (jobs_txt, vars_txt, edges_txt) strings
+    """
+    jobs_txt = textwrap.dedent(f'''\
+            JOB {run_prefix}-run_init run_init.sub
+            JOB {run_prefix}-pproc pproc.sub
+            JOB {run_prefix}-model_init model_init.sub\n''')
+    
+    vars_txt = textwrap.dedent(f'''\
+            VARS {run_prefix}-run_init config_pathname="{sweep_config_name}" run_prefix="{run_prefix}" output_config_pathname="{run_prefix}-config.yaml"
+            VARS {run_prefix}-pproc config_pathname="{run_prefix}-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="{run_prefix}-ap2002.h5"
+            VARS {run_prefix}-model_init config_pathname="{run_prefix}-config.yaml" output_model_pathname="{run_prefix}-model_init.pt"\n''')
+    
+    edges_txt = textwrap.dedent(f'''\
+            PARENT sweep_init CHILD {run_prefix}-run_init
+            PARENT {run_prefix}-run_init CHILD {run_prefix}-pproc {run_prefix}-model_init
+            PARENT {run_prefix}-pproc {run_prefix}-model_init CHILD {run_prefix}-train_epoch0\n''')
+            
+    return "\n".join([jobs_txt, vars_txt, edges_txt])
+
 # TODO: SUBMIT-DESCRIPTION for each job/resource combination of a TrainingRun,
 # but with VARS to handle certain throughline variables? Or just stuff it all
 # into some VARS?  The latter actually seems nice.. then we just have to create
@@ -200,8 +229,6 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
 def main(config):
     dag_txt = ''
     
-    # TODO: This will be job/resource dependent 
-    dag_txt += get_submit_description(None, None, config)
 
     # TODO: run_uuid (and to-be-implemented random seed) should be handled via a TrainingRun class
     run_uuid = str(uuid.uuid4()).split("-")[0]
@@ -220,39 +247,36 @@ def main(config):
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    # Create resource permutations
-    permutations = get_permutations(get_resources(), num_shishkabob, num_epoch/epochs_per_job)
+    resources = get_resources()
 
-    # The shishkebabs (permutations)
-    for i in range(num_shishkabob): # for each shishkabob
+    for resource in resources:
+        # TODO: one for OSPool and one for each annex.
+        dag_txt += get_submit_description(None, resource, config)
+
+    # Create resource permutations
+    permutations = get_permutations(resources, num_shishkabob, num_epoch/epochs_per_job)
+    
+    i = 0
+    for tr in permutations: # for each shishkabob
+        run_uuid = str(uuid.uuid4()).split("-")[0]
+        print(tr)
         print(i)
         # Initialize the run
         run_prefix = f'run{i}'
-        # jobs_txt += textwrap.dedent(f'''\
-        #         JOB {run_prefix}-run_init run_init.sub
-        #         JOB {run_prefix}-pproc pproc.sub
-        #         JOB {run_prefix}-model_init model_init.sub\n''')
-        # vars_txt += textwrap.dedent(f'''\
-        #         VARS {run_prefix}-run_init config_pathname="{sweep_config_name}" run_prefix="{run_prefix}" output_config_pathname="{run_prefix}-config.yaml"
-        #         VARS {run_prefix}-pproc config_pathname="{run_prefix}-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="{run_prefix}-ap2002.h5"
-        #         VARS {run_prefix}-model_init config_pathname="{run_prefix}-config.yaml" output_model_pathname="{run_prefix}-model_init.pt"\n''')
-        # edges_txt += textwrap.dedent(f'''\
-        #         PARENT sweep_init CHILD {run_prefix}-run_init
-        #         PARENT {run_prefix}-run_init CHILD {run_prefix}-pproc {run_prefix}-model_init
-        #         PARENT {run_prefix}-pproc {run_prefix}-model_init CHILD {run_prefix}-train_epoch0\n''')
-
-        # TODO: train for a given epoch range, then exit. With evaluation sidecare + short-circuiting
-        # TODO: use resource list to generate shuffles (via VARS->ResourceName)
+        # dag_txt += get_initialization(run_prefix, sweep_config_name)
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
-            input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
+            resource = tr[j]
+            # input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
+            job = Job(name=f'{run_prefix}-train_epoch{j}', 
+                      submit=f"{resource.name}_pretrain.sub", epoch=epoch, 
+                      run_uuid=run_uuid, tr_id=j)
+
             jobs_txt += textwrap.dedent(f'''\
-                    JOB {run_prefix}-train_epoch{j} metl_pretrain.sub
-                    {'JOB {run_prefix}-evaluate_epoch{j} evaluate.sub' if EVAL else ''}''')
-            vars_txt += textwrap.dedent(f'''\
-                    VARS {run_prefix}-train_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" run_uuid="{run_uuid}" ResourceName="{permutations[i][j]}" {'continue_from_checkpoint="true"' if j > 0 else ""}
-                    {'VARS {run_prefix}-evaluate_epoch{j} config_pathname="{run_prefix}-config.yaml" epoch="{epoch}" run_uuid="{run_uuid}" earlystop_marker_pathname="{run_prefix}.esm"' if EVAL else ''}''')
-            
+                    JOB {job.name} {job.submit}
+                    {'JOB {job.eval_name} {job.eval_submit}' if EVAL else ''}''')
+            vars_txt += get_vars(job, resource, config)
+
             # includes pre and post scripts for early stopping mechanism
             # TODO: why is earlystopdetector.py being called in both a pre and post?
             if EVAL:
@@ -277,6 +301,7 @@ def main(config):
         jobs_txt = ''
         vars_txt = ''
         edges_txt = ''
+        i+=1
 
     # comparison node
     # TODO: define model comparison node
