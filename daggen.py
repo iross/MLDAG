@@ -7,6 +7,7 @@ import htcondor
 import random
 from enum import Enum
 from pydantic import BaseModel
+from typing import Optional
 import sys
 import yaml
 import uuid
@@ -69,8 +70,12 @@ def get_permutations(resources: dict, permutations: int, sites_per_permutation: 
     return permutations_list
 
 
-class Job:
-    submit_template: str
+class Job(BaseModel):
+    name: str # combination of epoch and type
+    submit: str
+    epoch: int
+    run_uuid: str
+    tr_id: int
 
     def get_submit_description(self, **template_vars) -> str:
         """
@@ -91,13 +96,14 @@ class ResourceType(Enum):
 
 class Resource(BaseModel):
     name: str
-    username: str 
+    username: Optional[str] = None
     disk: int = "5GB"
     memory: int = "32GB"
+    cpu_count: int = 1
     gpu_count: int = 1
     gpu_memory: int = 8192
     two_factor_auth: bool = False
-    login_node: str 
+    login_node: Optional[str] = None
     resource_type: ResourceType = ResourceType.OSPOOL
 
 def get_resource_names(yaml_path: str) -> list[str]:
