@@ -171,45 +171,6 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
 
                 queue
         }}
-        SUBMIT-DESCRIPTION metl_finetune.sub {{
-                universe = container
-                container_image = osdf:///ospool/ap40/data/ian.ross/metl.sif
-
-                # request_disk should be at least 10x the size of the input files
-                # processing propose typically uses about 3.5 GB of CPU memory and 8GB of GPU memory
-                # add cpus=xx disk=yy memory=zz on the submit command line to override these defaults
-                request_disk = $(disk:5GB)
-                request_memory = $(memory:6GB)
-                request_cpus = $(cpus:1)
-                request_gpus = 1
-                gpus_minimum_capability = 7.5
-                gpus_minimum_memory = 8192
-
-                {'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"' if SHUFFLE else ''}
-
-                {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
-
-                +is_resumable = true
-
-                executable = /bin/bash
-                transfer_executable = false
-                arguments = finetune.sh $(epoch) $(run_uuid)
-
-                transfer_input_files = finetune.sh
-                if defined continue_from_checkpoint 
-                    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
-                endif
-                transfer_output_files = output
-                should_transfer_files = YES
-                when_to_transfer_output = ON_EXIT_OR_EVICT
-
-                output = $(CLUSTERID).out
-                error = $(CLUSTERID).err
-                log = metl.log
-
-                queue
-        }}
-        
         SUBMIT-DESCRIPTION evaluate.sub {{
                 universe = local
                 executable = /bin/echo
