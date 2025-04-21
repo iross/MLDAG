@@ -2,8 +2,11 @@ import yaml
 import getpass
 from pathlib import Path
 import htcondor2 as htcondor
+import typer
+from typing_extensions import Annotated
 from Resource import Resource
-from htcondor_cli.annex import Create
+from htcondor_cli.annex import Create, Add
+from htcondor_cli.annex_create import annex_name_exists
 from htcondor_cli.cli import get_logger
 
 def get_resource_names(yaml_path: str) -> list[str]:
@@ -16,58 +19,43 @@ def get_resources_from_yaml(yaml_path: str) -> list[Resource]:
     return [get_resource_from_yaml(yaml_path, resource_name) for resource_name in resource_names]
 
 def get_resource_from_yaml(yaml_path: str, resource_name: str) -> Resource:
-    # annex_name
-    # queue_at_system
-    # lifetime
-    # allocation
-    # login_name
-    # gpus
-    # lifetime
-    # mem_mb
-    # cpus
     with open(yaml_path, 'r') as f:
         resource_defs = yaml.safe_load(f)[resource_name]
-        # resource_defs['name'] = resource_name
         resource_defs['queue_at_system'] = f"{resource_defs['queue']}@{resource_name}"
         return Resource(**resource_defs)
 
 # Batch name is batch_name=$(run_uuid)_$(request_gpus)g_$(request_cpus)c_$(request_memory)
 # Doesn't really matter for annex name, but jotting it down here...
 
-# Can probably grab from the annex CLI:
-# https://github.com/htcondor/htcondor/blob/a2d2d2b11f47d318b29dca0ca65b49a6da058cad/src/condor_tools/htcondor_cli/annex.py
+app = typer.Typer()
 
-
-# Create(**options)
-# with options defined at https://github.com/htcondor/htcondor/blob/a2d2d2b11f47d318b29dca0ca65b49a6da058cad/src/condor_tools/htcondor_cli/annex.py#L24
-# CLI arguments I usually use:
-# htcondor annex create expanse_global_2025-04-18_2 gpu-shared@expanse --project ddp468  \
-# --login-name iaross --gpus 2  --lifetime 172800 --mem_mb 128000 --cpus 2
-
-if __name__ == "__main__":
-    resource = get_resource_from_yaml("resources.yaml", "expanse")
+@app.command()
+def create_annex(annex_name: Annotated[str, typer.Argument(help="The name of the annex to create (or add resources to).")], 
+                 resource_name: Annotated[str, typer.Argument(help="The name of the remote site resource to add to the annex.")]):
+    """
+    Create or add to an HTCondor annex with the given name. Hooks directly into
+    the htcondor CLI backend, with locally-defined configuration possible via a
+    resources.yaml file.
+    """
+    resource = get_resource_from_yaml("resources.yaml", resource_name)
     tdict = dict(resource)
-
     _to_pop = []
     for key in tdict.keys():
         if key not in Create.options.keys():
             _to_pop.append(key)
-
     for key in _to_pop:
         tdict.pop(key)
 
-    tdict = tdict | {
-        # TODO: grab defaults from Create.options
-        "nodes": 1,
-        "owners": getpass.getuser(),
-        "collector" : htcondor.param.get("ANNEX_COLLECTOR", "htcondor-cm-hpcannex.osgdev.chtc.io"),
-        "token_file" : None,
-        "password_file": Path(htcondor.param.get("ANNEX_PASSWORD_FILE", "~/.condor/annex_password_file")),
-        "control_path": Path(htcondor.param.get("ANNEX_TMP_DIR", "~/.hpc-annex")),
-        "login_host": None,
-        "startd_noclaim_shutdown": 300,
-        "gpu_type": None,
-        "test": None
-    }
-    Create(get_logger(), annex_name="test", **tdict)
+    defaults = {}
+    for key in Create.options.keys():
+        if key not in tdict.keys():
+            if 'default' in Create.options[key].keys():
+                defaults[key] = Create.options[key]['default']
+    tdict = tdict | defaults
+    if annex_name_exists(annex_name):
+        Add(get_logger(), annex_name=annex_name, **tdict)
+    else:
+        Create(get_logger(), annex_name=annex_name, **tdict)
 
+if __name__ == "__main__":
+    app()
