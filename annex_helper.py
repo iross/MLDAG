@@ -24,6 +24,29 @@ def get_resource_from_yaml(yaml_path: str = "resources.yaml", resource_name: str
         resource_defs['queue_at_system'] = f"{resource_defs['queue']}@{resource_name}"
         return Resource(**resource_defs)
 
+def scan_for_requests(request_path: str = "./") -> list[str]:
+    # Scan the request_path directory for files with the .request extension.
+    # The filename is the desired annex name.
+    # The contents of the file contain the target resource name
+    requests = []
+    for file in os.listdir(request_path):
+        if file.endswith('.request'):
+            target_resource = open(file).read().strip()
+            if target_resource not in get_resource_names():
+                print(f"Resource {target_resource} not found in resources.yaml")
+                continue
+            requests.append((file.replace(".request", ""), target_resource))
+    return requests
+
+def create_from_requests(request_path: str = "./"):
+    reqs = scan_for_requests(request_path)
+    for request in reqs:
+        check = create_annex(request[0], request[1])
+        if check != 0:
+            print(f"Failed to create annex {request[0]}")
+        else:
+            os.remove(f"{request_path}/{request[0]}.request")
+
 # Batch name is batch_name=$(run_uuid)_$(request_gpus)g_$(request_cpus)c_$(request_memory)
 # Doesn't really matter for annex name, but jotting it down here...
 
@@ -53,9 +76,13 @@ def create_annex(annex_name: Annotated[str, typer.Argument(help="The name of the
                 defaults[key] = Create.options[key]['default']
     tdict = tdict | defaults
     if annex_name_exists(annex_name):
+        # TODO: We don't get any kind of success coming back from the class init 😢
+        print(f"Annex {annex_name} already exists. Adding resources to it.")
         Add(get_logger(), annex_name=annex_name, **tdict)
     else:
+        print(f"Creating new annex {annex_name}.")
         Create(get_logger(), annex_name=annex_name, **tdict)
+    return 0
 
 if __name__ == "__main__":
     app()
