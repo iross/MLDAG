@@ -7,28 +7,14 @@ import htcondor
 import random
 from enum import Enum
 from pydantic import BaseModel
-from typing import Optional
 import sys
 import yaml
 import uuid
-
+from annex_helper import get_resource_names, get_resources_from_yaml, get_resource_from_yaml
+from Resource import Resource, ResourceType
 SHUFFLE=False
 EVAL=False
 
-class ResourceType(Enum):
-    OSPOOL = 1
-    ANNEX = 2
-class Resource(BaseModel):
-    name: str
-    username: Optional[str] = None
-    disk: int = "5GB"
-    memory: int = "32GB"
-    cpu_count: int = 1
-    gpu_count: int = 1
-    gpu_memory: int = 8192
-    two_factor_auth: bool = False
-    login_node: Optional[str] = None
-    resource_type: ResourceType = ResourceType.OSPOOL
 class Job(BaseModel):
     name: str # combination of epoch and type
     submit: str
@@ -60,7 +46,7 @@ class TrainingRun(BaseModel):
       super().__init__(**data)
       self.run_uuid = str(uuid.uuid4()).split("-")[0]
 
-def get_resources() -> dict:
+def get_ospool_resources() -> dict:
     """
     Usage: query the collector for a list of resources currently in the OSPool
     @return: dictionary whose keys are the names of all unique GLIDEIN_ResourceName s
@@ -114,20 +100,6 @@ def get_permutations(resources: list[Resource], config) -> list:
     return permutations_list
 
 
-def get_resource_names(yaml_path: str) -> list[str]:
-    with open(yaml_path, 'r') as f:
-        resource_defs = yaml.safe_load(f)
-        return list(resource_defs.keys())
-
-def get_resources_from_yaml(yaml_path: str) -> list[Resource]:
-    resource_names = get_resource_names(yaml_path)
-    return [get_resource_from_yaml(yaml_path, resource_name) for resource_name in resource_names]
-
-def get_resource_from_yaml(yaml_path: str, resource_name: str) -> Resource:
-    with open(yaml_path, 'r') as f:
-        resource_defs = yaml.safe_load(f)[resource_name]
-        resource_defs['name'] = resource_name
-        return Resource(**resource_defs)
 
 def get_vars(job: Job, resource: Resource, config: dict) -> str:
     return textwrap.dedent(f"""\
@@ -243,7 +215,7 @@ def main(config):
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    resources = get_resources()
+    resources = get_ospool_resources()
 
     for resource in resources:
         # TODO: one for OSPool and one for each annex.
