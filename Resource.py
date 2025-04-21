@@ -14,10 +14,11 @@ class Resource(BaseModel):
     allocation: Optional[str] = None
     owners: Optional[list[str]] = None
     # disk: int = "5GB"
-    mem_mb: int = "32GB"
-    cpus: int = 1
+    mem_mb: int = None
+    cpus: int = None
     gpus: str = "1"
     lifetime: int = 172800
+    gpu_type: Optional[str] = None
     # gpu_memory: int = 8192
     two_factor_auth: bool = False
     login_node: Optional[str] = None
