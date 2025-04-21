@@ -12,3 +12,5 @@ EventLog*
 *.h5
 pipeline.dag*
 nodes.dag.status
+resources.yaml
+config.yaml
