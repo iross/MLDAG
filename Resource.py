@@ -12,7 +12,6 @@ class Resource(BaseModel):
     queue_at_system: Optional[str] = None
     login_name: Optional[str] = None
     allocation: Optional[str] = None
-    owners: Optional[list[str]] = None
     # disk: int = "5GB"
     mem_mb: int = None
     cpus: int = None
