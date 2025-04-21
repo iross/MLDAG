@@ -9,16 +9,16 @@ from htcondor_cli.annex import Create, Add
 from htcondor_cli.annex_create import annex_name_exists
 from htcondor_cli.cli import get_logger
 
-def get_resource_names(yaml_path: str) -> list[str]:
+def get_resource_names(yaml_path: str = "resources.yaml") -> list[str]:
     with open(yaml_path, 'r') as f:
         resource_defs = yaml.safe_load(f)
         return list(resource_defs.keys())
 
-def get_resources_from_yaml(yaml_path: str) -> list[Resource]:
+def get_resources_from_yaml(yaml_path: str = "resources.yaml") -> list[Resource]:
     resource_names = get_resource_names(yaml_path)
     return [get_resource_from_yaml(yaml_path, resource_name) for resource_name in resource_names]
 
-def get_resource_from_yaml(yaml_path: str, resource_name: str) -> Resource:
+def get_resource_from_yaml(yaml_path: str = "resources.yaml", resource_name: str = None) -> Resource:
     with open(yaml_path, 'r') as f:
         resource_defs = yaml.safe_load(f)[resource_name]
         resource_defs['queue_at_system'] = f"{resource_defs['queue']}@{resource_name}"
