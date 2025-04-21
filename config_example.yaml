@@ -1,0 +1,10 @@
+runs: 2
+epochs: 10
+epochs_per_job: 2
+earlystop_threshold: 5
+
+wandb:
+  enable: True
+  api_key: 123
+  entity: chtc-ml
+  project: metl-global-tests
