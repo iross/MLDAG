@@ -1,4 +1,7 @@
 import yaml
+import getpass
+from pathlib import Path
+import htcondor2 as htcondor
 from Resource import Resource
 from htcondor_cli.annex import Create
 from htcondor_cli.cli import get_logger
@@ -24,7 +27,7 @@ def get_resource_from_yaml(yaml_path: str, resource_name: str) -> Resource:
     # cpus
     with open(yaml_path, 'r') as f:
         resource_defs = yaml.safe_load(f)[resource_name]
-        resource_defs['name'] = resource_name
+        # resource_defs['name'] = resource_name
         resource_defs['queue_at_system'] = f"{resource_defs['queue']}@{resource_name}"
         return Resource(**resource_defs)
 
@@ -43,5 +46,28 @@ def get_resource_from_yaml(yaml_path: str, resource_name: str) -> Resource:
 
 if __name__ == "__main__":
     resource = get_resource_from_yaml("resources.yaml", "expanse")
-    Create(get_logger(), annex_name="test", **dict(resource))
+    tdict = dict(resource)
+
+    _to_pop = []
+    for key in tdict.keys():
+        if key not in Create.options.keys():
+            _to_pop.append(key)
+
+    for key in _to_pop:
+        tdict.pop(key)
+
+    tdict = tdict | {
+        # TODO: grab defaults from Create.options
+        "nodes": 1,
+        "owners": getpass.getuser(),
+        "collector" : htcondor.param.get("ANNEX_COLLECTOR", "htcondor-cm-hpcannex.osgdev.chtc.io"),
+        "token_file" : None,
+        "password_file": Path(htcondor.param.get("ANNEX_PASSWORD_FILE", "~/.condor/annex_password_file")),
+        "control_path": Path(htcondor.param.get("ANNEX_TMP_DIR", "~/.hpc-annex")),
+        "login_host": None,
+        "startd_noclaim_shutdown": 300,
+        "gpu_type": None,
+        "test": None
+    }
+    Create(get_logger(), annex_name="test", **tdict)
 
