@@ -138,9 +138,9 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
                 container_image = file:///staging/iaross/metl_global.sif
 
                 request_disk = {resource.disk}
-                request_memory = {resource.memory}
-                request_cpus = {resource.cpu_count}
-                request_gpus = {resource.gpu_count}
+                request_memory = {resource.mem_mb}
+                request_cpus = {resource.cpus}
+                request_gpus = {resource.gpus}
                 gpus_minimum_memory = {resource.gpu_memory}
                 gpus_minimum_capability = 7.5
 
