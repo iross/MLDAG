@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import argparse
-import os
+import typer
+from typing_extensions import Annotated
 import textwrap
 import htcondor
 import random
@@ -204,7 +204,10 @@ def get_initialization(run_prefix: str, sweep_config_name: str) -> tuple[str, st
 # --annex-name`... Can a DAG do this for us (in a way more elegant than the node
 # being a shell command)? Surely I can just set the annex name within the submit file?
 
-def main(config):
+app = typer.Typer()
+@app.command()
+def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")] = 'config.yaml'):
+    config = yaml.safe_load(open(config, 'r'))
     dag_txt = ''
     
     # TODO: This is set in the metl runtime options, so we'll  need to update that to pull it in from config or read it from the METL run config
@@ -300,13 +303,5 @@ def main(config):
         f.write(dag_txt)
     print('generated pipeline.dag')
 
-
 if __name__ == "__main__":
-    # TODO: add options to visualize?
-    # TODO: maybe flesh out some CLI options -- need to figure out what lives in config and what is pulled in at "submit" time
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    parser = argparse.ArgumentParser()
-    parser.add_argument('config', type=str)
-    args = parser.parse_args()
-    with open(args.config, 'r') as config:
-        main(yaml.safe_load(config))
+    app()

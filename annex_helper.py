@@ -41,11 +41,12 @@ def scan_for_requests(request_path: str = "./") -> list[str]:
 def create_from_requests(request_path: str = "./"):
     reqs = scan_for_requests(request_path)
     for request in reqs:
-        check = create_annex(request[0], request[1])
+        check = create(request[0], request[1])
         if check != 0:
             print(f"Failed to create annex {request[0]}")
         else:
             os.remove(f"{request_path}/{request[0]}.request")
+    return 0
 
 # Batch name is batch_name=$(run_uuid)_$(request_gpus)g_$(request_cpus)c_$(request_memory)
 # Doesn't really matter for annex name, but jotting it down here...
@@ -53,7 +54,24 @@ def create_from_requests(request_path: str = "./"):
 app = typer.Typer()
 
 @app.command()
-def create_annex(annex_name: Annotated[str, typer.Argument(help="The name of the annex to create (or add resources to).")], 
+def watch(
+    interval: Annotated[int, typer.Option(help="Interval in seconds between checks for new requests")] = 60
+):
+    """
+    Continuously monitor for new annex requests and create them.
+    Press Ctrl+C to stop monitoring.
+    """
+    while True:
+        try:
+            _to_create = create_from_requests()
+            time.sleep(interval)
+        except KeyboardInterrupt:
+            print("\nStopping request monitor")
+            break
+
+
+@app.command()
+def create(annex_name: Annotated[str, typer.Argument(help="The name of the annex to create (or add resources to).")], 
                  resource_name: Annotated[str, typer.Argument(help="The name of the remote site resource to add to the annex.")]):
     """
     Create or add to an HTCondor annex with the given name. Hooks directly into
