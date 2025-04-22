@@ -272,7 +272,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
                 jobs_txt += '\n'
                 vars_txt += '\n'
                 edges_txt += '\n'
-                script_txt += '\n' if script_txt is not '' else ''
+                script_txt += '\n' if script_txt !='' else ''
 
         dag_txt += '\n' + jobs_txt + '\n' + vars_txt + '\n' + edges_txt + '\n' + script_txt + '\n'
         
