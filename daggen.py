@@ -112,6 +112,19 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
         script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex_{job.run_uuid}'
     return script_txt
 
+def get_service() -> str:
+    service_txt = ''
+    service_txt += 'SERVICE annex_helper annex_helper.sub\n'
+    service_txt += textwrap.dedent("""\
+        SUBMIT-DESCRIPTION annex_helper.sub {{
+            universe = local
+            executable = /home/MLDAG/.venv/bin/python
+            arguments = annex_helper.py watch --interval 60
+            queue
+    }}
+    """)
+    return service_txt
+
 class EvaluationRun:
     def __init__(self):
         raise NotImplementedError("EvaluationRun is not implemented")
@@ -217,6 +230,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     jobs_txt = ''
     vars_txt = ''
     edges_txt = ''
+    script_txt = ''
 
     # TODO: add flexibility in this structure?
     # Provisioning node
@@ -240,6 +254,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         # Initialize the run
         run_prefix = f'run{i}'
         # dag_txt += get_initialization(run_prefix, sweep_config_name)
+        dag_txt += get_service() # TODO: move this to initialization?
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             resource = tr.resources[j]

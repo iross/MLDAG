@@ -40,6 +40,7 @@ def scan_for_requests(request_path: str = "./") -> list[str]:
 
 def create_from_requests(request_path: str = "./"):
     reqs = scan_for_requests(request_path)
+    print(f"Attempting to create {len(reqs)} annexes.")
     for request in reqs:
         check = create(request[0], request[1])
         if check != 0:
@@ -47,9 +48,6 @@ def create_from_requests(request_path: str = "./"):
         else:
             os.remove(f"{request_path}/{request[0]}.request")
     return 0
-
-# Batch name is batch_name=$(run_uuid)_$(request_gpus)g_$(request_cpus)c_$(request_memory)
-# Doesn't really matter for annex name, but jotting it down here...
 
 app = typer.Typer()
 
