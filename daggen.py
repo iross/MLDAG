@@ -5,12 +5,11 @@ import os
 import textwrap
 import htcondor
 import random
-from enum import Enum
 from pydantic import BaseModel
+from typing import Optional
 import sys
 import yaml
 import uuid
-from annex_helper import get_resource_names, get_resources_from_yaml, get_resource_from_yaml
 from Resource import Resource, ResourceType
 SHUFFLE=False
 EVAL=False

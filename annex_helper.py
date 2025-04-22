@@ -1,8 +1,6 @@
 import os
 import yaml
-import getpass
-from pathlib import Path
-import htcondor2 as htcondor
+import time
 import typer
 from typing_extensions import Annotated
 from Resource import Resource
@@ -29,6 +27,7 @@ def scan_for_requests(request_path: str = "./") -> list[str]:
     # Scan the request_path directory for files with the .request extension.
     # The filename is the desired annex name.
     # The contents of the file contain the target resource name
+    # Return a list of tuples, where the first element is the annex name and the second element is the target resource name
     requests = []
     for file in os.listdir(request_path):
         if file.endswith('.request'):
