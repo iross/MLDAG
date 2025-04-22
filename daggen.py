@@ -105,6 +105,12 @@ def get_vars(job: Job, resource: Resource, config: dict) -> str:
         VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
         {'VARS {job.eval_name} epoch="{job.epoch}" run_uuid="{job.training_run.run_uuid}" earlystop_marker_pathname="{job.training_run.run_prefix}.esm"' if EVAL else ''}""")
 
+def get_script(job: Job, resource: Resource, config: dict) -> str:
+    # TODO: any other pre-  or post-scripts? Seems resource and job specific..
+    script_txt = ''
+    if resource.resource_type == ResourceType.ANNEX:
+        script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex_{job.run_uuid}'
+    return script_txt
 
 class EvaluationRun:
     def __init__(self):
@@ -244,6 +250,8 @@ def main(config):
                     {'JOB {job.eval_name} {job.eval_submit}' if EVAL else ''}''')
             vars_txt += get_vars(job, resource, config)
 
+            script_txt += get_script(job, resource, config)
+
             # includes pre and post scripts for early stopping mechanism
             # TODO: why is earlystopdetector.py being called in both a pre and post?
             if EVAL:
@@ -261,13 +269,15 @@ def main(config):
                 jobs_txt += '\n'
                 vars_txt += '\n'
                 edges_txt += '\n'
+                script_txt += '\n' if script_txt is not '' else ''
 
-        dag_txt += '\n' + jobs_txt + '\n' + vars_txt + '\n' + edges_txt + '\n'        
+        dag_txt += '\n' + jobs_txt + '\n' + vars_txt + '\n' + edges_txt + '\n' + script_txt + '\n'
         
         # flush out each shishkabob
         jobs_txt = ''
         vars_txt = ''
         edges_txt = ''
+        script_txt = ''
         i+=1
 
     # comparison node
