@@ -10,7 +10,7 @@ from typing import Optional
 import sys
 import yaml
 import uuid
-from Resource import Resource, ResourceType
+from Resource import Resource, ResourceType, get_resources_from_yaml
 SHUFFLE=False
 EVAL=False
 
@@ -239,11 +239,14 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
     resources = get_ospool_resources()
 
+    # Grab the resources from resources.yaml
+    resources = get_resources_from_yaml()
+
     for resource in resources:
         # TODO: one for OSPool and one for each annex.
         dag_txt += get_submit_description(None, resource, config)
 
-
+    dag_txt += get_service() 
 
     # Create resource permutations
     permutations = get_permutations(resources, config)
@@ -254,7 +257,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         # Initialize the run
         run_prefix = f'run{i}'
         # dag_txt += get_initialization(run_prefix, sweep_config_name)
-        dag_txt += get_service() # TODO: move this to initialization?
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             resource = tr.resources[j]
@@ -307,8 +309,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # Cleanup
     # TODO: Any cleanup needed
     # dag_txt += f'SCRIPT POST getbestmodel cleanup.py {sweep_config_name}\n' 
-
-
 
     # misc directives
     dag_txt += '\nRETRY ALL_NODES 3\n'
