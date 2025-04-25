@@ -37,4 +37,6 @@ def get_resource_from_yaml(yaml_path: str = "resources.yaml", resource_name: str
     with open(yaml_path, 'r') as f:
         resource_defs = yaml.safe_load(f)[resource_name]
         resource_defs['queue_at_system'] = f"{resource_defs['queue']}@{resource_name}"
+        resource_defs['name'] = resource_name
+        resource_defs['resource_type'] = ResourceType.ANNEX
         return Resource(**resource_defs)
