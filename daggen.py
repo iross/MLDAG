@@ -83,23 +83,25 @@ def get_permutations(resources: list[Resource], config) -> list:
     """
     permutations_list = []
     if config['epochs']/config['epochs_per_job'] > len(resources):
-        print("Requested number of sites is incompatible than available. No re-use of sites is allowed (yet) so this experiment cannot be run. Exiting.")
-        sys.exit(1)
+        print("WARNING: Requested number of sites is less than available sites. Sites will be reused.")
+        # sys.exit(1)
     while len(permutations_list) < config['runs']:
         print("Generating training run")
         tr = TrainingRun(epochs=config['epochs'], epochs_per_job=config['epochs_per_job'])
         permutation = []
+        random.shuffle(resources)
         while len(permutation) < config['epochs']/config['epochs_per_job']:
-            print("...")
-            resource = random.choice(resources)
-            if resource not in permutation:
+            # make sure that each resource appears once before any are repeated
+            if len(permutation) < len(resources):
+                permutation.append(resources[len(permutation)])
+            else:
+                resource = random.choice(resources)
                 permutation.append(resource)
         tr.resources += permutation
         permutations_list.append(tr)
     return permutations_list
 
-
-
+# TODO: make the vars more flexible. (e.g. for hyperparameter sweeps)
 def get_vars(job: Job, resource: Resource, config: dict) -> str:
     return textwrap.dedent(f"""\
         VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
@@ -237,7 +239,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    resources = get_ospool_resources()
+    # resources = get_ospool_resources()
 
     # Grab the resources from resources.yaml
     resources = get_resources_from_yaml()
