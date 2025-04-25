@@ -136,7 +136,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
     dag_txt = textwrap.dedent(f"""\
         SUBMIT-DESCRIPTION {resource.name}_pretrain.sub {{
                 universe = container
-                container_image = file:///staging/iaross/metl_global.sif
+                container_image = osdf:///ospool/ap40/data/ian.ross/metl_global.sif 
 
                 request_disk = {resource.disk}
                 request_memory = {resource.mem_mb}
@@ -152,6 +152,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
                 {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
 
                 +is_resumable = true
+                +JobDurationCategory = "Long" # change to Medium if runtime is <20 hours. This particular pipeline is a hair over, so I need Long.
 
                 executable = /bin/bash
                 transfer_executable = false
@@ -165,8 +166,10 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
                 should_transfer_files = YES
                 when_to_transfer_output = ON_EXIT_OR_EVICT
 
-                output = $(CLUSTERID).out
-                error = $(CLUSTERID).err
+                output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+                error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+                stream_output = true
+                stream_error = true
                 log = metl.log
 
                 queue
