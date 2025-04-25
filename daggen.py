@@ -111,19 +111,18 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
     # TODO: any other pre-  or post-scripts? Seems resource and job specific..
     script_txt = ''
     if resource.resource_type == ResourceType.ANNEX:
-        script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex_{job.run_uuid}'
+        script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex_{job.run_uuid}\n'
     return script_txt
 
 def get_service() -> str:
-    service_txt = ''
-    service_txt += 'SERVICE annex_helper annex_helper.sub\n'
-    service_txt += textwrap.dedent("""\
-        SUBMIT-DESCRIPTION annex_helper.sub {{
-            universe = local
-            executable = /home/MLDAG/.venv/bin/python
-            arguments = annex_helper.py watch --interval 60
-            queue
-    }}
+    service_txt = textwrap.dedent("""\
+    SUBMIT-DESCRIPTION annex_helper.sub {
+        universe = local
+        executable = /home/ian.ross/MLDAG/.venv/bin/python
+        arguments = annex_helper.py watch --interval 60
+        queue
+    }
+    SERVICE annex_helper annex_helper.sub
     """)
     return service_txt
 
@@ -148,7 +147,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
 
                 {f'TARGET.GLIDEIN_ResourceName == "{resource.name}"' if resource.resource_type == ResourceType.OSPOOL else ''}
                 # TODO: annex name should be more flexible
-                {f'MY.TargetAnnexName == "{resource.name}_annex"' if resource.resource_type == ResourceType.ANNEX else ''}
+                {f'MY.TargetAnnexName = "{resource.name}_annex_$(run_uuid)"' if resource.resource_type == ResourceType.ANNEX else ''}
 
                 {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
 
@@ -248,7 +247,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         # TODO: one for OSPool and one for each annex.
         dag_txt += get_submit_description(None, resource, config)
 
-    dag_txt += get_service() 
+    dag_txt += textwrap.dedent(get_service()) 
 
     # Create resource permutations
     permutations = get_permutations(resources, config)
