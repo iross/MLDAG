@@ -10,7 +10,7 @@ import yaml
 from Resource import Resource, ResourceType, get_resources_from_yaml
 from TrainingRun import TrainingRun
 from Experiment import Experiment, read_from_config
-SHUFFLE=False
+
 EVAL=False
 
 class Job(BaseModel):
@@ -93,8 +93,6 @@ class EvaluationRun:
 
 
 def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment) -> str:
-    # TODO this should be built based as needed from the job and resource. Need to think about how much gets done via VARS vs templating -- most probably winds up in VARS
-    print(experiment.submit_template)
     inner_txt = experiment.submit_template.format(resource = resource)
 
     # Hacky. Fix this.
@@ -115,44 +113,6 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     dag_txt += "}\n"
     return dag_txt
 
-def get_initialization(run_prefix: str, sweep_config_name: str) -> tuple[str, str, str]:
-    """Get the initialization jobs, vars and edges for a training run
-    
-    Args:
-        run_prefix: Prefix for the run (e.g. 'run0')
-        sweep_config_name: Name of the sweep config file
-        
-    Returns:
-        Tuple of (jobs_txt, vars_txt, edges_txt) strings
-    """
-    jobs_txt = textwrap.dedent(f'''\
-            JOB {run_prefix}-run_init run_init.sub
-            JOB {run_prefix}-pproc pproc.sub
-            JOB {run_prefix}-model_init model_init.sub\n''')
-    
-    vars_txt = textwrap.dedent(f'''\
-            VARS {run_prefix}-run_init config_pathname="{sweep_config_name}" run_prefix="{run_prefix}" output_config_pathname="{run_prefix}-config.yaml"
-            VARS {run_prefix}-pproc config_pathname="{run_prefix}-config.yaml" geld_pathname="ap2002_geld.json" output_tensor_pathname="{run_prefix}-ap2002.h5"
-            VARS {run_prefix}-model_init config_pathname="{run_prefix}-config.yaml" output_model_pathname="{run_prefix}-model_init.pt"\n''')
-    
-    edges_txt = textwrap.dedent(f'''\
-            PARENT sweep_init CHILD {run_prefix}-run_init
-            PARENT {run_prefix}-run_init CHILD {run_prefix}-pproc {run_prefix}-model_init
-            PARENT {run_prefix}-pproc {run_prefix}-model_init CHILD {run_prefix}-train_epoch0\n''')
-            
-    return "\n".join([jobs_txt, vars_txt, edges_txt])
-
-# TODO: SUBMIT-DESCRIPTION for each job/resource combination of a TrainingRun,
-# but with VARS to handle certain throughline variables? Or just stuff it all
-# into some VARS?  The latter actually seems nice.. then we just have to create
-# VARS lines for each job/resource combination. And we can do it "cleanly" by
-# adding if statements within theh submit description
-
-# TODO : oof, what does the submit workflow really look like when we're using a
-# DAG? We need to specify annex name which might require `htcondor job create
-# --annex-name`... Can a DAG do this for us (in a way more elegant than the node
-# being a shell command)? Surely I can just set the annex name within the submit file?
-
 app = typer.Typer()
 @app.command()
 def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")] = 'config.yaml'):
@@ -168,7 +128,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     edges_txt = ''
     script_txt = ''
 
-    # TODO: add flexibility in this structure?
     # Provisioning node
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
@@ -184,19 +143,13 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # TODO: explode vars here as well? How to couple the TrainingRun and Resource permutations? Unless we just stuff resources as a VAR
 
     for resource in resources:
-        # TODO: one for OSPool and one for each annex.
-        # TODO: get submit description based on Experiment.submit_template, with
-        # values coming from TrainingRun and Resource instances per job.
         dag_txt += get_submit_description(None, resource, config, experiment)
 
 
     i = 0
     for tr in experiment.training_runs: # for each shishkabob
-        print(tr)
-        print(i)
         # Initialize the run
         run_prefix = f'run{i}'
-        # dag_txt += get_initialization(run_prefix, sweep_config_name)
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             resource = tr.resources[j]
@@ -224,14 +177,8 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
             # if j < num_epoch/epoch - 1:
                 edges_txt += f'\nPARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-train_epoch{j + 1}'
 
-            # create newlines (pretty view)
-            if j < num_epoch/epoch - 1:
-                jobs_txt += '\n'
-                vars_txt += '\n'
-                edges_txt += '\n'
-                script_txt += '\n' if script_txt !='' else ''
 
-        dag_txt += '\n' + jobs_txt + '\n' + vars_txt + '\n' + edges_txt + '\n' + script_txt + '\n'
+        dag_txt += jobs_txt + vars_txt + edges_txt + script_txt + '\n'
         
         # flush out each shishkabob
         jobs_txt = ''
@@ -239,16 +186,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         edges_txt = ''
         script_txt = ''
         i+=1
-
-    # comparison node
-    # TODO: define model comparison node
-#     dag_txt += 'FINAL getbestmodel getbestmodel.sub\n'
-#     dag_txt += 'VARS getbestmodel config_pathname="sweep.yaml"\n'
-#     dag_txt += 'SCRIPT PRE getbestmodel prefinal.py sweep.yaml final_input_dir\n'
-
-    # Cleanup
-    # TODO: Any cleanup needed
-    # dag_txt += f'SCRIPT POST getbestmodel cleanup.py {sweep_config_name}\n' 
 
     # misc directives
     dag_txt += '\nRETRY ALL_NODES 3\n'
