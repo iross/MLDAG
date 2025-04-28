@@ -61,33 +61,6 @@ def get_ospool_resources() -> dict:
     resources = [Resource(name=name, resource_type=ResourceType.OSPOOL) for name in unique_resources.keys()]
     return resources
 
-def get_permutations(resources: list[Resource], config) -> list:
-    """
-    Usage: generate a list of permutations of resources
-    @param resources: dictionary whose keys are the names of all unique GLIDEIN_ResourceName s
-                      currently visible in the OSPool
-    @param permutations: number of permutations to generate
-    @return: list of lists of permutations of resources
-    """
-    permutations_list = []
-    if config['epochs']/config['epochs_per_job'] > len(resources):
-        print("WARNING: Requested number of sites is less than available sites. Sites will be reused.")
-        # sys.exit(1)
-    while len(permutations_list) < config['runs']:
-        print("Generating training run")
-        tr = TrainingRun(epochs=config['epochs'], epochs_per_job=config['epochs_per_job'])
-        permutation = []
-        random.shuffle(resources)
-        while len(permutation) < config['epochs']/config['epochs_per_job']:
-            # make sure that each resource appears once before any are repeated
-            if len(permutation) < len(resources):
-                permutation.append(resources[len(permutation)])
-            else:
-                resource = random.choice(resources)
-                permutation.append(resource)
-        tr.resources += permutation
-        permutations_list.append(tr)
-    return permutations_list
 
 # TODO: make the vars more flexible. (e.g. for hyperparameter sweeps)
 def get_vars(job: Job, resource: Resource, config: dict) -> str:
@@ -119,56 +92,27 @@ class EvaluationRun:
         raise NotImplementedError("EvaluationRun is not implemented")
 
 
-def get_submit_description(job: Job, resource: Resource, config: dict) -> str:
+def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment) -> str:
     # TODO this should be built based as needed from the job and resource. Need to think about how much gets done via VARS vs templating -- most probably winds up in VARS
-    dag_txt = textwrap.dedent(f"""\
-        SUBMIT-DESCRIPTION {resource.name}_pretrain.sub {{
-                universe = container
-                container_image = osdf:///ospool/ap40/data/ian.ross/metl_global.sif 
+    print(experiment.submit_template)
+    inner_txt = experiment.submit_template.format(resource = resource)
 
-                request_disk = {resource.disk}
-                request_memory = {resource.mem_mb}
-                request_cpus = {resource.cpus}
-                request_gpus = {resource.gpus}
-                gpus_minimum_memory = {resource.gpu_memory}
-                gpus_minimum_capability = 7.5
+    # Hacky. Fix this.
+    if "queue" in inner_txt and inner_txt.strip().endswith("queue"):
+        inner_txt = inner_txt.strip().rstrip("queue")
+    if resource.resource_type == ResourceType.OSPOOL:
+        inner_txt += f'TARGET.GLIDEIN_ResourceName == "{resource.name}"\n'
+    elif resource.resource_type == ResourceType.ANNEX:
+        inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex_$(run_uuid)"\n'
+    if "wandb" in config:
+        inner_txt += f'environment = "WANDB_API_KEY={config["wandb"]["api_key"]}"\n'
+    inner_txt += 'queue\n'
 
-                {f'TARGET.GLIDEIN_ResourceName == "{resource.name}"' if resource.resource_type == ResourceType.OSPOOL else ''}
-                # TODO: annex name should be more flexible
-                {f'MY.TargetAnnexName = "{resource.name}_annex_$(run_uuid)"' if resource.resource_type == ResourceType.ANNEX else ''}
+    inner_txt = textwrap.indent(inner_txt, "\t")
 
-                {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
-
-                +is_resumable = true
-                +JobDurationCategory = "Long" # change to Medium if runtime is <20 hours. This particular pipeline is a hair over, so I need Long.
-
-                executable = /bin/bash
-                transfer_executable = false
-                arguments = pretrain.sh $(epoch) $(run_uuid)
-
-                transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
-                if defined continue_from_checkpoint 
-                    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
-                endif
-                transfer_output_files = output
-                should_transfer_files = YES
-                when_to_transfer_output = ON_EXIT_OR_EVICT
-
-                output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
-                error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
-                stream_output = true
-                stream_error = true
-                log = metl.log
-
-                queue
-        }}
-        SUBMIT-DESCRIPTION evaluate.sub {{
-                universe = local
-                executable = /bin/echo
-                arguments = "TODO: Evaluation"
-                queue
-        }}
-    """)
+    dag_txt = f"SUBMIT-DESCRIPTION {resource.name}_pretrain.sub {{"
+    dag_txt += f"\n{inner_txt}"
+    dag_txt += "}\n"
     return dag_txt
 
 def get_initialization(run_prefix: str, sweep_config_name: str) -> tuple[str, str, str]:
@@ -213,11 +157,11 @@ app = typer.Typer()
 @app.command()
 def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")] = 'config.yaml'):
     config = yaml.safe_load(open(config, 'r'))
+    experiment = read_from_config("Experiment.yaml")
     dag_txt = ''
     
-    # TODO: This is set in the metl runtime options, so we'll  need to update that to pull it in from config or read it from the METL run config
-    num_epoch = config['epochs']
-    epochs_per_job = config['epochs_per_job']
+    num_epoch = experiment.vars['epochs']
+    epochs_per_job = experiment.vars['epochs_per_job']
     
     jobs_txt = ''
     vars_txt = ''
@@ -229,21 +173,25 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    # resources = get_ospool_resources()
+    dag_txt += textwrap.dedent(get_service()) 
 
     # Grab the resources from resources.yaml
+    # resources = get_ospool_resources()
     resources = get_resources_from_yaml()
+    # Create resource permutations
+    experiment._add_resource_permutations(resources)
+    # experiment._add_var_permutations()
+    # TODO: explode vars here as well? How to couple the TrainingRun and Resource permutations? Unless we just stuff resources as a VAR
 
     for resource in resources:
         # TODO: one for OSPool and one for each annex.
-        dag_txt += get_submit_description(None, resource, config)
+        # TODO: get submit description based on Experiment.submit_template, with
+        # values coming from TrainingRun and Resource instances per job.
+        dag_txt += get_submit_description(None, resource, config, experiment)
 
-    dag_txt += textwrap.dedent(get_service()) 
 
-    # Create resource permutations
-    permutations = get_permutations(resources, config)
     i = 0
-    for tr in permutations: # for each shishkabob
+    for tr in experiment.training_runs: # for each shishkabob
         print(tr)
         print(i)
         # Initialize the run
