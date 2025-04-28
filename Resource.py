@@ -8,7 +8,7 @@ class ResourceType(Enum):
     ANNEX = 2
 
 class Resource(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = "default"
     # annex_name: Optional[str] = None
     queue_at_system: Optional[str] = None
     login_name: Optional[str] = None
