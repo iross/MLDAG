@@ -5,12 +5,12 @@ import uuid
 from Resource import Resource
 
 class TrainingRun(BaseModel):
-    # TODO: stuff these in vars?
     resources: Optional[list[Resource]] = []
     run_uuid: Optional[str] = None
     random_seed: Optional[int] = None
     epochs: int
     epochs_per_job: int
+    vars: Optional[dict] = {}
 
     def __init__(self, **data) -> None:
       super().__init__(**data)
