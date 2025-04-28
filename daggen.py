@@ -201,9 +201,10 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     dag_txt += '\nRETRY ALL_NODES 3\n'
     dag_txt += 'NODE_STATUS_FILE nodes.dag.status 30\n'
 
-    with open('pipeline.dag', 'w') as f:
+    ename = experiment.name.replace(' ', '_').lower()
+    with open(f'{ename}.dag', 'w') as f:
         f.write(dag_txt)
-    print('generated pipeline.dag')
+    print(f'generated {ename}.dag')
 
 if __name__ == "__main__":
     app()
