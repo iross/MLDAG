@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import yaml
 from Resource import Resource, ResourceType, get_resources_from_yaml
 from TrainingRun import TrainingRun
+from Experiment import Experiment, read_from_config
 SHUFFLE=False
 EVAL=False
 
