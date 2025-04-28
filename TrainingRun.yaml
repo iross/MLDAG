@@ -1,0 +1,71 @@
+# TODO The template is currently a bit weird -- there's a mix of DAG VARS
+# ($(varname)) and things filled in at write time ({resource.name})
+# The externalities won't work as currently written, but are here as a placeholder.
+# Is this a place where t-strings can help?? It's such new hotness that I don't
+# know that it's a good requirement.
+# Conceptually the current separation makes sense, since some are dependent on
+# externalities like the target resource, but it needs cleaner definitions.
+submit_template: |
+       SUBMIT-DESCRIPTION {resource.name}_pretrain.sub {
+                universe = container
+                container_image = osdf:///ospool/ap40/data/ian.ross/metl_global.sif 
+
+                request_disk = {resource.disk}
+                request_memory = {resource.mem_mb}
+                request_cpus = {resource.cpus}
+                request_gpus = {resource.gpus}
+                gpus_minimum_memory = {resource.gpu_memory}
+                gpus_minimum_capability = 7.5
+
+                {f'TARGET.GLIDEIN_ResourceName == "{resource.name}"' if resource.resource_type == ResourceType.OSPOOL else ''}
+                # TODO: annex name should be more flexible
+                {f'MY.TargetAnnexName = "{resource.name}_annex_$(run_uuid)"' if resource.resource_type == ResourceType.ANNEX else ''}
+
+                {'environment = "WANDB_API_KEY='+str(config["wandb"]["api_key"])+'"' if "wandb" in config else ''}
+
+                +is_resumable = true
+                +JobDurationCategory = "Long"
+
+                executable = /bin/bash
+                transfer_executable = false
+                arguments = pretrain.sh $(epoch) $(run_uuid)
+
+                transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+                if defined continue_from_checkpoint 
+                    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+                endif
+                transfer_output_files = output
+                should_transfer_files = YES
+                when_to_transfer_output = ON_EXIT_OR_EVICT
+
+                output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+                error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+                stream_output = true
+                stream_error = true
+                log = metl.log
+
+                queue
+        }
+vars:
+    epochs: 
+      value: 30
+      type: value
+      description: "Number of epochs to train for"
+    epochs_per_job: 
+      value: 1
+      type: value
+      description: "Number of epochs to train in each job"
+    run_uuid:
+      value: str(uuid.uuid4()).split("-")[0]
+      type: function
+      description: "UUID for the run"
+    run_number:
+      stop: 2
+      type: range
+      description: "Number of runs to generate"
+    test:
+      start: 0
+      stop: 10
+      step: 1
+      type: range
+      description: "Test variable"

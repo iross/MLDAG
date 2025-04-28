@@ -6,11 +6,9 @@ import textwrap
 import htcondor
 import random
 from pydantic import BaseModel
-from typing import Optional
-import sys
 import yaml
-import uuid
 from Resource import Resource, ResourceType, get_resources_from_yaml
+from TrainingRun import TrainingRun
 SHUFFLE=False
 EVAL=False
 
@@ -33,17 +31,6 @@ class Job(BaseModel):
         """
         return self.submit_template.format(**template_vars)
 
-class TrainingRun(BaseModel):
-    run_uuid: Optional[str] = None
-    random_seed: int = random.randint(0, 1000000)
-    epochs: int
-    epochs_per_job: int
-    # jobs: list[Job]
-    resources: Optional[list[Resource]] = []
-
-    def __init__(self, **data) -> None:
-      super().__init__(**data)
-      self.run_uuid = str(uuid.uuid4()).split("-")[0]
 
 def get_ospool_resources() -> dict:
     """
