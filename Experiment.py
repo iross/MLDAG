@@ -18,11 +18,10 @@ def read_from_config(config: str = "Experiment.yaml") -> None:
     for key, value in config["vars"].items():
         if key in _experiment_attrs:
             config[key] = value['value']
-        # TODO: parse special types of config options and resolve them within vars attribute
         if value['type'] == 'value':
             config['vars'][key] = value['value']
         elif value['type'] == 'function':
-            config['vars'][key] = "TODO"
+            raise NotImplementedError("Function type not implemented") #TODO: implement
         elif value['type'] == 'range':
             config['vars'][key] = list(range(value['start'] if 'start' in value else 0, value['stop'], value['step'] if 'step' in value else 1))
 
@@ -40,17 +39,15 @@ class Experiment(BaseModel):
         """ 
         Get all the combinations of the vars dictionary and return a list of dict holding the values for each combination.
         """
-        # TODO: probably shouldn't be a method on the TrainingRun class -- makes more sense to _generate_ TrainingRun instances
         var_names = list(self.vars.keys())
         value_lists = [self.vars[var] if isinstance(self.vars[var], list) else [self.vars[var]] for var in var_names]
-        
+
         # Use itertools.product to generate all combinations
         from itertools import product
         for values in product(*value_lists):
             # Create dict mapping var names to values for this combination
             var_dict = dict(zip(var_names, values))
-            print(var_dict)
-            self.training_runs.append(TrainingRun(**var_dict))
+            self.training_runs.append(TrainingRun(**{"resources": [Resource(name="default")], "epochs": var_dict['epochs'], "epochs_per_job": var_dict['epochs_per_job'], "vars": var_dict}))
 
     def _add_resource_permutations(self, resources: list[Resource]) -> list[TrainingRun]:
         """
