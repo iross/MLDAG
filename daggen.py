@@ -62,11 +62,12 @@ def get_ospool_resources() -> dict:
     return resources
 
 
-# TODO: make the vars more flexible. (e.g. for hyperparameter sweeps)
-def get_vars(job: Job, resource: Resource, config: dict) -> str:
+def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
+    # {'VARS {job.eval_name} epoch="{job.epoch}" run_uuid="{job.training_run.run_uuid}" earlystop_marker_pathname="{job.training_run.run_prefix}.esm"' if EVAL else ''}
     return textwrap.dedent(f"""\
         VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
-        {'VARS {job.eval_name} epoch="{job.epoch}" run_uuid="{job.training_run.run_uuid}" earlystop_marker_pathname="{job.training_run.run_prefix}.esm"' if EVAL else ''}""")
+        VARS {job.name} {" ".join([f'{key}="{str(value)}"' for key, value in training_run.vars.items()])}
+        """)
 
 def get_script(job: Job, resource: Resource, config: dict) -> str:
     # TODO: any other pre-  or post-scripts? Seems resource and job specific..
@@ -134,17 +135,27 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
     dag_txt += textwrap.dedent(get_service()) 
 
-    # Grab the resources from resources.yaml
+    # Grab the resources, if targeting is desired 
     # resources = get_ospool_resources()
-    resources = get_resources_from_yaml()
-    # Create resource permutations
-    experiment._add_resource_permutations(resources)
-    # experiment._add_var_permutations()
-    # TODO: explode vars here as well? How to couple the TrainingRun and Resource permutations? Unless we just stuff resources as a VAR
+    # resources = get_resources_from_yaml()
+
+    # Create experiment permutations and expansion
+    # TODO: It doesn't really make sense to do both resource and var expansions,
+    # but should be mulled over a bit
+    experiment._add_var_permutations()
+    # experiment._add_resource_permutations(resources)
+
+    # Create job descriptions for each resource.
+    resources = []
+    resource_names = set()
+    for tr in experiment.training_runs:
+        for resource in tr.resources:
+            if resource.name in resource_names: continue
+            resources.append(resource)
+            resource_names.add(resource.name)
 
     for resource in resources:
         dag_txt += get_submit_description(None, resource, config, experiment)
-
 
     i = 0
     for tr in experiment.training_runs: # for each shishkabob
@@ -152,7 +163,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         run_prefix = f'run{i}'
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
-            resource = tr.resources[j]
+            resource = tr.resources[j] if tr.resources else Resource(name="default")
             # input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
             job = Job(name=f'{run_prefix}-train_epoch{j}', 
                       submit=f"{resource.name}_pretrain.sub", epoch=epoch, 
@@ -161,7 +172,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
             jobs_txt += textwrap.dedent(f'''\
                     JOB {job.name} {job.submit}
                     {'JOB {job.eval_name} {job.eval_submit}' if EVAL else ''}''')
-            vars_txt += get_vars(job, resource, config)
+            vars_txt += get_vars(job, resource, tr)
 
             script_txt += get_script(job, resource, config)
 
