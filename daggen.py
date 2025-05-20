@@ -64,10 +64,14 @@ def get_ospool_resources() -> dict:
 
 def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
     # {'VARS {job.eval_name} epoch="{job.epoch}" run_uuid="{job.training_run.run_uuid}" earlystop_marker_pathname="{job.training_run.run_prefix}.esm"' if EVAL else ''}
-    return textwrap.dedent(f"""\
+    vars_txt = textwrap.dedent(f"""\
         VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
+        """)
+    if len(training_run.vars.items()) > 0:
+        vars_txt += textwrap.dedent(f"""\
         VARS {job.name} {" ".join([f'{key}="{str(value)}"' for key, value in training_run.vars.items()])}
         """)
+    return vars_txt
 
 def get_script(job: Job, resource: Resource, config: dict) -> str:
     script_txt = ''
