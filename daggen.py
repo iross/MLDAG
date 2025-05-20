@@ -192,7 +192,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
                 edges_txt += f'\nPARENT {run_prefix}-train_epoch{j} CHILD {run_prefix}-train_epoch{j + 1}'
 
 
-        dag_txt += jobs_txt + vars_txt + edges_txt + script_txt + '\n'
+        dag_txt += jobs_txt + '\n' + vars_txt  + '\n' + edges_txt  + '\n' + script_txt + '\n'
         
         # flush out each shishkabob
         jobs_txt = ''
