@@ -165,6 +165,9 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         # Initialize the run
         run_prefix = f'run{i}'
 
+        if not os.path.exists(tr.run_uuid):
+            os.makedirs(tr.run_uuid)
+
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             resource = tr.resources[j] if tr.resources else Resource(name="default")
             # input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
