@@ -76,7 +76,7 @@ def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
 def get_script(job: Job, resource: Resource, config: dict) -> str:
     script_txt = ''
     if resource.resource_type == ResourceType.ANNEX:
-        script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex_{job.run_uuid}\n'
+        script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex\n'
     return script_txt
 
 def get_service() -> str:
