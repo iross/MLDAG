@@ -1,5 +1,6 @@
 import os
 import time
+import htcondor2 as htcondor
 import typer
 from typing_extensions import Annotated
 from Resource import get_resource_names, get_resource_from_yaml
@@ -76,6 +77,16 @@ def create(annex_name: Annotated[str, typer.Argument(help="The name of the annex
                 defaults[key] = Create.options[key]['default']
     tdict = tdict | defaults
     if annex_name_exists(annex_name):
+        schedd = htcondor.Schedd()
+        constraint = f'hpc_annex_name == "{annex_name}"'
+        annex_jobs = schedd.query(
+            constraint,
+            opts=htcondor.QueryOpts.DefaultMyJobsOnly,
+            projection=['ClusterID', 'ProcID'],
+        )
+        if len(annex_jobs) >= 5:
+            print(f"{len(annex_jobs)} annex requests already exist for {annex_name}. Aborting.")
+            return 1
         # TODO: We don't get any kind of success coming back from the class init 😢
         print(f"Annex {annex_name} already exists. Adding resources to it.")
         Add(get_logger(), annex_name=annex_name, **tdict)
