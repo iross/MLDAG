@@ -1,0 +1,12 @@
+resource:
+    queue: "queue_name"
+    allocation: "project_name"
+    login_name: "user_name"
+    cpus: 1
+    mem_mb: 64000
+    gpus: 1
+    lifetime: 43200
+    two_factor_auth: false
+
+    # unused?
+    login_node: "site_login_node.net"

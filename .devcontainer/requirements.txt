@@ -1,0 +1,4 @@
+htcondor
+pydantic
+pyyaml
+ruff

@@ -1,9 +1,18 @@
+__pycache__/
 data/EventLog*
 data/gel_timestamp.txt
 data/logs/
+output/
+*.err
+*.out
 
 pproc/logs
+*log
 
 EventLog*
-*.json
 *.h5
+pipeline.dag*
+nodes.dag.status
+resources.yaml
+config.yaml
+*baseline.dag
