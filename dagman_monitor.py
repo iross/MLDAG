@@ -862,7 +862,7 @@ class DAGStatusMonitor:
         - FAILED jobs
         
         Args:
-            verbose: Include HTCondor job IDs if True
+            verbose: Currently unused, kept for API compatibility
             exclude_helper: Exclude annex_helper jobs if True
             show_all: Show all jobs including planned but unsubmitted ones if True
             
@@ -879,8 +879,7 @@ class DAGStatusMonitor:
         table.add_column("Run", justify="right", style="cyan", no_wrap=True)
         table.add_column("Epoch", justify="right", style="green")
         table.add_column("Run UUID", style="blue", max_width=8)
-        if verbose:
-            table.add_column("HTCondor Job ID", justify="right", style="dim white", max_width=12)
+        table.add_column("HTCondor Job ID", justify="right", style="dim white", max_width=12)
         table.add_column("Targeted Resource", style="yellow", max_width=15)
         table.add_column("Duration", style="white")
         table.add_column("Status", style="magenta")
@@ -958,27 +957,24 @@ class DAGStatusMonitor:
             }
             status_style = status_colors.get(job.status.value, job.status.value)
             
+            # Show cluster ID if available, otherwise show "N/A" for completed jobs
+            if job.cluster_id:
+                cluster_display = str(job.cluster_id)
+            elif job.status == JobStatus.COMPLETED:
+                cluster_display = "N/A"
+            else:
+                cluster_display = ""
+            
             # Prepare row data
             row_data = [
                 display_run,
                 str(job.epoch) if job.epoch else "",
                 job.run_uuid[:8] if job.run_uuid else "",
-            ]
-            
-            if verbose:
-                # Show cluster ID if available, otherwise show "N/A" for completed jobs
-                if job.cluster_id:
-                    row_data.append(str(job.cluster_id))
-                elif job.status == JobStatus.COMPLETED:
-                    row_data.append("N/A")
-                else:
-                    row_data.append("")
-            
-            row_data.extend([
+                cluster_display,
                 job.resource_name or "",
                 duration,
                 status_style
-            ])
+            ]
             
             table.add_row(*row_data)
         
