@@ -7,6 +7,7 @@ This module provides real-time monitoring of HTCondor DAGMan workflows,
 parsing log files to track training job progress across distributed compute resources.
 """
 
+import csv
 import json
 import re
 import time
@@ -1230,6 +1231,88 @@ class DAGStatusMonitor:
         
         return table
     
+    def export_to_csv(self, output_file: str, show_all: bool = False) -> None:
+        """Export job status data to CSV file.
+        
+        Args:
+            output_file: Path to output CSV file
+            show_all: Show all jobs including planned but unsubmitted ones
+        """
+        # Get currently queued cluster IDs from HTCondor
+        queued_cluster_ids = self.get_queued_cluster_ids()
+        
+        # Filter jobs: exclude helper jobs and optionally filter to active jobs only
+        filtered_jobs = []
+        for job in self.jobs.values():
+            if job.name == "annex_helper":
+                continue
+            if not self._matches_run_filter(job):
+                continue
+            if show_all or self.should_show_job(job, queued_cluster_ids):
+                filtered_jobs.append(job)
+        
+        # Sort jobs
+        sorted_jobs = sorted(filtered_jobs, key=lambda x: self.natural_sort_key(x.name))
+        
+        # Write to CSV
+        try:
+            with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = [
+                    'Job Name', 'Run Number', 'Epoch', 'Run UUID', 'HTCondor Cluster ID', 
+                    'Targeted Resource', 'Status', 'Submit Time', 'Start Time', 'End Time', 
+                    'Duration (seconds)', 'Duration (human)'
+                ]
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                for job in sorted_jobs:
+                    # Extract run number from job name
+                    run_match = re.match(r'run(\d+)-train_epoch(\d+)', job.name)
+                    run_number = run_match.group(1) if run_match else ""
+                    
+                    # Calculate duration
+                    duration_seconds = ""
+                    duration_human = ""
+                    if job.start_time and job.end_time:
+                        duration_delta = job.end_time - job.start_time
+                        duration_seconds = str(int(duration_delta.total_seconds()))
+                        duration_human = str(duration_delta).split('.')[0]
+                    elif job.start_time:
+                        duration_delta = datetime.now() - job.start_time
+                        duration_seconds = str(int(duration_delta.total_seconds()))
+                        duration_human = str(duration_delta).split('.')[0]
+                    
+                    # Format timestamps
+                    submit_time_str = job.submit_time.isoformat() if job.submit_time else ""
+                    start_time_str = job.start_time.isoformat() if job.start_time else ""
+                    end_time_str = job.end_time.isoformat() if job.end_time else ""
+                    
+                    # Map resource names: keep major resources, others become "ospool"
+                    major_resources = {"expanse", "bridges2", "delta", "anvil"}
+                    resource_name = job.resource_name or ""
+                    if resource_name and resource_name.lower() not in major_resources:
+                        resource_name = "ospool"
+                    
+                    writer.writerow({
+                        'Job Name': job.name,
+                        'Run Number': run_number,
+                        'Epoch': job.epoch if job.epoch is not None else "",
+                        'Run UUID': job.run_uuid or "",
+                        'HTCondor Cluster ID': job.cluster_id if job.cluster_id is not None else "",
+                        'Targeted Resource': resource_name,
+                        'Status': job.status.value,
+                        'Submit Time': submit_time_str,
+                        'Start Time': start_time_str,
+                        'End Time': end_time_str,
+                        'Duration (seconds)': duration_seconds,
+                        'Duration (human)': duration_human
+                    })
+                    
+            self.console.print(f"[green]CSV data exported to {output_file}[/green]")
+            
+        except IOError as e:
+            self.console.print(f"[red]Error writing CSV file {output_file}: {e}[/red]")
+    
     def monitor_once(self, verbose: bool = False, show_all: bool = False, show_progress: bool = False) -> None:
         """Single monitoring cycle - process logs and update status.
         
@@ -1345,6 +1428,8 @@ def main() -> None:
     parser.add_argument("--filter-runs", type=str, metavar="RUNS",
                        help="Filter to specific training runs (comma-separated list of run numbers or UUIDs). "
                             "Examples: --filter-runs 1,3,5 or --filter-runs abc123,def456 or --filter-runs 1,abc123")
+    parser.add_argument("--csv-output", action="store_true",
+                       help="Export job status data to CSV file with timestamp and exit")
     
     args = parser.parse_args()
     
@@ -1360,6 +1445,18 @@ def main() -> None:
     
     if args.debug_timing:
         monitor.debug_timing_info()
+        return
+    
+    if args.csv_output:
+        # Create progress directory if it doesn't exist
+        progress_dir = Path("./progress")
+        progress_dir.mkdir(exist_ok=True)
+        
+        # Generate timestamp-based filename in progress directory
+        dag_basename = Path(args.dag_file).stem
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_filename = progress_dir / f"{dag_basename}_{timestamp}.csv"
+        monitor.export_to_csv(str(csv_filename), show_all=args.show_all)
         return
     
     if args.once or not args.live:
