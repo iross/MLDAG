@@ -23,6 +23,40 @@ from rich.live import Live
 from rich.columns import Columns
 
 
+# Constants
+HTCONDOR_EVENT_CODES = {
+    'JOB_SUBMITTED': '000',
+    'JOB_EXECUTING': '001', 
+    'JOB_TERMINATED': '005',
+    'JOB_HELD': '012',
+    'JOB_RELEASED': '013',
+    'TRANSFER_INPUT': '040'
+}
+
+TIMESTAMP_FORMATS = {
+    'MODERN': '%Y-%m-%d %H:%M:%S',
+    'LEGACY': '%m/%d/%y %H:%M:%S'
+}
+
+DAG_FILE_PATTERNS = {
+    'JOB_LINE': r'JOB\s+(run\d+-train_epoch\d+)\s+',
+    'VARS_LINE': r'VARS\s+(run\d+-train_epoch\d+)\s+.*?epoch="(\d+)".*?run_uuid="([^"]+)"',
+    'JOB_NAME': r'run(\d+)-train_epoch(\d+)',
+    'VARS_EXTRACTION': r'VARS\s+{job_name}\s+(.+)'
+}
+
+DISPLAY_CONFIG = {
+    'MAX_UUID_WIDTH': 8,
+    'MAX_RESOURCE_WIDTH': 15,
+    'MAX_CLUSTER_WIDTH': 12,
+    'PROGRESS_BAR_WIDTH': 20,
+    'RESCUE_RETRY_PREFIX': 'RETRY ',
+    'RESCUE_DONE_PREFIX': 'DONE ',
+    'DEFAULT_REFRESH_INTERVAL': 60.0,
+    'DEFAULT_TIMEOUT': 10
+}
+
+
 class JobStatus(Enum):
     """Status enumeration for DAG jobs."""
     UNKNOWN = "UNKNOWN"
@@ -99,57 +133,35 @@ class DAGManLogParser:
     
     def __init__(self) -> None:
         """Initialize the log parser with regex patterns for different log formats."""
-        # Updated patterns for modern log format (YYYY-MM-DD HH:MM:SS)
+        # Flexible timestamp pattern that matches both formats
+        modern_ts = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
+        legacy_ts = r'\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}'
+        timestamp_pattern = f'({modern_ts}|{legacy_ts})'
+        
+        # Event patterns using flexible timestamp
         self.patterns = {
             'job_submitted': re.compile(
-                r'^000 \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) Job submitted from host:'
+                rf'^000 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job submitted from host:'
             ),
             'job_executing': re.compile(
-                r'^001 \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) Job executing on host:'
+                rf'^001 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job executing on host:'
             ),
             'job_terminated': re.compile(
-                r'^005 \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) Job terminated\.'
+                rf'^005 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job terminated\.'
             ),
             'job_held': re.compile(
-                r'^012 \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) Job was held\.'
+                rf'^012 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job was held\.'
             ),
             'job_released': re.compile(
-                r'^013 \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) Job was released\.'
+                rf'^013 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job was released\.'
             ),
             'transfer_input_started': re.compile(
-                r'^040 \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) Started transferring input files'
+                rf'^040 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Started transferring input files'
             ),
             'transfer_input_finished': re.compile(
-                r'^040 \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) Finished transferring input files'
+                rf'^040 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Finished transferring input files'
             ),
-            'dag_node': re.compile(
-                r'^\s*DAG Node: (.+)$'
-            ),
-        }
-        
-        # Legacy patterns for older log format (MM/dd/yy HH:MM:SS)
-        self.legacy_patterns = {
-            'job_submitted': re.compile(
-                r'^000 \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) Job submitted from host:'
-            ),
-            'job_executing': re.compile(
-                r'^001 \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) Job executing on host:'
-            ),
-            'job_terminated': re.compile(
-                r'^005 \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) Job terminated\.'
-            ),
-            'job_held': re.compile(
-                r'^012 \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) Job was held\.'
-            ),
-            'job_released': re.compile(
-                r'^013 \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) Job was released\.'
-            ),
-            'transfer_input_started': re.compile(
-                r'^040 \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) Started transferring input files'
-            ),
-            'transfer_input_finished': re.compile(
-                r'^040 \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) Finished transferring input files'
-            ),
+            'dag_node': re.compile(r'^\s*DAG Node: (.+)$'),
         }
     
     def parse_timestamp(self, timestamp_str: str) -> datetime:
@@ -165,13 +177,13 @@ class DAGManLogParser:
         """
         # Try modern format first
         try:
-            return datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+            return datetime.strptime(timestamp_str, TIMESTAMP_FORMATS['MODERN'])
         except ValueError:
             pass
             
         # Fall back to legacy format
         try:
-            return datetime.strptime(timestamp_str, '%m/%d/%y %H:%M:%S')
+            return datetime.strptime(timestamp_str, TIMESTAMP_FORMATS['LEGACY'])
         except ValueError:
             return datetime.now()
     
@@ -197,26 +209,23 @@ class DAGManLogParser:
                 'raw_line': line
             }
             
-        # Try modern patterns first, then legacy
-        for pattern_set in [self.patterns, self.legacy_patterns]:
-            for event_type, pattern in pattern_set.items():
-                if event_type == 'dag_node':
-                    continue
-                    
-                match = pattern.search(line)
-                if match:
-                    groups = match.groups()
-                    
-                    # Regular events with cluster ID
-                    cluster_id = int(groups[0])
-                    timestamp = self.parse_timestamp(groups[1])
-                    
-                    return {
-                        'event_type': event_type,
-                        'timestamp': timestamp,
-                        'cluster_id': cluster_id,
-                        'raw_line': line
-                    }
+        # Try event patterns
+        for event_type, pattern in self.patterns.items():
+            if event_type == 'dag_node':
+                continue
+                
+            match = pattern.search(line)
+            if match:
+                cluster_id = int(match.group(1))
+                timestamp_str = match.group(2)
+                timestamp = self.parse_timestamp(timestamp_str)
+                
+                return {
+                    'event_type': event_type,
+                    'timestamp': timestamp,
+                    'cluster_id': cluster_id,
+                    'raw_line': line
+                }
         
         return None
 
@@ -254,6 +263,11 @@ class DAGStatusMonitor:
         # Cluster ID to DAG node name mapping
         self.cluster_to_dagnode: Dict[int, str] = {}
         
+        # Track rescue file parsing to avoid re-parsing
+        self.rescue_files_processed: Set[Path] = set()
+        
+        # Optional run filtering
+        self.run_filter: Optional[Set[str]] = None
         
         # Cache job timing information from metl.log
         self.metl_job_timing: Dict[int, Dict[str, datetime]] = {}
@@ -262,8 +276,56 @@ class DAGStatusMonitor:
         self.planned_training_runs: Dict[str, Dict[str, Any]] = {}
         self._parse_planned_training_runs()
         
-        # Track rescue file parsing to avoid re-parsing
-        self.rescue_files_processed: Set[Path] = set()
+    def set_run_filter(self, filter_runs: Optional[str]) -> None:
+        """Set filter for specific training runs.
+        
+        Args:
+            filter_runs: Comma-separated list of run numbers or UUIDs to filter by
+        """
+        if not filter_runs:
+            self.run_filter = None
+            return
+            
+        # Parse the filter criteria
+        criteria = [item.strip() for item in filter_runs.split(',')]
+        self.run_filter = set()
+        
+        for criterion in criteria:
+            # Check if it's a run number (just digits)
+            if criterion.isdigit():
+                # Add run number as "run{number}"
+                self.run_filter.add(f"run{criterion}")
+            else:
+                # Assume it's a UUID or partial UUID
+                self.run_filter.add(criterion)
+    
+    def _matches_run_filter(self, job: JobInfo) -> bool:
+        """Check if a job matches the current run filter.
+        
+        Args:
+            job: JobInfo object to check
+            
+        Returns:
+            True if job matches filter (or no filter set), False otherwise
+        """
+        if not self.run_filter:
+            return True
+            
+        # Check run UUID (exact or partial match)
+        if job.run_uuid:
+            for filter_item in self.run_filter:
+                if filter_item in job.run_uuid:
+                    return True
+        
+        # Check run number from job name
+        if job.name:
+            match = re.match(DAG_FILE_PATTERNS['JOB_NAME'], job.name)
+            if match:
+                run_name = f"run{match.group(1)}"
+                if run_name in self.run_filter:
+                    return True
+        
+        return False
         
     def parse_job_vars(self, job_name: str) -> Dict[str, str]:
         """Extract job variables from DAG file.
@@ -602,14 +664,17 @@ class DAGStatusMonitor:
         Returns:
             Tuple of (run_number, epoch_number) for sorting
         """
-        match = re.match(r'run(\d+)-train_epoch(\d+)', job_name)
-        if match:
-            run_num = int(match.group(1))
-            epoch_num = int(match.group(2))
-            return (run_num, epoch_num)
-        else:
-            # Fallback for any other format
-            return (999, 999)
+        try:
+            match = re.match(DAG_FILE_PATTERNS['JOB_NAME'], job_name)
+            if match:
+                run_num = int(match.group(1))
+                epoch_num = int(match.group(2))
+                return (run_num, epoch_num)
+        except (ValueError, AttributeError):
+            pass
+        
+        # Fallback for any other format
+        return (999, 999)
     
     def update_job_info(self, event: Dict[str, Any], job_name: str) -> None:
         """Update job information based on log event.
@@ -654,11 +719,10 @@ class DAGStatusMonitor:
         elif event['event_type'] == 'transfer_input_started':
             job.status = JobStatus.TRANSFERRING
         elif event['event_type'] == 'transfer_input_finished':
-            # Job finished transferring, but not yet executing - keep as IDLE until execution starts
             job.status = JobStatus.IDLE
             
         # Update training run status
-        if job.run_uuid:
+        if job.run_uuid is not None:
             self.update_training_run_status(job)
     
     
@@ -668,19 +732,20 @@ class DAGStatusMonitor:
         Args:
             job: JobInfo object to update training run status for
         """
-        if not job.run_uuid:
+        run_uuid = job.run_uuid
+        if not run_uuid:
             return
             
-        if job.run_uuid not in self.training_runs:
+        if run_uuid not in self.training_runs:
             # Use planned total epochs if available, otherwise fall back to submitted count
-            planned_total = (self.planned_training_runs.get(job.run_uuid, {})
+            planned_total = (self.planned_training_runs.get(run_uuid, {})
                            .get('total_epochs', 0))
-            self.training_runs[job.run_uuid] = TrainingRunStatus(
-                run_uuid=job.run_uuid,
+            self.training_runs[run_uuid] = TrainingRunStatus(
+                run_uuid=run_uuid,
                 total_epochs=planned_total
             )
         
-        tr_status = self.training_runs[job.run_uuid]
+        tr_status = self.training_runs[run_uuid]
         tr_status.jobs[job.name] = job
         
         # Count epochs from submitted jobs
@@ -692,7 +757,7 @@ class DAGStatusMonitor:
         tr_status.failed_epochs = failed
         
         # Use planned total if available and larger than submitted count
-        planned_total = (self.planned_training_runs.get(job.run_uuid, {})
+        planned_total = (self.planned_training_runs.get(run_uuid, {})
                         .get('total_epochs', 0))
         tr_status.total_epochs = max(planned_total, submitted_total)
     
@@ -718,55 +783,74 @@ class DAGStatusMonitor:
         # Process rescue files to get authoritative completion status (after metl.log parsing)
         self.process_rescue_files()
         
-        # Try nodes.log first (more detailed), then dagman.log, then metl.log
-        metl_log = Path("metl.log")
-        if self.nodes_log.exists():
-            log_file = self.nodes_log
-        elif self.dagman_log.exists():
-            log_file = self.dagman_log
-        elif metl_log.exists():
-            log_file = metl_log
-        else:
-            return
-        
-        if not log_file.exists():
+        # Find the best log file to use
+        log_file = self._select_log_file()
+        if not log_file:
             return
             
         try:
-            with open(log_file, 'r') as f:
+            lines = self._read_log_file(log_file, incremental)
+            if not lines:
+                return
+                
+            # Build cluster to DAG node mapping if processing full file
+            if not incremental:
+                self.build_cluster_mapping(lines)
+                self._initialize_planned_training_runs()
+            
+            self._process_log_lines(lines)
+                        
+        except (FileNotFoundError, IOError):
+            pass
+    
+    def _select_log_file(self) -> Optional[Path]:
+        """Select the best available log file to process."""
+        candidates = [
+            self.nodes_log,
+            self.dagman_log, 
+            Path("metl.log")
+        ]
+        
+        for log_file in candidates:
+            if log_file.exists():
+                return log_file
+        return None
+    
+    def _read_log_file(self, log_file: Path, incremental: bool) -> List[str]:
+        """Read lines from log file with proper positioning and error handling."""
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
                 if incremental:
+                    # Ensure seek position is valid
+                    file_size = f.seek(0, 2)  # Seek to end to get file size
+                    if self.last_log_position > file_size:
+                        self.last_log_position = 0  # Reset if file was truncated
                     f.seek(self.last_log_position)
                     lines = f.readlines()
                     self.last_log_position = f.tell()
                 else:
                     lines = f.readlines()
-                    
-                # Build cluster to DAG node mapping if processing full file
-                if not incremental:
-                    self.build_cluster_mapping(lines)
-                    # Initialize all planned training runs
-                    self._initialize_planned_training_runs()
+                    self.last_log_position = 0
+            return lines
+        except (OSError, IOError) as e:
+            self.console.print(f"[yellow]Warning: Error reading log file {log_file}: {e}[/yellow]")
+            return []
+    
+    def _process_log_lines(self, lines: List[str]) -> None:
+        """Process a list of log lines for events."""
+        for line in lines:
+            line = line.strip()
+            if not line or line == '...':
+                continue
+            
+            event = self.parser.parse_log_line(line)
+            if not event or event.get('event_type') == 'dag_node':
+                continue
                 
-                # Process all events
-                for line in lines:
-                    line = line.strip()
-                    if not line or line == '...':
-                        continue
-                    
-                    event = self.parser.parse_log_line(line)
-                    if event:
-                        if event.get('event_type') == 'dag_node':
-                            continue
-                        elif 'cluster_id' in event:
-                            cluster_id = event['cluster_id']
-                            
-                            # Get job name from cluster mapping or use cluster ID
-                            job_name = self.cluster_to_dagnode.get(cluster_id, f'cluster_{cluster_id}')
-                            
-                            self.update_job_info(event, job_name)
-                        
-        except FileNotFoundError:
-            pass
+            if 'cluster_id' in event:
+                cluster_id = event['cluster_id']
+                job_name = self.cluster_to_dagnode.get(cluster_id, f'cluster_{cluster_id}')
+                self.update_job_info(event, job_name)
     
     
     def get_htcondor_status(self) -> Dict[int, Dict[str, Any]]:
@@ -795,9 +879,11 @@ class DAGStatusMonitor:
                             'hold_reason': job.get('HoldReason', ''),
                             'last_job_status': job.get('LastJobStatus', 0)
                         }
-        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, json.JSONDecodeError):
+        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, json.JSONDecodeError) as e:
             # HTCondor not available - return empty status
-            pass
+            # Only log if it's an unexpected error (not just htcondor not found)
+            if not isinstance(e, FileNotFoundError):
+                self.console.print(f"[dim]HTCondor query failed: {type(e).__name__}[/dim]")
             
         return job_status
     
@@ -830,26 +916,31 @@ class DAGStatusMonitor:
         Returns:
             True if job should be displayed, False otherwise
         """
-        # Always show completed, running, transferring, held, and failed jobs
-        if job.status in [JobStatus.COMPLETED, JobStatus.RUNNING, JobStatus.TRANSFERRING, JobStatus.HELD, JobStatus.FAILED]:
+        # Always show these definitive statuses
+        definitive_statuses = {
+            JobStatus.COMPLETED, JobStatus.RUNNING, JobStatus.TRANSFERRING, 
+            JobStatus.HELD, JobStatus.FAILED
+        }
+        if job.status in definitive_statuses:
             return True
         
-        # For IDLE jobs, show if they're queued in HTCondor OR if HTCondor is unavailable 
-        # but they have a cluster ID (indicating they were submitted)
-        if job.status == JobStatus.IDLE:
-            if queued_cluster_ids:  # HTCondor is available
-                return job.cluster_id and job.cluster_id in queued_cluster_ids
-            else:  # HTCondor not available, fallback to cluster ID check
-                return job.cluster_id is not None
-        
-        # Don't show unknown status jobs unless they have a cluster ID
-        if job.status == JobStatus.UNKNOWN:
-            if queued_cluster_ids:  # HTCondor is available
-                return job.cluster_id and job.cluster_id in queued_cluster_ids
-            else:  # HTCondor not available, show if has cluster ID
-                return job.cluster_id is not None
+        # For IDLE and UNKNOWN jobs, show based on queue status or cluster ID
+        if job.status in [JobStatus.IDLE, JobStatus.UNKNOWN]:
+            return self._should_show_queued_job(job, queued_cluster_ids)
         
         return False
+    
+    def _should_show_queued_job(self, job: JobInfo, queued_cluster_ids: Set[int]) -> bool:
+        """Check if a queued job should be shown based on HTCondor availability."""
+        if job.cluster_id is None:
+            return False
+        
+        # If HTCondor is available, check if job is in queue
+        if queued_cluster_ids:
+            return job.cluster_id in queued_cluster_ids
+        
+        # HTCondor not available, show if job has cluster ID (was submitted)
+        return True
     
     def create_status_table(self, verbose: bool = False, exclude_helper: bool = True, show_all: bool = False) -> Table:
         """Create a rich table showing current job status.
@@ -869,12 +960,17 @@ class DAGStatusMonitor:
         Returns:
             Rich Table object with job status information
         """
+        # Determine table title based on filtering and display options
+        filter_suffix = f" [Filtered: {', '.join(sorted(self.run_filter))}]" if self.run_filter else ""
+        
         if show_all:
-            table = Table(title="DAG Job Status (All Jobs)")
+            title = f"DAG Job Status (All Jobs){filter_suffix}"
         elif verbose:
-            table = Table(title="DAG Job Status (Active Jobs Only)")
+            title = f"DAG Job Status (Active Jobs Only){filter_suffix}"
         else:
-            table = Table(title="DAG Job Status (Latest Epoch per Run)")
+            title = f"DAG Job Status (Latest Epoch per Run){filter_suffix}"
+            
+        table = Table(title=title)
             
         table.add_column("Run", justify="right", style="cyan", no_wrap=True)
         table.add_column("Epoch", justify="right", style="green")
@@ -891,6 +987,8 @@ class DAGStatusMonitor:
         filtered_jobs = []
         for job in self.jobs.values():
             if exclude_helper and job.name == "annex_helper":
+                continue
+            if not self._matches_run_filter(job):
                 continue
             if show_all or self.should_show_job(job, queued_cluster_ids):
                 filtered_jobs.append(job)
@@ -980,7 +1078,7 @@ class DAGStatusMonitor:
         
         return table
     
-    def create_training_summary_table(self, exclude_helper: bool = True, show_all: bool = False, verbose: bool = False) -> Table:
+    def create_training_summary_table(self, exclude_helper: bool = True, show_all: bool = False) -> Table:
         """Create a summary table of training progress.
         
         By default shows only active jobs (same filtering as status table).
@@ -993,10 +1091,15 @@ class DAGStatusMonitor:
         Returns:
             Rich Table object with training summary
         """
+        # Determine table title based on filtering
+        filter_suffix = f" [Filtered: {', '.join(sorted(self.run_filter))}]" if self.run_filter else ""
+        
         if show_all:
-            table = Table(title="Training Summary (All Jobs)")
+            title = f"Training Summary (All Jobs){filter_suffix}"
         else:
-            table = Table(title="Training Summary (Active Jobs Only)")
+            title = f"Training Summary (Active Jobs Only){filter_suffix}"
+            
+        table = Table(title=title)
             
         table.add_column("Metric", style="cyan", no_wrap=True)
         table.add_column("Count", justify="right", style="green")
@@ -1010,6 +1113,8 @@ class DAGStatusMonitor:
         filtered_jobs = []
         for job in self.jobs.values():
             if exclude_helper and job.name == "annex_helper":
+                continue
+            if not self._matches_run_filter(job):
                 continue
             if show_all or self.should_show_job(job, queued_cluster_ids):
                 filtered_jobs.append(job)
@@ -1063,7 +1168,10 @@ class DAGStatusMonitor:
         Returns:
             Rich Table object with training run progress
         """
-        table = Table(title="Training Run Progress (Active Runs Only)")
+        # Determine table title based on filtering
+        filter_suffix = f" [Filtered: {', '.join(sorted(self.run_filter))}]" if self.run_filter else ""
+        title = f"Training Run Progress (Active Runs Only){filter_suffix}"
+        table = Table(title=title)
         table.add_column("Run", justify="right", style="cyan", no_wrap=True)
         table.add_column("Run UUID", style="blue", max_width=8)
         table.add_column("Progress", style="magenta")
@@ -1087,8 +1195,9 @@ class DAGStatusMonitor:
             return 999  # fallback for runs without jobs
         
         for tr in sorted(self.training_runs.values(), key=get_run_number):
-            # Count job states, but only for active jobs
-            active_jobs = [j for j in tr.jobs.values() if self.should_show_job(j, queued_cluster_ids)]
+            # Count job states, but only for active jobs that match the filter
+            active_jobs = [j for j in tr.jobs.values() 
+                          if self.should_show_job(j, queued_cluster_ids) and self._matches_run_filter(j)]
             
             if not active_jobs:
                 # Skip training runs with no active jobs
@@ -1133,7 +1242,7 @@ class DAGStatusMonitor:
         
         # Display tables
         job_table = self.create_status_table(verbose=verbose, show_all=show_all)
-        summary_table = self.create_training_summary_table(show_all=show_all, verbose=verbose)
+        summary_table = self.create_training_summary_table(show_all=show_all)
         
         self.console.print(job_table)
         self.console.print()
@@ -1161,7 +1270,7 @@ class DAGStatusMonitor:
                     
                     # Update display with tables
                     job_table = self.create_status_table(verbose=verbose, show_all=show_all)
-                    summary_table = self.create_training_summary_table(show_all=show_all, verbose=verbose)
+                    summary_table = self.create_training_summary_table(show_all=show_all)
                     
                     if show_progress and self.training_runs:
                         training_table = self.create_training_run_table()
@@ -1233,11 +1342,18 @@ def main() -> None:
                        help="Show debug information about timing data extraction")
     parser.add_argument("--show-progress", action="store_true",
                        help="Show training run progress table (default: hidden)")
+    parser.add_argument("--filter-runs", type=str, metavar="RUNS",
+                       help="Filter to specific training runs (comma-separated list of run numbers or UUIDs). "
+                            "Examples: --filter-runs 1,3,5 or --filter-runs abc123,def456 or --filter-runs 1,abc123")
     
     args = parser.parse_args()
     
     # Initialize monitor
     monitor = DAGStatusMonitor(args.dag_file)
+    
+    # Set run filter if specified
+    if args.filter_runs:
+        monitor.set_run_filter(args.filter_runs)
     
     # Process entire log file initially
     monitor.process_log_entries(incremental=False)
