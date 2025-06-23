@@ -706,13 +706,22 @@ class DAGStatusMonitor:
         # Update status based on event type
         if event['event_type'] == 'job_submitted':
             job.status = JobStatus.IDLE
-            job.submit_time = event['timestamp']
+            # Reset execution times for new submission (retry/resubmission)
+            if job.submit_time is None or event['timestamp'] > job.submit_time:
+                job.submit_time = event['timestamp']
+                job.start_time = None  # Clear previous execution time
+                job.end_time = None    # Clear previous end time
         elif event['event_type'] == 'job_executing':
             job.status = JobStatus.RUNNING
-            job.start_time = event['timestamp']
+            # Only update if this is a newer execution
+            if job.start_time is None or event['timestamp'] > job.start_time:
+                job.start_time = event['timestamp']
+                job.end_time = None  # Clear any previous end time
         elif event['event_type'] == 'job_terminated':
             job.status = JobStatus.COMPLETED
-            job.end_time = event['timestamp']
+            # Only update end time if we have a valid start time and this is after it
+            if job.start_time and event['timestamp'] > job.start_time:
+                job.end_time = event['timestamp']
         elif event['event_type'] == 'job_held':
             job.status = JobStatus.HELD
         elif event['event_type'] == 'job_released':
@@ -1011,7 +1020,7 @@ class DAGStatusMonitor:
             
             # For each run, keep only the job with the highest epoch number
             latest_jobs = []
-            for run_uuid, jobs in jobs_by_run.items():
+            for _, jobs in jobs_by_run.items():
                 if jobs:
                     # Sort by epoch number and take the highest
                     jobs_with_epochs = [j for j in jobs if j.epoch is not None]
@@ -1032,10 +1041,20 @@ class DAGStatusMonitor:
         
         for job in sorted_jobs:
             duration = ""
-            if job.start_time and job.end_time:
-                duration = str(job.end_time - job.start_time).split('.')[0]
+            if job.status == JobStatus.IDLE:
+                duration = ""
+            elif job.start_time and job.end_time:
+                duration_delta = job.end_time - job.start_time
+                if duration_delta.total_seconds() >= 0:
+                    duration = str(duration_delta).split('.')[0]
+                else:
+                    duration = "[red]negative[/red]"
             elif job.start_time:
-                duration = str(datetime.now() - job.start_time).split('.')[0]
+                duration_delta = datetime.now() - job.start_time
+                if duration_delta.total_seconds() >= 0:
+                    duration = str(duration_delta).split('.')[0]
+                else:
+                    duration = "[red]clock skew[/red]"
             
             # Extract run number from job name
             run_match = re.match(r'run(\d+)-train_epoch(\d+)', job.name)
@@ -1273,14 +1292,25 @@ class DAGStatusMonitor:
                     # Calculate duration
                     duration_seconds = ""
                     duration_human = ""
-                    if job.start_time and job.end_time:
+                    if job.status == JobStatus.IDLE:
+                        duration_seconds = ""
+                        duration_human = ""
+                    elif job.start_time and job.end_time:
                         duration_delta = job.end_time - job.start_time
-                        duration_seconds = str(int(duration_delta.total_seconds()))
-                        duration_human = str(duration_delta).split('.')[0]
+                        if duration_delta.total_seconds() >= 0:
+                            duration_seconds = str(int(duration_delta.total_seconds()))
+                            duration_human = str(duration_delta).split('.')[0]
+                        else:
+                            duration_seconds = "0"
+                            duration_human = "negative"
                     elif job.start_time:
                         duration_delta = datetime.now() - job.start_time
-                        duration_seconds = str(int(duration_delta.total_seconds()))
-                        duration_human = str(duration_delta).split('.')[0]
+                        if duration_delta.total_seconds() >= 0:
+                            duration_seconds = str(int(duration_delta.total_seconds()))
+                            duration_human = str(duration_delta).split('.')[0]
+                        else:
+                            duration_seconds = "0"
+                            duration_human = "clock skew"
                     
                     # Format timestamps
                     submit_time_str = job.submit_time.isoformat() if job.submit_time else ""
