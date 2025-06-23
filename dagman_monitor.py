@@ -98,6 +98,8 @@ class JobInfo:
     resource_name: Optional[str] = None
     retries: int = 0
     last_event_time: Optional[datetime] = None
+    total_bytes_sent: int = 0
+    total_bytes_received: int = 0
 
 
 @dataclass 
@@ -440,6 +442,19 @@ class DAGStatusMonitor:
                         elif event_code == '005':  # Job terminated
                             self.metl_job_timing[cluster_id]['end_time'] = timestamp
                             
+                            # Look for data transfer information in the following lines
+                            j = i + 1
+                            while j < len(lines) and not lines[j].strip().startswith('...'):
+                                line_content = lines[j].strip()
+                                bytes_sent_match = re.search(r'(\d+)\s+-\s+Total Bytes Sent By Job', line_content)
+                                bytes_received_match = re.search(r'(\d+)\s+-\s+Total Bytes Received By Job', line_content)
+                                
+                                if bytes_sent_match:
+                                    self.metl_job_timing[cluster_id]['total_bytes_sent'] = int(bytes_sent_match.group(1))
+                                if bytes_received_match:
+                                    self.metl_job_timing[cluster_id]['total_bytes_received'] = int(bytes_received_match.group(1))
+                                j += 1
+                            
                     i += 1
                     
         except FileNotFoundError:
@@ -545,10 +560,12 @@ class DAGStatusMonitor:
                         
                         # Search for timing info by looking through all cluster IDs
                         # Find the most recent successful completion for this job
+                        # ONLY use timing from clusters that executed under this DAG
                         for cluster_id, timing_info in self.metl_job_timing.items():
                             if (timing_info.get('dag_node') == job_name and 
                                 timing_info.get('end_time') and 
-                                timing_info.get('start_time')):
+                                timing_info.get('start_time') and
+                                cluster_id in self.cluster_to_dagnode):  # Only clusters from this DAG
                                 
                                 # Prefer the most recent completion (highest cluster ID as proxy)
                                 if best_timing is None or cluster_id > best_cluster_id:
@@ -563,6 +580,10 @@ class DAGStatusMonitor:
                                 job.start_time = best_timing['start_time']
                             if 'end_time' in best_timing:
                                 job.end_time = best_timing['end_time']
+                            if 'total_bytes_sent' in best_timing:
+                                job.total_bytes_sent = best_timing['total_bytes_sent']
+                            if 'total_bytes_received' in best_timing:
+                                job.total_bytes_received = best_timing['total_bytes_received']
                             if best_cluster_id:
                                 job.cluster_id = best_cluster_id
                             timing_applied = True
@@ -577,8 +598,97 @@ class DAGStatusMonitor:
                 # Update training run status
                 if job.run_uuid:
                     self.update_training_run_status(job)
+        
+        # Apply metl.log timing and transfer data to all jobs that have it
+        # This is separate from rescue file status since jobs may have completed
+        # but been restarted, so they don't show as COMPLETED in rescue files
+        self.apply_metl_data_to_all_jobs()
             
-            self.rescue_files_processed.add(rescue_file)
+        self.rescue_files_processed.add(rescue_file)
+    
+    def apply_metl_data_to_all_jobs(self) -> None:
+        """Apply metl.log timing and transfer data to all jobs that have it.
+        
+        This method applies timing and transfer data from metl.log to jobs
+        regardless of their rescue file status, since jobs may have completed
+        but been restarted and thus don't show as COMPLETED in rescue files.
+        
+        IMPORTANT: Only applies data for jobs that are actually defined in the current DAG,
+        to avoid mixing data from other DAGs that share the same metl.log file.
+        """
+        # Get the set of job names actually defined in this DAG
+        defined_jobs = set(self.jobs.keys())
+        
+        for job in self.jobs.values():
+            if hasattr(job, '_metl_data_applied'):
+                continue
+                
+            best_timing = None
+            best_cluster_id = None
+            
+            # Find the best timing info for this job from metl.log
+            # ONLY consider timing info for jobs that actually executed under this DAG
+            for cluster_id, timing_info in self.metl_job_timing.items():
+                dag_node = timing_info.get('dag_node')
+                if (dag_node == job.name and 
+                    dag_node in defined_jobs and  # Job is defined in this DAG
+                    cluster_id in self.cluster_to_dagnode and  # Cluster executed under this DAG
+                    timing_info.get('end_time')):
+                    
+                    # Prefer the most recent completion (highest cluster ID as proxy)
+                    if best_timing is None or cluster_id > best_cluster_id:
+                        best_timing = timing_info
+                        best_cluster_id = cluster_id
+            
+            # Apply the best timing and transfer information found
+            if best_timing:
+                if 'total_bytes_sent' in best_timing:
+                    job.total_bytes_sent = best_timing['total_bytes_sent']
+                if 'total_bytes_received' in best_timing:
+                    job.total_bytes_received = best_timing['total_bytes_received']
+                # Also apply timing if not already set
+                if 'submit_time' in best_timing and not job.submit_time:
+                    job.submit_time = best_timing['submit_time']
+                if 'start_time' in best_timing and not job.start_time:
+                    job.start_time = best_timing['start_time']
+                if 'end_time' in best_timing and not job.end_time:
+                    job.end_time = best_timing['end_time']
+                if best_cluster_id and not job.cluster_id:
+                    job.cluster_id = best_cluster_id
+                
+                job._metl_data_applied = True
+    
+    def _filter_cluster_mapping_to_current_dag(self) -> None:
+        """Filter cluster_to_dagnode mapping to only include clusters from this DAG.
+        
+        Since metl.log is shared between DAGs, we need to filter out cluster mappings
+        from other DAGs to prevent cross-contamination of job data.
+        """
+        if not self.dagman_log.exists():
+            return
+            
+        # Get the set of cluster IDs that actually appear in this DAG's logs
+        dag_cluster_ids = set()
+        
+        try:
+            with open(self.dagman_log, 'r') as f:
+                content = f.read()
+                
+            # Look for cluster ID assignments in this DAG's log
+            import re
+            cluster_matches = re.findall(r'assigned HTCondor ID \((\d+)\.\d+\.\d+\)', content)
+            dag_cluster_ids.update(int(cid) for cid in cluster_matches)
+            
+        except (OSError, IOError):
+            pass
+        
+        # Filter cluster_to_dagnode to only include clusters from this DAG
+        filtered_mapping = {}
+        for cluster_id, dag_node in self.cluster_to_dagnode.items():
+            if cluster_id in dag_cluster_ids:
+                filtered_mapping[cluster_id] = dag_node
+        
+        self.cluster_to_dagnode = filtered_mapping
     
     def _parse_planned_training_runs(self) -> None:
         """Parse the DAG file to extract all planned training runs and their epochs.
@@ -789,6 +899,9 @@ class DAGStatusMonitor:
         """
         # Parse metl.log first to get timing information
         self.parse_metl_log_timing(incremental)
+        
+        # Filter cluster_to_dagnode to only include clusters that appear in this DAG's logs
+        self._filter_cluster_mapping_to_current_dag()
         
         # Process rescue files to get authoritative completion status (after metl.log parsing)
         self.process_rescue_files()
@@ -1279,7 +1392,7 @@ class DAGStatusMonitor:
                 fieldnames = [
                     'Job Name', 'Run Number', 'Epoch', 'Run UUID', 'HTCondor Cluster ID', 
                     'Targeted Resource', 'Status', 'Submit Time', 'Start Time', 'End Time', 
-                    'Duration (seconds)', 'Duration (human)'
+                    'Duration (seconds)', 'Duration (human)', 'Total Bytes Sent', 'Total Bytes Received'
                 ]
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
@@ -1335,7 +1448,9 @@ class DAGStatusMonitor:
                         'Start Time': start_time_str,
                         'End Time': end_time_str,
                         'Duration (seconds)': duration_seconds,
-                        'Duration (human)': duration_human
+                        'Duration (human)': duration_human,
+                        'Total Bytes Sent': job.total_bytes_sent,
+                        'Total Bytes Received': job.total_bytes_received
                     })
                     
             self.console.print(f"[green]CSV data exported to {output_file}[/green]")
@@ -1478,6 +1593,9 @@ def main() -> None:
         return
     
     if args.csv_output:
+        # Process rescue files to get complete timing and transfer data
+        monitor.process_rescue_files()
+        
         # Create progress directory if it doesn't exist
         progress_dir = Path("./progress")
         progress_dir.mkdir(exist_ok=True)
