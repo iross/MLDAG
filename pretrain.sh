@@ -37,7 +37,7 @@ python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain
     --max_epochs $epochs --uuid=$run_uuid  \
     --condor_checkpoint_every_n_epochs 1 \
     --use_wandb \
-    --wandb_online --wandb_project metl_global_$run_uuid \
+    --wandb_online --wandb_project metl_global_$run_uuid\_$epochs \
     --random_seed $random_seed
 
 #python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_avgfp_local.txt \
