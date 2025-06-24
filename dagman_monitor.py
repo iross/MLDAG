@@ -623,17 +623,22 @@ class DAGStatusMonitor:
                         
                         # Search for timing info by looking through all cluster IDs
                         # Find the most recent successful completion for this job
-                        # ONLY use timing from clusters that executed under this DAG
+                        # For completed jobs, allow timing from metl.log even if cluster not in current DAGMan log
+                        # (DAGMan logs can be rotated, but metl.log might have older data)
                         for cluster_id, timing_info in self.metl_job_timing.items():
                             if (timing_info.get('dag_node') == job_name and 
                                 timing_info.get('end_time') and 
-                                timing_info.get('start_time') and
-                                cluster_id in self.cluster_to_dagnode):  # Only clusters from this DAG
+                                timing_info.get('start_time')):
                                 
-                                # Prefer the most recent completion (highest cluster ID as proxy)
-                                if best_timing is None or cluster_id > best_cluster_id:
-                                    best_timing = timing_info
-                                    best_cluster_id = cluster_id
+                                # For completed jobs from rescue file, accept any matching DAG node
+                                # For other jobs, still require cluster to be in current DAG
+                                if (status == JobStatus.COMPLETED or 
+                                    cluster_id in self.cluster_to_dagnode):
+                                    
+                                    # Prefer the most recent completion (highest cluster ID as proxy)
+                                    if best_timing is None or cluster_id > best_cluster_id:
+                                        best_timing = timing_info
+                                        best_cluster_id = cluster_id
                         
                         # Apply the best timing information found
                         if best_timing:
@@ -684,12 +689,15 @@ class DAGStatusMonitor:
         
         # Pre-filter timing info to only include DAG-relevant clusters
         # This avoids O(n²) behavior in the inner loop
+        # For completed jobs, include timing even if cluster not in current DAGMan log
         dag_relevant_timing = {}
         for cluster_id, timing_info in self.metl_job_timing.items():
             dag_node = timing_info.get('dag_node')
             if (dag_node in defined_jobs and 
-                cluster_id in self.cluster_to_dagnode and 
                 timing_info.get('end_time')):
+                
+                # Allow timing data for jobs defined in this DAG
+                # Even if cluster not in current DAGMan log (for older completed jobs)
                 
                 if dag_node not in dag_relevant_timing:
                     dag_relevant_timing[dag_node] = []
