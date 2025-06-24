@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Dict, List, Optional, Set, Tuple, Any, Union, cast
 from dataclasses import dataclass, field
 import subprocess
 
@@ -177,7 +177,15 @@ class DAGManLogParser:
             
         Returns:
             Parsed datetime object, or current time if parsing fails
+            
+        Raises:
+            ValueError: If timestamp_str is empty or None
         """
+        if not timestamp_str or not timestamp_str.strip():
+            raise ValueError("Timestamp string cannot be empty")
+            
+        timestamp_str = timestamp_str.strip()
+        
         # Try modern format first
         try:
             return datetime.strptime(timestamp_str, TIMESTAMP_FORMATS['MODERN'])
@@ -188,6 +196,8 @@ class DAGManLogParser:
         try:
             return datetime.strptime(timestamp_str, TIMESTAMP_FORMATS['LEGACY'])
         except ValueError:
+            # Log the parsing failure for debugging
+            self.console.print(f"[dim yellow]Warning: Could not parse timestamp: {timestamp_str}[/dim yellow]")
             return datetime.now()
     
     def parse_log_line(self, line: str) -> Optional[Dict[str, Any]]:
@@ -245,8 +255,18 @@ class DAGStatusMonitor:
         
         Args:
             dag_file: Path to the DAG file to monitor
+            
+        Raises:
+            ValueError: If dag_file is empty or invalid
+            FileNotFoundError: If dag_file does not exist
         """
+        if not dag_file or not dag_file.strip():
+            raise ValueError("DAG file path cannot be empty")
+            
         self.dag_file = Path(dag_file)
+        if not self.dag_file.exists():
+            raise FileNotFoundError(f"DAG file not found: {self.dag_file}")
+            
         self.dagman_log = self.dag_file.with_suffix('.dag.dagman.log')
         self.nodes_log = self.dag_file.with_suffix('.dag.nodes.log')
         self.node_status_file = self.dag_file.with_suffix('.dag.status')
@@ -273,10 +293,18 @@ class DAGStatusMonitor:
         self.run_filter: Optional[Set[str]] = None
         
         # Cache job timing information from metl.log
-        self.metl_job_timing: Dict[int, Dict[str, datetime]] = {}
+        self.metl_job_timing: Dict[int, Dict[str, Union[datetime, int, str]]] = {}
         
         # Cache of planned training runs from DAG file
-        self.planned_training_runs: Dict[str, Dict[str, Any]] = {}
+        self.planned_training_runs: Dict[str, Dict[str, Union[int, List[str]]]] = {}
+        
+        # Performance optimizations: cache frequently accessed data
+        self._dag_file_content_cache: Optional[str] = None
+        self._dag_file_mtime: Optional[float] = None
+        self._htcondor_status_cache: Optional[Dict[int, Dict[str, Any]]] = None
+        self._htcondor_cache_time: float = 0
+        self._htcondor_cache_ttl: float = 5.0  # Cache HTCondor status for 5 seconds
+        
         self._parse_planned_training_runs()
         
     def set_run_filter(self, filter_runs: Optional[str]) -> None:
@@ -284,18 +312,31 @@ class DAGStatusMonitor:
         
         Args:
             filter_runs: Comma-separated list of run numbers or UUIDs to filter by
+            
+        Raises:
+            ValueError: If filter_runs contains invalid criteria
         """
-        if not filter_runs:
+        if not filter_runs or not filter_runs.strip():
             self.run_filter = None
             return
             
         # Parse the filter criteria
-        criteria = [item.strip() for item in filter_runs.split(',')]
+        criteria = [item.strip() for item in filter_runs.split(',') if item.strip()]
+        if not criteria:
+            self.run_filter = None
+            return
+            
         self.run_filter = set()
         
         for criterion in criteria:
+            if not criterion:
+                continue
+                
             # Check if it's a run number (just digits)
             if criterion.isdigit():
+                run_num = int(criterion)
+                if run_num < 0:
+                    raise ValueError(f"Run number must be non-negative: {criterion}")
                 # Add run number as "run{number}"
                 self.run_filter.add(f"run{criterion}")
             else:
@@ -315,9 +356,10 @@ class DAGStatusMonitor:
             return True
             
         # Check run UUID (exact or partial match)
-        if job.run_uuid:
+        if job.run_uuid is not None and self.run_filter:
+            job_run_uuid = cast(str, job.run_uuid)  # Type narrowing after None check
             for filter_item in self.run_filter:
-                if filter_item in job.run_uuid:
+                if filter_item in job_run_uuid:
                     return True
         
         # Check run number from job name
@@ -330,6 +372,29 @@ class DAGStatusMonitor:
         
         return False
         
+    def _get_dag_file_content(self) -> str:
+        """Get DAG file content with caching to avoid repeated file reads.
+        
+        Returns:
+            Content of DAG file as string, empty if file not found
+        """
+        try:
+            current_mtime = self.dag_file.stat().st_mtime
+            
+            # Check if we need to reload the file
+            if (self._dag_file_content_cache is None or 
+                self._dag_file_mtime is None or 
+                current_mtime > self._dag_file_mtime):
+                
+                with open(self.dag_file, 'r') as f:
+                    self._dag_file_content_cache = f.read()
+                self._dag_file_mtime = current_mtime
+                
+            return self._dag_file_content_cache
+            
+        except (FileNotFoundError, OSError):
+            return ""
+    
     def parse_job_vars(self, job_name: str) -> Dict[str, str]:
         """Extract job variables from DAG file.
         
@@ -343,31 +408,28 @@ class DAGStatusMonitor:
             Dictionary of variable name/value pairs
         """
         vars_dict: Dict[str, str] = {}
-        try:
-            with open(self.dag_file, 'r') as f:
-                content = f.read()
+        content = self._get_dag_file_content()
+        if not content:
+            return vars_dict
                 
-            # Look for VARS lines for this job
-            pattern = rf'VARS\s+{re.escape(job_name)}\s+(.+)'
-            matches = re.findall(pattern, content, re.MULTILINE)
+        # Look for VARS lines for this job
+        pattern = rf'VARS\s+{re.escape(job_name)}\s+(.+)'
+        matches = re.findall(pattern, content, re.MULTILINE)
+        
+        for match in matches:
+            # Parse key="value" pairs (with quotes)
+            var_pattern = r'(\w+)="([^"]*)"'
+            var_matches = re.findall(var_pattern, match)
+            for key, value in var_matches:
+                vars_dict[key] = value
             
-            for match in matches:
-                # Parse key="value" pairs (with quotes)
-                var_pattern = r'(\w+)="([^"]*)"'
-                var_matches = re.findall(var_pattern, match)
-                for key, value in var_matches:
+            # Also parse unquoted key=value pairs
+            unquoted_pattern = r'(\w+)=([^\s"]+)'
+            unquoted_matches = re.findall(unquoted_pattern, match)
+            for key, value in unquoted_matches:
+                if key not in vars_dict:  # Don't overwrite quoted values
                     vars_dict[key] = value
-                
-                # Also parse unquoted key=value pairs
-                unquoted_pattern = r'(\w+)=([^\s"]+)'
-                unquoted_matches = re.findall(unquoted_pattern, match)
-                for key, value in unquoted_matches:
-                    if key not in vars_dict:  # Don't overwrite quoted values
-                        vars_dict[key] = value
                     
-        except FileNotFoundError:
-            pass
-            
         return vars_dict
     
     def parse_metl_log_timing(self, incremental: bool = True) -> None:
@@ -547,9 +609,10 @@ class DAGStatusMonitor:
                 
                 job = self.jobs[job_name]
                 
-                # Only update status if it's not already marked as completed from logs
-                # This gives precedence to log-based status over rescue file status
-                if job.status not in [JobStatus.COMPLETED, JobStatus.FAILED]:
+                # Only update status if it's not already set from metl.log
+                # metl.log is the source of truth for real-time status
+                # Rescue files are just DAGMan bookkeeping and can be stale
+                if job.status not in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.RUNNING, JobStatus.TRANSFERRING, JobStatus.HELD]:
                     job.status = status
                     
                     # Try to get timing information from metl.log for completed jobs
@@ -619,29 +682,33 @@ class DAGStatusMonitor:
         # Get the set of job names actually defined in this DAG
         defined_jobs = set(self.jobs.keys())
         
+        # Pre-filter timing info to only include DAG-relevant clusters
+        # This avoids O(n²) behavior in the inner loop
+        dag_relevant_timing = {}
+        for cluster_id, timing_info in self.metl_job_timing.items():
+            dag_node = timing_info.get('dag_node')
+            if (dag_node in defined_jobs and 
+                cluster_id in self.cluster_to_dagnode and 
+                timing_info.get('end_time')):
+                
+                if dag_node not in dag_relevant_timing:
+                    dag_relevant_timing[dag_node] = []
+                dag_relevant_timing[dag_node].append((cluster_id, timing_info))
+        
+        # Sort timing entries by cluster ID for each job to prefer most recent
+        for job_name in dag_relevant_timing:
+            dag_relevant_timing[job_name].sort(key=lambda x: x[0], reverse=True)
+        
         for job in self.jobs.values():
             if hasattr(job, '_metl_data_applied'):
                 continue
                 
-            best_timing = None
-            best_cluster_id = None
-            
-            # Find the best timing info for this job from metl.log
-            # ONLY consider timing info for jobs that actually executed under this DAG
-            for cluster_id, timing_info in self.metl_job_timing.items():
-                dag_node = timing_info.get('dag_node')
-                if (dag_node == job.name and 
-                    dag_node in defined_jobs and  # Job is defined in this DAG
-                    cluster_id in self.cluster_to_dagnode and  # Cluster executed under this DAG
-                    timing_info.get('end_time')):
-                    
-                    # Prefer the most recent completion (highest cluster ID as proxy)
-                    if best_timing is None or cluster_id > best_cluster_id:
-                        best_timing = timing_info
-                        best_cluster_id = cluster_id
-            
-            # Apply the best timing and transfer information found
-            if best_timing:
+            # Get the best (most recent) timing info for this job
+            timing_entries = dag_relevant_timing.get(job.name, [])
+            if timing_entries:
+                best_cluster_id, best_timing = timing_entries[0]
+                
+                # Apply the best timing and transfer information found
                 if 'total_bytes_sent' in best_timing:
                     job.total_bytes_sent = best_timing['total_bytes_sent']
                 if 'total_bytes_received' in best_timing:
@@ -697,43 +764,40 @@ class DAGStatusMonitor:
         """
         self.planned_training_runs.clear()
         
-        try:
-            with open(self.dag_file, 'r') as f:
-                content = f.read()
-            
-            # Find all JOB lines that match training pattern
-            job_pattern = r'JOB\s+(run\d+-train_epoch\d+)\s+'
-            job_matches = re.findall(job_pattern, content, re.MULTILINE)
-            
-            # Find all VARS lines with run_uuid and epoch
-            vars_pattern = r'VARS\s+(run\d+-train_epoch\d+)\s+.*?epoch="(\d+)".*?run_uuid="([^"]+)"'
-            vars_matches = re.findall(vars_pattern, content, re.MULTILINE)
-            
-            # Build mapping of job_name -> (run_uuid, epoch)
-            job_to_run_epoch = {}
-            for job_name, epoch, run_uuid in vars_matches:
-                job_to_run_epoch[job_name] = (run_uuid, int(epoch))
-            
-            # Group by run_uuid and count epochs
-            for job_name in job_matches:
-                if job_name in job_to_run_epoch:
-                    run_uuid, epoch = job_to_run_epoch[job_name]
-                    
-                    if run_uuid not in self.planned_training_runs:
-                        self.planned_training_runs[run_uuid] = {
-                            'total_epochs': 0,
-                            'max_epoch': 0,
-                            'job_names': []
-                        }
-                    
-                    self.planned_training_runs[run_uuid]['total_epochs'] += 1
-                    self.planned_training_runs[run_uuid]['max_epoch'] = max(
-                        self.planned_training_runs[run_uuid]['max_epoch'], epoch
-                    )
-                    self.planned_training_runs[run_uuid]['job_names'].append(job_name)
+        content = self._get_dag_file_content()
+        if not content:
+            return
         
-        except FileNotFoundError:
-            pass
+        # Find all JOB lines that match training pattern
+        job_pattern = r'JOB\s+(run\d+-train_epoch\d+)\s+'
+        job_matches = re.findall(job_pattern, content, re.MULTILINE)
+        
+        # Find all VARS lines with run_uuid and epoch
+        vars_pattern = r'VARS\s+(run\d+-train_epoch\d+)\s+.*?epoch="(\d+)".*?run_uuid="([^"]+)"'
+        vars_matches = re.findall(vars_pattern, content, re.MULTILINE)
+        
+        # Build mapping of job_name -> (run_uuid, epoch)
+        job_to_run_epoch = {}
+        for job_name, epoch, run_uuid in vars_matches:
+            job_to_run_epoch[job_name] = (run_uuid, int(epoch))
+        
+        # Group by run_uuid and count epochs
+        for job_name in job_matches:
+            if job_name in job_to_run_epoch:
+                run_uuid, epoch = job_to_run_epoch[job_name]
+                
+                if run_uuid not in self.planned_training_runs:
+                    self.planned_training_runs[run_uuid] = {
+                        'total_epochs': 0,
+                        'max_epoch': 0,
+                        'job_names': []
+                    }
+                
+                self.planned_training_runs[run_uuid]['total_epochs'] += 1
+                self.planned_training_runs[run_uuid]['max_epoch'] = max(
+                    self.planned_training_runs[run_uuid]['max_epoch'], epoch
+                )
+                self.planned_training_runs[run_uuid]['job_names'].append(job_name)
     
     def build_cluster_mapping(self, lines: List[str]) -> None:
         """Build mapping from HTCondor cluster IDs to DAG node names.
@@ -977,11 +1041,18 @@ class DAGStatusMonitor:
     
     
     def get_htcondor_status(self) -> Dict[int, Dict[str, Any]]:
-        """Get job status from HTCondor queue.
+        """Get job status from HTCondor queue with caching.
         
         Returns:
             Dictionary mapping cluster IDs to HTCondor job information
         """
+        current_time = time.time()
+        
+        # Return cached result if still valid
+        if (self._htcondor_status_cache is not None and 
+            current_time - self._htcondor_cache_time < self._htcondor_cache_ttl):
+            return self._htcondor_status_cache
+        
         job_status: Dict[int, Dict[str, Any]] = {}
         try:
             # Use condor_q to get current job status
@@ -1002,11 +1073,20 @@ class DAGStatusMonitor:
                             'hold_reason': job.get('HoldReason', ''),
                             'last_job_status': job.get('LastJobStatus', 0)
                         }
+            
+            # Cache the result
+            self._htcondor_status_cache = job_status
+            self._htcondor_cache_time = current_time
+            
         except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, json.JSONDecodeError) as e:
             # HTCondor not available - return empty status
             # Only log if it's an unexpected error (not just htcondor not found)
             if not isinstance(e, FileNotFoundError):
                 self.console.print(f"[dim]HTCondor query failed: {type(e).__name__}[/dim]")
+            
+            # Cache empty result to avoid repeated failed calls
+            self._htcondor_status_cache = job_status
+            self._htcondor_cache_time = current_time
             
         return job_status
     
@@ -1369,7 +1449,19 @@ class DAGStatusMonitor:
         Args:
             output_file: Path to output CSV file
             show_all: Show all jobs including planned but unsubmitted ones
+            
+        Raises:
+            ValueError: If output_file is empty
+            OSError: If unable to write to output file
         """
+        if not output_file or not output_file.strip():
+            raise ValueError("Output file path cannot be empty")
+            
+        output_path = Path(output_file)
+        
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
         # Get currently queued cluster IDs from HTCondor
         queued_cluster_ids = self.get_queued_cluster_ids()
         
@@ -1552,6 +1644,7 @@ class DAGStatusMonitor:
 def main() -> None:
     """Main entry point for the DAG monitor."""
     import argparse
+    import sys
     
     parser = argparse.ArgumentParser(description="Monitor DAG execution status")
     parser.add_argument("dag_file", nargs="?", default="pipeline.dag", 
@@ -1578,12 +1671,27 @@ def main() -> None:
     
     args = parser.parse_args()
     
-    # Initialize monitor
-    monitor = DAGStatusMonitor(args.dag_file)
+    # Validate arguments
+    if args.refresh_interval <= 0:
+        parser.error("Refresh interval must be positive")
+        
+    # Initialize monitor with error handling
+    try:
+        monitor = DAGStatusMonitor(args.dag_file)
+    except (ValueError, FileNotFoundError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error initializing monitor: {e}", file=sys.stderr)
+        sys.exit(1)
     
     # Set run filter if specified
     if args.filter_runs:
-        monitor.set_run_filter(args.filter_runs)
+        try:
+            monitor.set_run_filter(args.filter_runs)
+        except ValueError as e:
+            print(f"Error in run filter: {e}", file=sys.stderr)
+            sys.exit(1)
     
     # Process entire log file initially
     monitor.process_log_entries(incremental=False)
@@ -1593,24 +1701,37 @@ def main() -> None:
         return
     
     if args.csv_output:
-        # Process rescue files to get complete timing and transfer data
-        monitor.process_rescue_files()
-        
-        # Create progress directory if it doesn't exist
-        progress_dir = Path("./progress")
-        progress_dir.mkdir(exist_ok=True)
-        
-        # Generate timestamp-based filename in progress directory
-        dag_basename = Path(args.dag_file).stem
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_filename = progress_dir / f"{dag_basename}_{timestamp}.csv"
-        monitor.export_to_csv(str(csv_filename), show_all=args.show_all)
-        return
+        try:
+            # Process rescue files to get complete timing and transfer data
+            monitor.process_rescue_files()
+            
+            # Create progress directory if it doesn't exist
+            progress_dir = Path("./progress")
+            progress_dir.mkdir(exist_ok=True)
+            
+            # Generate timestamp-based filename in progress directory
+            dag_basename = Path(args.dag_file).stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            csv_filename = progress_dir / f"{dag_basename}_{timestamp}.csv"
+            monitor.export_to_csv(str(csv_filename), show_all=args.show_all)
+            return
+        except (ValueError, OSError) as e:
+            print(f"Error exporting CSV: {e}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Unexpected error during CSV export: {e}", file=sys.stderr)
+            sys.exit(1)
     
-    if args.once or not args.live:
-        monitor.monitor_once(verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
-    else:
-        monitor.monitor_live(args.refresh_interval, verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
+    try:
+        if args.once or not args.live:
+            monitor.monitor_once(verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
+        else:
+            monitor.monitor_live(args.refresh_interval, verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
+    except KeyboardInterrupt:
+        print("\nMonitoring stopped by user")
+    except Exception as e:
+        print(f"Error during monitoring: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
