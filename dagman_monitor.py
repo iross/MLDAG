@@ -768,13 +768,22 @@ class DAGStatusMonitor:
                     elif metl_status == 'transferring_input':
                         job.status = JobStatus.TRANSFERRING
                     elif metl_status == 'ready_to_run':
-                        job.status = JobStatus.IDLE
+                        # Check if job is actually running (has start_time but no end_time)
+                        if job.start_time and not job.end_time:
+                            job.status = JobStatus.RUNNING
+                        else:
+                            job.status = JobStatus.IDLE
                     elif metl_status == 'transferring_output':
                         job.status = JobStatus.TRANSFERRING
                     elif metl_status == 'transfer_complete':
                         # Job finished transferring output but may not be marked complete yet
                         if not job.end_time:
                             job.status = JobStatus.COMPLETED
+                
+                # Additional check: if job has start_time but no end_time and no specific status set,
+                # it should be RUNNING regardless of metl status
+                elif job.start_time and not job.end_time and job.status == JobStatus.IDLE:
+                    job.status = JobStatus.RUNNING
                 
                 job._metl_data_applied = True
     
