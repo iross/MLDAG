@@ -471,8 +471,8 @@ class DAGStatusMonitor:
                         i += 1
                         continue
                     
-                    # Look for job events (000 = submission, 001 = execution, 005 = termination)
-                    event_match = re.match(r'^(000|001|005) \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                    # Look for job events (000=submission, 001=execution, 005=termination, 012=held, 013=released, 040=transfer)
+                    event_match = re.match(r'^(000|001|005|012|013|040) \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                     if event_match:
                         event_code = event_match.group(1)
                         cluster_id = int(event_match.group(2))
@@ -491,14 +491,14 @@ class DAGStatusMonitor:
                         # Store timing information based on event type
                         if event_code == '000':  # Job submission
                             self.metl_job_timing[cluster_id]['submit_time'] = timestamp
-                            # Look for DAG Node on next line
+                            # Store DAG Node info for reference but don't use it for mapping
+                            # (DAGMan output is the authoritative source for cluster→node mapping)
                             if i + 1 < len(lines):
                                 next_line = lines[i + 1].strip()
                                 dag_match = re.match(r'^\s*DAG Node: (.+)$', next_line)
                                 if dag_match:
                                     dag_node_name = dag_match.group(1)
-                                    self.cluster_to_dagnode[cluster_id] = dag_node_name
-                                    self.metl_job_timing[cluster_id]['dag_node'] = dag_node_name
+                                    self.metl_job_timing[cluster_id]['dag_node_from_metl'] = dag_node_name
                         elif event_code == '001':  # Job executing
                             self.metl_job_timing[cluster_id]['start_time'] = timestamp
                         elif event_code == '005':  # Job terminated
@@ -516,6 +516,25 @@ class DAGStatusMonitor:
                                 if bytes_received_match:
                                     self.metl_job_timing[cluster_id]['total_bytes_received'] = int(bytes_received_match.group(1))
                                 j += 1
+                        elif event_code == '012':  # Job held
+                            self.metl_job_timing[cluster_id]['held_time'] = timestamp
+                            self._update_status_if_newer(cluster_id, timestamp, 'held')
+                        elif event_code == '013':  # Job released
+                            self.metl_job_timing[cluster_id]['released_time'] = timestamp
+                            self._update_status_if_newer(cluster_id, timestamp, 'released')
+                        elif event_code == '040':  # Transfer events
+                            if 'Started transferring input files' in line:
+                                self.metl_job_timing[cluster_id]['transfer_input_start'] = timestamp
+                                self._update_status_if_newer(cluster_id, timestamp, 'transferring_input')
+                            elif 'Finished transferring input files' in line:
+                                self.metl_job_timing[cluster_id]['transfer_input_end'] = timestamp
+                                self._update_status_if_newer(cluster_id, timestamp, 'ready_to_run')
+                            elif 'Started transferring output files' in line:
+                                self.metl_job_timing[cluster_id]['transfer_output_start'] = timestamp
+                                self._update_status_if_newer(cluster_id, timestamp, 'transferring_output')
+                            elif 'Finished transferring output files' in line:
+                                self.metl_job_timing[cluster_id]['transfer_output_end'] = timestamp
+                                self._update_status_if_newer(cluster_id, timestamp, 'transfer_complete')
                             
                     i += 1
                     
@@ -524,6 +543,17 @@ class DAGStatusMonitor:
         except Exception as e:
             # Log error but don't fail the entire monitoring
             self.console.print(f"[yellow]Warning: Error parsing metl.log: {e}[/yellow]")
+    
+    def _update_status_if_newer(self, cluster_id: int, timestamp: datetime, status: str) -> None:
+        """Update the current status only if this timestamp is newer than the last status update."""
+        if cluster_id not in self.metl_job_timing:
+            return
+            
+        # Track the timestamp of the last status update
+        last_status_time = self.metl_job_timing[cluster_id].get('last_status_time')
+        if last_status_time is None or timestamp >= last_status_time:
+            self.metl_job_timing[cluster_id]['current_status'] = status
+            self.metl_job_timing[cluster_id]['last_status_time'] = timestamp
     
     def find_rescue_files(self) -> List[Path]:
         """Find all rescue files for this DAG.
@@ -689,16 +719,13 @@ class DAGStatusMonitor:
         
         # Pre-filter timing info to only include DAG-relevant clusters
         # This avoids O(n²) behavior in the inner loop
-        # For completed jobs, include timing even if cluster not in current DAGMan log
+        # Use the authoritative DAGMan cluster→node mapping
         dag_relevant_timing = {}
         for cluster_id, timing_info in self.metl_job_timing.items():
-            dag_node = timing_info.get('dag_node')
-            if (dag_node in defined_jobs and 
-                timing_info.get('end_time')):
-                
-                # Allow timing data for jobs defined in this DAG
-                # Even if cluster not in current DAGMan log (for older completed jobs)
-                
+            # Use DAGMan mapping as the authoritative source
+            dag_node = self.cluster_to_dagnode.get(cluster_id)
+            if dag_node and dag_node in defined_jobs:
+                # This cluster belongs to a job in this DAG
                 if dag_node not in dag_relevant_timing:
                     dag_relevant_timing[dag_node] = []
                 dag_relevant_timing[dag_node].append((cluster_id, timing_info))
@@ -730,6 +757,24 @@ class DAGStatusMonitor:
                     job.end_time = best_timing['end_time']
                 if best_cluster_id and not job.cluster_id:
                     job.cluster_id = best_cluster_id
+                
+                # Apply current status from metl.log if available (most authoritative)
+                if 'current_status' in best_timing:
+                    metl_status = best_timing['current_status']
+                    if metl_status == 'held':
+                        job.status = JobStatus.HELD
+                    elif metl_status == 'released':
+                        job.status = JobStatus.IDLE
+                    elif metl_status == 'transferring_input':
+                        job.status = JobStatus.TRANSFERRING
+                    elif metl_status == 'ready_to_run':
+                        job.status = JobStatus.IDLE
+                    elif metl_status == 'transferring_output':
+                        job.status = JobStatus.TRANSFERRING
+                    elif metl_status == 'transfer_complete':
+                        # Job finished transferring output but may not be marked complete yet
+                        if not job.end_time:
+                            job.status = JobStatus.COMPLETED
                 
                 job._metl_data_applied = True
     
@@ -807,12 +852,72 @@ class DAGStatusMonitor:
                 )
                 self.planned_training_runs[run_uuid]['job_names'].append(job_name)
     
+    def build_cluster_mapping_from_dagman_out(self) -> None:
+        """Build mapping from HTCondor cluster IDs to DAG node names using .dagman.out file.
+        
+        This finds the MOST RECENT cluster ID assigned to each DAG node by parsing
+        the DAGMan output file which contains "assigned HTCondor ID" messages.
+        """
+        self.cluster_to_dagnode.clear()
+        dagman_out_file = self.dag_file.with_suffix('.dag.dagman.out')
+        
+        if not dagman_out_file.exists():
+            # Fallback to old method if .dagman.out doesn't exist
+            return
+            
+        try:
+            with open(dagman_out_file, 'r') as f:
+                lines = f.readlines()
+            
+            # Track the most recent cluster assignment for each DAG node
+            # Format: "assigned HTCondor ID (12345.0.0)" followed by "Submitting HTCondor Node job_name"
+            dagnode_to_cluster: Dict[str, int] = {}
+            
+            i = 0
+            while i < len(lines):
+                line = lines[i].strip()
+                
+                # Look for cluster assignment
+                cluster_match = re.search(r'assigned HTCondor ID \((\d+)\.\d+\.\d+\)', line)
+                if cluster_match:
+                    cluster_id = int(cluster_match.group(1))
+                    
+                    # Look ahead for the corresponding DAG node submission
+                    for j in range(i + 1, min(i + 15, len(lines))):  # Look at next 15 lines
+                        next_line = lines[j].strip()
+                        # Look for "Submitting HTCondor Node" or "Reassigning the id of job" patterns
+                        node_match = re.search(r'Submitting HTCondor Node (\S+)', next_line)
+                        if not node_match:
+                            node_match = re.search(r'Reassigning the id of job (\S+) from', next_line)
+                        if node_match:
+                            dag_node_name = node_match.group(1)
+                            # Always update to get the most recent cluster ID for this node
+                            dagnode_to_cluster[dag_node_name] = cluster_id
+                            break
+                
+                i += 1
+            
+            # Build the reverse mapping (cluster -> dagnode) using most recent assignments
+            for dag_node, cluster_id in dagnode_to_cluster.items():
+                self.cluster_to_dagnode[cluster_id] = dag_node
+                
+        except (OSError, IOError) as e:
+            self.console.print(f"[yellow]Warning: Could not read {dagman_out_file}: {e}[/yellow]")
+    
     def build_cluster_mapping(self, lines: List[str]) -> None:
         """Build mapping from HTCondor cluster IDs to DAG node names.
         
         Args:
             lines: List of lines from the log file
         """
+        # First try to use .dagman.out file for accurate mapping
+        self.build_cluster_mapping_from_dagman_out()
+        
+        # If we got mappings from .dagman.out, we're done
+        if self.cluster_to_dagnode:
+            return
+            
+        # Fallback to old method using log file events
         self.cluster_to_dagnode.clear()
         
         i = 0
@@ -859,6 +964,60 @@ class DAGStatusMonitor:
         # Fallback for any other format
         return (999, 999)
     
+    def extract_epoch_from_job_name(self, job_name: str) -> Optional[int]:
+        """Extract epoch number from job name.
+        
+        Args:
+            job_name: Job name like "run10-train_epoch5"
+            
+        Returns:
+            Epoch number from job name, or None if not found
+        """
+        try:
+            match = re.match(DAG_FILE_PATTERNS['JOB_NAME'], job_name)
+            if match:
+                return int(match.group(2))
+        except (ValueError, AttributeError):
+            pass
+        return None
+    
+    def get_status_start_time(self, job: JobInfo) -> Optional[datetime]:
+        """Get the start time for the job's current status.
+        
+        For jobs in different states, this returns:
+        - TRANSFERRING: When transfer started
+        - RUNNING: When execution started  
+        - HELD: When job was held
+        - Other states: Job start time
+        
+        Args:
+            job: JobInfo object
+            
+        Returns:
+            Datetime when the current status began, or None if not available
+        """
+        if not job.cluster_id or job.cluster_id not in self.metl_job_timing:
+            return job.start_time
+            
+        metl_timing = self.metl_job_timing[job.cluster_id]
+        
+        if job.status == JobStatus.TRANSFERRING:
+            # For transferring jobs, use the transfer start time
+            current_status = metl_timing.get('current_status')
+            if current_status == 'transferring_input':
+                return metl_timing.get('transfer_input_start')
+            elif current_status == 'transferring_output':
+                return metl_timing.get('transfer_output_start')
+        elif job.status == JobStatus.HELD:
+            # For held jobs, use when they were held
+            return metl_timing.get('held_time')
+        elif job.status == JobStatus.RUNNING:
+            # For running jobs, use execution start time
+            return job.start_time
+            
+        # Default to job start time
+        return job.start_time
+    
     def update_job_info(self, event: Dict[str, Any], job_name: str) -> None:
         """Update job information based on log event.
         
@@ -885,33 +1044,43 @@ class DAGStatusMonitor:
         if 'cluster_id' in event:
             job.cluster_id = event['cluster_id']
         
-        # Update status based on event type
-        if event['event_type'] == 'job_submitted':
-            job.status = JobStatus.IDLE
-            # Reset execution times for new submission (retry/resubmission)
-            if job.submit_time is None or event['timestamp'] > job.submit_time:
-                job.submit_time = event['timestamp']
-                job.start_time = None  # Clear previous execution time
-                job.end_time = None    # Clear previous end time
-        elif event['event_type'] == 'job_executing':
-            job.status = JobStatus.RUNNING
-            # Only update if this is a newer execution
-            if job.start_time is None or event['timestamp'] > job.start_time:
-                job.start_time = event['timestamp']
-                job.end_time = None  # Clear any previous end time
-        elif event['event_type'] == 'job_terminated':
-            job.status = JobStatus.COMPLETED
-            # Only update end time if we have a valid start time and this is after it
-            if job.start_time and event['timestamp'] > job.start_time:
-                job.end_time = event['timestamp']
-        elif event['event_type'] == 'job_held':
-            job.status = JobStatus.HELD
-        elif event['event_type'] == 'job_released':
-            job.status = JobStatus.IDLE
-        elif event['event_type'] == 'transfer_input_started':
-            job.status = JobStatus.TRANSFERRING
-        elif event['event_type'] == 'transfer_input_finished':
-            job.status = JobStatus.IDLE
+        # Check if metl.log has newer status information before updating
+        metl_override = False
+        if job.cluster_id and job.cluster_id in self.metl_job_timing:
+            metl_timing = self.metl_job_timing[job.cluster_id]
+            metl_last_status_time = metl_timing.get('last_status_time')
+            if metl_last_status_time and metl_last_status_time > event['timestamp']:
+                # metl.log has newer status information, don't override it
+                metl_override = True
+        
+        # Update status based on event type (only if metl.log doesn't have newer info)
+        if not metl_override:
+            if event['event_type'] == 'job_submitted':
+                job.status = JobStatus.IDLE
+                # Reset execution times for new submission (retry/resubmission)
+                if job.submit_time is None or event['timestamp'] > job.submit_time:
+                    job.submit_time = event['timestamp']
+                    job.start_time = None  # Clear previous execution time
+                    job.end_time = None    # Clear previous end time
+            elif event['event_type'] == 'job_executing':
+                job.status = JobStatus.RUNNING
+                # Only update if this is a newer execution
+                if job.start_time is None or event['timestamp'] > job.start_time:
+                    job.start_time = event['timestamp']
+                    job.end_time = None  # Clear any previous end time
+            elif event['event_type'] == 'job_terminated':
+                job.status = JobStatus.COMPLETED
+                # Only update end time if we have a valid start time and this is after it
+                if job.start_time and event['timestamp'] > job.start_time:
+                    job.end_time = event['timestamp']
+            elif event['event_type'] == 'job_held':
+                job.status = JobStatus.HELD
+            elif event['event_type'] == 'job_released':
+                job.status = JobStatus.IDLE
+            elif event['event_type'] == 'transfer_input_started':
+                job.status = JobStatus.TRANSFERRING
+            elif event['event_type'] == 'transfer_input_finished':
+                job.status = JobStatus.IDLE
             
         # Update training run status
         if job.run_uuid is not None:
@@ -994,6 +1163,10 @@ class DAGStatusMonitor:
                 self._initialize_planned_training_runs()
             
             self._process_log_lines(lines)
+            
+            # Re-apply metl.log status after processing DAG log events
+            # This ensures metl.log (which is more current) takes precedence
+            self.apply_metl_data_to_all_jobs()
                         
         except (FileNotFoundError, IOError):
             pass
@@ -1144,7 +1317,9 @@ class DAGStatusMonitor:
     def _should_show_queued_job(self, job: JobInfo, queued_cluster_ids: Set[int]) -> bool:
         """Check if a queued job should be shown based on HTCondor availability."""
         if job.cluster_id is None:
-            return False
+            # For jobs without cluster IDs, show them if they're the next epoch to run
+            # in their training run (i.e., ready to be submitted)
+            return self._is_next_epoch_to_run(job)
         
         # If HTCondor is available, check if job is in queue
         if queued_cluster_ids:
@@ -1152,6 +1327,46 @@ class DAGStatusMonitor:
         
         # HTCondor not available, show if job has cluster ID (was submitted)
         return True
+    
+    def _is_next_epoch_to_run(self, job: JobInfo) -> bool:
+        """Check if this job is the next epoch ready to run in its training run.
+        
+        Args:
+            job: JobInfo object to check
+            
+        Returns:
+            True if this is the next epoch that should run (all predecessors completed)
+        """
+        if not job.run_uuid:
+            return False
+            
+        # Get all jobs for this training run
+        run_jobs = [j for j in self.jobs.values() if j.run_uuid == job.run_uuid]
+        
+        # Extract epoch numbers
+        job_epoch = self.extract_epoch_from_job_name(job.name)
+        if job_epoch is None:
+            return False
+            
+        # Check if all previous epochs are completed
+        for other_job in run_jobs:
+            other_epoch = self.extract_epoch_from_job_name(other_job.name)
+            if other_epoch is not None and other_epoch < job_epoch:
+                if other_job.status != JobStatus.COMPLETED:
+                    # Previous epoch not completed, so this job is not ready
+                    return False
+        
+        # Check if this is the earliest incomplete epoch
+        for other_job in run_jobs:
+            other_epoch = self.extract_epoch_from_job_name(other_job.name)
+            if (other_epoch is not None and other_epoch < job_epoch and 
+                other_job.status != JobStatus.COMPLETED):
+                # There's an earlier incomplete epoch
+                return False
+        
+        # This job is ready to run (all previous epochs completed)
+        # But only show it if it's not already completed
+        return job.status != JobStatus.COMPLETED
     
     def create_status_table(self, verbose: bool = False, exclude_helper: bool = True, show_all: bool = False) -> Table:
         """Create a rich table showing current job status.
@@ -1250,12 +1465,15 @@ class DAGStatusMonitor:
                     duration = str(duration_delta).split('.')[0]
                 else:
                     duration = "[red]negative[/red]"
-            elif job.start_time:
-                duration_delta = datetime.now() - job.start_time
-                if duration_delta.total_seconds() >= 0:
-                    duration = str(duration_delta).split('.')[0]
-                else:
-                    duration = "[red]clock skew[/red]"
+            else:
+                # For ongoing jobs, use status-appropriate start time
+                status_start_time = self.get_status_start_time(job)
+                if status_start_time:
+                    duration_delta = datetime.now() - status_start_time
+                    if duration_delta.total_seconds() >= 0:
+                        duration = str(duration_delta).split('.')[0]
+                    else:
+                        duration = "[red]clock skew[/red]"
             
             # Extract run number from job name
             run_match = re.match(r'run(\d+)-train_epoch(\d+)', job.name)
@@ -1284,10 +1502,13 @@ class DAGStatusMonitor:
             else:
                 cluster_display = ""
             
+            # Use epoch from job name instead of VARS epoch for display consistency
+            display_epoch = self.extract_epoch_from_job_name(job.name)
+            
             # Prepare row data
             row_data = [
                 display_run,
-                str(job.epoch) if job.epoch else "",
+                str(display_epoch) if display_epoch is not None else "",
                 job.run_uuid[:8] if job.run_uuid else "",
                 cluster_display,
                 job.resource_name or "",
@@ -1516,14 +1737,17 @@ class DAGStatusMonitor:
                         else:
                             duration_seconds = "0"
                             duration_human = "negative"
-                    elif job.start_time:
-                        duration_delta = datetime.now() - job.start_time
-                        if duration_delta.total_seconds() >= 0:
-                            duration_seconds = str(int(duration_delta.total_seconds()))
-                            duration_human = str(duration_delta).split('.')[0]
-                        else:
-                            duration_seconds = "0"
-                            duration_human = "clock skew"
+                    else:
+                        # For ongoing jobs, use status-appropriate start time
+                        status_start_time = self.get_status_start_time(job)
+                        if status_start_time:
+                            duration_delta = datetime.now() - status_start_time
+                            if duration_delta.total_seconds() >= 0:
+                                duration_seconds = str(int(duration_delta.total_seconds()))
+                                duration_human = str(duration_delta).split('.')[0]
+                            else:
+                                duration_seconds = "0"
+                                duration_human = "clock skew"
                     
                     # Format timestamps
                     submit_time_str = job.submit_time.isoformat() if job.submit_time else ""
@@ -1536,10 +1760,13 @@ class DAGStatusMonitor:
                     if resource_name and resource_name.lower() not in major_resources:
                         resource_name = "ospool"
                     
+                    # Use epoch from job name for consistency
+                    display_epoch = self.extract_epoch_from_job_name(job.name)
+                    
                     writer.writerow({
                         'Job Name': job.name,
                         'Run Number': run_number,
-                        'Epoch': job.epoch if job.epoch is not None else "",
+                        'Epoch': display_epoch if display_epoch is not None else "",
                         'Run UUID': job.run_uuid or "",
                         'HTCondor Cluster ID': job.cluster_id if job.cluster_id is not None else "",
                         'Targeted Resource': resource_name,
