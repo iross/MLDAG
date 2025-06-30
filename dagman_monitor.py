@@ -870,9 +870,20 @@ class DAGStatusMonitor:
                 lines = f.readlines()
             
             # Track the most recent cluster assignment for each DAG node
-            # Format: "assigned HTCondor ID (12345.0.0)" followed by "Submitting HTCondor Node job_name"
             dagnode_to_cluster: Dict[str, int] = {}
             
+            # PHASE 1: Process "Reassigning" patterns first - these are most authoritative
+            for line in lines:
+                line = line.strip()
+                # Pattern: "Reassigning the id of job run2-train_epoch14 from (12641644.0.0) to (12641644.0.0)"
+                reassign_match = re.search(r'Reassigning the id of job (\S+) from \((\d+)\.\d+\.\d+\) to \((\d+)\.\d+\.\d+\)', line)
+                if reassign_match:
+                    dag_node_name = reassign_match.group(1)
+                    # Use the "to" cluster ID (group 3) as the final assignment
+                    cluster_id = int(reassign_match.group(3))
+                    dagnode_to_cluster[dag_node_name] = cluster_id
+            
+            # PHASE 2: Process initial assignments for jobs that weren't reassigned
             i = 0
             while i < len(lines):
                 line = lines[i].strip()
@@ -881,23 +892,30 @@ class DAGStatusMonitor:
                 cluster_match = re.search(r'assigned HTCondor ID \((\d+)\.\d+\.\d+\)', line)
                 if cluster_match:
                     cluster_id = int(cluster_match.group(1))
+                    dag_node_name = None
                     
                     # Look ahead for the corresponding DAG node submission
-                    for j in range(i + 1, min(i + 15, len(lines))):  # Look at next 15 lines
+                    # Find the IMMEDIATE next "Submitting HTCondor Node" line
+                    for j in range(i + 1, min(i + 15, len(lines))):
                         next_line = lines[j].strip()
-                        # Look for "Submitting HTCondor Node" or "Reassigning the id of job" patterns
+                        
+                        # Look for "Submitting HTCondor Node" 
                         node_match = re.search(r'Submitting HTCondor Node (\S+)', next_line)
-                        if not node_match:
-                            node_match = re.search(r'Reassigning the id of job (\S+) from', next_line)
                         if node_match:
                             dag_node_name = node_match.group(1)
-                            # Always update to get the most recent cluster ID for this node
-                            dagnode_to_cluster[dag_node_name] = cluster_id
                             break
+                        
+                        # Stop if we hit another cluster assignment to prevent cross-contamination
+                        if re.search(r'assigned HTCondor ID \((\d+)\.\d+\.\d+\)', next_line):
+                            break
+                    
+                    # Only update if this job wasn't already handled by reassignment
+                    if dag_node_name and dag_node_name not in dagnode_to_cluster:
+                        dagnode_to_cluster[dag_node_name] = cluster_id
                 
                 i += 1
             
-            # Build the reverse mapping (cluster -> dagnode) using most recent assignments
+            # Build the reverse mapping (cluster -> dagnode) using final assignments
             for dag_node, cluster_id in dagnode_to_cluster.items():
                 self.cluster_to_dagnode[cluster_id] = dag_node
                 
