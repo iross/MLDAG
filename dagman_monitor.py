@@ -647,7 +647,6 @@ class DAGStatusMonitor:
                     
                     # Try to get timing information from metl.log for completed jobs
                     if status == JobStatus.COMPLETED and not job.end_time:
-                        timing_applied = False
                         best_timing = None
                         best_cluster_id = None
                         
@@ -684,14 +683,10 @@ class DAGStatusMonitor:
                                 job.total_bytes_received = best_timing['total_bytes_received']
                             if best_cluster_id:
                                 job.cluster_id = best_cluster_id
-                            timing_applied = True
                         
-                        # If no timing found in metl.log, use rescue file modification time as fallback
-                        if not timing_applied and not job.end_time:
-                            try:
-                                job.end_time = datetime.fromtimestamp(rescue_file.stat().st_mtime)
-                            except OSError:
-                                job.end_time = datetime.now()
+                        # If no timing found in metl.log and no end_time set, leave end_time as None
+                        # Using rescue file modification time or current time is inaccurate for job completion
+                        # It's better to have no end_time than an incorrect one
                 
                 # Update training run status
                 if job.run_uuid:
@@ -1757,6 +1752,7 @@ class DAGStatusMonitor:
                         duration_seconds = ""
                         duration_human = ""
                     elif job.start_time and job.end_time:
+                        # Completed jobs: duration from start to end
                         duration_delta = job.end_time - job.start_time
                         if duration_delta.total_seconds() >= 0:
                             duration_seconds = str(int(duration_delta.total_seconds()))
@@ -1764,8 +1760,17 @@ class DAGStatusMonitor:
                         else:
                             duration_seconds = "0"
                             duration_human = "negative"
+                    elif job.status == JobStatus.RUNNING and job.start_time:
+                        # Running jobs: duration from execution start to now
+                        duration_delta = datetime.now() - job.start_time
+                        if duration_delta.total_seconds() >= 0:
+                            duration_seconds = str(int(duration_delta.total_seconds()))
+                            duration_human = str(duration_delta).split('.')[0]
+                        else:
+                            duration_seconds = "0"
+                            duration_human = "clock skew"
                     else:
-                        # For ongoing jobs, use status-appropriate start time
+                        # For other ongoing jobs, use status-appropriate start time
                         status_start_time = self.get_status_start_time(job)
                         if status_start_time:
                             duration_delta = datetime.now() - status_start_time
