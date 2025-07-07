@@ -17,15 +17,12 @@ output/
 *.dag.metrics
 *.dag.condor.sub
 
-
-
-
-
 pproc/logs
 *.log
 
 EventLog*
 *.h5
+*.csv
 pipeline.dag*
 nodes.dag.status
 resources.yaml
@@ -54,5 +51,8 @@ node_modules/
 .DS_Store
 
 # Task files
+.cursor
+.cursorrules
+CLAUDE.md
 # tasks.json
-# tasks/ 
+# tasks/
