@@ -1,7 +1,7 @@
 ---
 id: task-5
 title: Figure out where the compute was really done for very short reported epochs
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-07-07'
 updated_date: '2025-07-07'
