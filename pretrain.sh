@@ -35,9 +35,12 @@ python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain
     --ds_fn $PWD/global/global.db   \
     --split_dir $PWD/global/splits/standard_tr0.9_tu0.05_te0.05_w2a93d88bac32_r2098 \
     --max_epochs $epochs --uuid=$run_uuid  \
-    --use_wandb \
-    --wandb_online --wandb_project metl_global_$run_uuid\_$epochs \
     --random_seed $random_seed
+
+
+
+    #--use_wandb \
+    #--wandb_online --wandb_project metl_global_$run_uuid\_$epochs \
 
 #python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_avgfp_local.txt \
     #--ds_fn $PWD/global/global.db   \
