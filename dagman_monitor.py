@@ -1803,6 +1803,132 @@ class DAGStatusMonitor:
 
         return table
 
+    def _detect_hidden_compute(self, job_name: str, reported_duration: int) -> Tuple[bool, int, str]:
+        """Detect hidden compute work for short epochs.
+
+        Args:
+            job_name: Name of the job to check
+            reported_duration: Reported duration in seconds
+
+        Returns:
+            Tuple of (has_hidden_work, hidden_duration_seconds, failed_cluster_id)
+        """
+        # Only check for hidden compute if reported duration is less than 30 minutes
+        if reported_duration >= 1800:  # 30 minutes
+            return False, 0, ""
+
+        # Look for status 85 failures in DAGMan log
+        dagman_out = self.dag_file.with_suffix('.dag.dagman.out')
+        if not dagman_out.exists():
+            return False, 0, ""
+
+        try:
+            with open(dagman_out, 'r') as f:
+                content = f.read()
+
+            # Find all status 85 failures for this job
+            pattern = rf'Node {re.escape(job_name)} job proc \((\d+)\.0\.0\) failed with status 85'
+            matches = re.findall(pattern, content)
+
+            if not matches:
+                return False, 0, ""
+
+            # Check timing for each failed cluster
+            longest_duration = 0
+            longest_cluster = ""
+
+            for cluster_id in matches:
+                timing = self._get_cluster_timing_from_metl(cluster_id)
+                if timing and timing > longest_duration:
+                    longest_duration = timing
+                    longest_cluster = cluster_id
+
+            # Consider it hidden work if failed job was significantly longer
+            if longest_duration > reported_duration * 2:  # At least 2x longer
+                return True, longest_duration, longest_cluster
+
+            return False, 0, ""
+
+        except (OSError, IOError):
+            return False, 0, ""
+
+    def _get_cluster_timing_from_metl(self, cluster_id: str) -> Optional[int]:
+        """Get duration in seconds for a cluster from metl.log."""
+        metl_log_path = Path("metl.log")
+        if not metl_log_path.exists():
+            return None
+
+        start_time = None
+        end_time = None
+
+        try:
+            with open(metl_log_path, 'r') as f:
+                for line in f:
+                    if f"({cluster_id}." in line:
+                        # Job execution start
+                        if "001 " in line and "Job executing" in line:
+                            time_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                            if time_match:
+                                start_time = time_match.group(1)
+
+                        # Job termination
+                        elif "005 " in line and "Job terminated" in line:
+                            time_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                            if time_match:
+                                end_time = time_match.group(1)
+
+            if start_time and end_time:
+                from datetime import datetime
+                start = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+                end = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
+                return int((end - start).total_seconds())
+
+        except (OSError, IOError):
+            pass
+
+        return None
+
+    def _get_cluster_timing_details(self, cluster_id: str) -> Optional[Dict[str, str]]:
+        """Get detailed timing info for a cluster from metl.log."""
+        metl_log_path = Path("metl.log")
+        if not metl_log_path.exists():
+            return None
+
+        start_time = None
+        end_time = None
+
+        try:
+            with open(metl_log_path, 'r') as f:
+                for line in f:
+                    if f"({cluster_id}." in line:
+                        # Job execution start
+                        if "001 " in line and "Job executing" in line:
+                            time_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                            if time_match:
+                                start_time = time_match.group(1)
+
+                        # Job termination
+                        elif "005 " in line and "Job terminated" in line:
+                            time_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                            if time_match:
+                                end_time = time_match.group(1)
+
+            if start_time and end_time:
+                # Convert to ISO format for consistency with job timestamps
+                from datetime import datetime
+                start_dt = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+                end_dt = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
+
+                return {
+                    'start_time': start_dt.isoformat(),
+                    'end_time': end_dt.isoformat()
+                }
+
+        except (OSError, IOError):
+            pass
+
+        return None
+
     def export_to_csv(self, output_file: str, show_all: bool = False) -> None:
         """Export job status data to CSV file.
 
@@ -1907,19 +2033,50 @@ class DAGStatusMonitor:
                     # Use epoch from job name for consistency
                     display_epoch = self.extract_epoch_from_job_name(job.name)
 
+                    # For short COMPLETED epochs, check if actual compute was done by a different job
+                    actual_cluster_id = job.cluster_id
+                    actual_duration_seconds = duration_seconds
+                    actual_duration_human = duration_human
+                    actual_start_time = start_time_str
+                    actual_end_time = end_time_str
+
+                    if (job.status == JobStatus.COMPLETED and
+                        duration_seconds and duration_seconds.isdigit() and
+                        int(duration_seconds) < 1800):  # Less than 30 minutes
+
+                        has_hidden, hidden_dur, hidden_cid = self._detect_hidden_compute(
+                            job.name, int(duration_seconds))
+
+                        if has_hidden:
+                            # Use the actual compute job's data instead
+                            actual_cluster_id = hidden_cid
+                            actual_duration_seconds = str(hidden_dur)
+
+                            # Calculate human-readable duration
+                            hours = hidden_dur // 3600
+                            minutes = (hidden_dur % 3600) // 60
+                            secs = hidden_dur % 60
+                            actual_duration_human = f"{hours}:{minutes:02d}:{secs:02d}"
+
+                            # Get timing from the actual compute job
+                            hidden_timing = self._get_cluster_timing_details(hidden_cid)
+                            if hidden_timing:
+                                actual_start_time = hidden_timing['start_time']
+                                actual_end_time = hidden_timing['end_time']
+
                     writer.writerow({
                         'Job Name': job.name,
                         'Run Number': run_number,
                         'Epoch': display_epoch if display_epoch is not None else "",
                         'Run UUID': job.run_uuid or "",
-                        'HTCondor Cluster ID': job.cluster_id if job.cluster_id is not None else "",
+                        'HTCondor Cluster ID': actual_cluster_id if actual_cluster_id is not None else "",
                         'Targeted Resource': resource_name,
                         'Status': job.status.value,
                         'Submit Time': submit_time_str,
-                        'Start Time': start_time_str,
-                        'End Time': end_time_str,
-                        'Duration (seconds)': duration_seconds,
-                        'Duration (human)': duration_human,
+                        'Start Time': actual_start_time,
+                        'End Time': actual_end_time,
+                        'Duration (seconds)': actual_duration_seconds,
+                        'Duration (human)': actual_duration_human,
                         'Total Bytes Sent': job.total_bytes_sent,
                         'Total Bytes Received': job.total_bytes_received
                     })
