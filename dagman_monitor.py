@@ -1672,14 +1672,39 @@ class DAGStatusMonitor:
 
         for job in sorted_jobs:
             duration = ""
+            display_cluster_id = job.cluster_id
+            
             if job.status == JobStatus.IDLE:
                 duration = ""
             elif job.start_time and job.end_time:
                 duration_delta = job.end_time - job.start_time
-                if duration_delta.total_seconds() >= 0:
-                    duration = str(duration_delta).split('.')[0]
+                original_duration_seconds = int(duration_delta.total_seconds())
+                
+                # Check for hidden compute work for short completed jobs
+                if (job.status == JobStatus.COMPLETED and 
+                    original_duration_seconds > 0 and 
+                    original_duration_seconds < 1800):  # Less than 30 minutes
+                    
+                    has_hidden, hidden_dur, hidden_cid = self._detect_hidden_compute(
+                        job.name, original_duration_seconds)
+                    
+                    if has_hidden:
+                        # Use actual compute time and cluster
+                        hidden_hours = hidden_dur // 3600
+                        hidden_minutes = (hidden_dur % 3600) // 60
+                        hidden_secs = hidden_dur % 60
+                        duration = f"[bright_yellow]{hidden_hours}:{hidden_minutes:02d}:{hidden_secs:02d}*[/bright_yellow]"
+                        display_cluster_id = hidden_cid
+                    else:
+                        if duration_delta.total_seconds() >= 0:
+                            duration = str(duration_delta).split('.')[0]
+                        else:
+                            duration = "[red]negative[/red]"
                 else:
-                    duration = "[red]negative[/red]"
+                    if duration_delta.total_seconds() >= 0:
+                        duration = str(duration_delta).split('.')[0]
+                    else:
+                        duration = "[red]negative[/red]"
             else:
                 # For ongoing jobs, use status-appropriate start time
                 status_start_time = self.get_status_start_time(job)
@@ -1710,8 +1735,9 @@ class DAGStatusMonitor:
             status_style = status_colors.get(job.status.value, job.status.value)
 
             # Show cluster ID if available, otherwise show "N/A" for completed jobs
-            if job.cluster_id:
-                cluster_display = str(job.cluster_id)
+            # Use display_cluster_id which may be the hidden compute cluster
+            if display_cluster_id:
+                cluster_display = str(display_cluster_id)
             elif job.status == JobStatus.COMPLETED:
                 cluster_display = "N/A"
             else:
@@ -1733,9 +1759,35 @@ class DAGStatusMonitor:
             
             # Add GPU information for verbose mode
             if verbose:
-                gpu_count_display = str(job.gpu_count) if job.gpu_count > 0 else ""
-                device_name_display = job.gpu_device_name or ""
-                gpu_memory_display = str(job.gpu_memory_mb) if job.gpu_memory_mb > 0 else ""
+                # Use GPU info from hidden compute job if available, otherwise from current job
+                display_gpu_count = job.gpu_count
+                display_gpu_device = job.gpu_device_name
+                display_gpu_memory = job.gpu_memory_mb
+                
+                # Check if this job uses hidden compute and get GPU info from actual compute job
+                if (job.status == JobStatus.COMPLETED and job.start_time and job.end_time):
+                    duration_delta = job.end_time - job.start_time
+                    original_duration_seconds = int(duration_delta.total_seconds())
+                    
+                    if original_duration_seconds < 1800:  # Less than 30 minutes
+                        has_hidden, hidden_dur, hidden_cid = self._detect_hidden_compute(
+                            job.name, original_duration_seconds)
+                        
+                        if has_hidden:
+                            # Get GPU info from the actual compute job
+                            hidden_cluster_int = int(hidden_cid)
+                            if hidden_cluster_int in self.metl_job_timing:
+                                hidden_job_timing = self.metl_job_timing[hidden_cluster_int]
+                                if 'gpu_count' in hidden_job_timing:
+                                    display_gpu_count = hidden_job_timing['gpu_count']
+                                if 'gpu_device_name' in hidden_job_timing:
+                                    display_gpu_device = hidden_job_timing['gpu_device_name']
+                                if 'gpu_memory_mb' in hidden_job_timing:
+                                    display_gpu_memory = hidden_job_timing['gpu_memory_mb']
+                
+                gpu_count_display = str(display_gpu_count) if display_gpu_count > 0 else ""
+                device_name_display = display_gpu_device or ""
+                gpu_memory_display = str(display_gpu_memory) if display_gpu_memory > 0 else ""
                 
                 row_data.extend([
                     gpu_count_display,
@@ -2139,6 +2191,9 @@ class DAGStatusMonitor:
                     actual_duration_human = duration_human
                     actual_start_time = start_time_str
                     actual_end_time = end_time_str
+                    actual_gpu_count = job.gpu_count
+                    actual_gpu_device_name = job.gpu_device_name
+                    actual_gpu_memory_mb = job.gpu_memory_mb
 
                     if (job.status == JobStatus.COMPLETED and
                         duration_seconds and duration_seconds.isdigit() and
@@ -2163,6 +2218,17 @@ class DAGStatusMonitor:
                             if hidden_timing:
                                 actual_start_time = hidden_timing['start_time']
                                 actual_end_time = hidden_timing['end_time']
+                            
+                            # Get GPU info from the actual compute job
+                            hidden_cluster_int = int(hidden_cid)
+                            if hidden_cluster_int in self.metl_job_timing:
+                                hidden_job_timing = self.metl_job_timing[hidden_cluster_int]
+                                if 'gpu_count' in hidden_job_timing:
+                                    actual_gpu_count = hidden_job_timing['gpu_count']
+                                if 'gpu_device_name' in hidden_job_timing:
+                                    actual_gpu_device_name = hidden_job_timing['gpu_device_name']
+                                if 'gpu_memory_mb' in hidden_job_timing:
+                                    actual_gpu_memory_mb = hidden_job_timing['gpu_memory_mb']
 
                     writer.writerow({
                         'Job Name': job.name,
@@ -2179,9 +2245,9 @@ class DAGStatusMonitor:
                         'Duration (human)': actual_duration_human,
                         'Total Bytes Sent': job.total_bytes_sent,
                         'Total Bytes Received': job.total_bytes_received,
-                        'Number of GPUs': job.gpu_count if job.gpu_count > 0 else "",
-                        'DeviceName': job.gpu_device_name or "",
-                        'GlobalMemoryMb': job.gpu_memory_mb if job.gpu_memory_mb > 0 else ""
+                        'Number of GPUs': actual_gpu_count if actual_gpu_count > 0 else "",
+                        'DeviceName': actual_gpu_device_name or "",
+                        'GlobalMemoryMb': actual_gpu_memory_mb if actual_gpu_memory_mb > 0 else ""
                     })
 
             self.console.print(f"[green]CSV data exported to {output_file}[/green]")
