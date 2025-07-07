@@ -6,8 +6,23 @@ output/
 *.err
 *.out
 
+# DAGs, logs, etc
+*.dag
+*.dag.status
+*.dag.log
+*.dag.err
+*.dag.out
+*.dag.rescue*
+*.dag.lock
+*.dag.metrics
+*.dag.condor.sub
+
+
+
+
+
 pproc/logs
-*log
+*.log
 
 EventLog*
 *.h5
@@ -16,3 +31,28 @@ nodes.dag.status
 resources.yaml
 config.yaml
 *baseline.dag
+
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+# Dependency directories
+node_modules/
+# Environment variables
+.env
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+.DS_Store
+
+# Task files
+# tasks.json
+# tasks/ 
