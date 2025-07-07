@@ -4,8 +4,10 @@ title: Refactor to generalize the dag monitoring
 status: To Do
 assignee: []
 created_date: '2025-07-07'
+updated_date: '2025-07-07'
 labels: []
 dependencies: []
+priority: low
 ---
 
 ## Description
