@@ -28,9 +28,16 @@ from rich.columns import Columns
 HTCONDOR_EVENT_CODES = {
     'JOB_SUBMITTED': '000',
     'JOB_EXECUTING': '001', 
+    'JOB_EVICTED': '004',
     'JOB_TERMINATED': '005',
+    'IMAGE_SIZE_CHANGED': '006',
+    'JOB_ABORTED': '009',
     'JOB_HELD': '012',
     'JOB_RELEASED': '013',
+    'REMOTE_ERROR': '021',
+    'REMOTE_SYSTEM_CALL_SOCKET_LOST': '022',
+    'REMOTE_SYSTEM_CALL_SOCKET_REESTABLISHED': '023',
+    'REMOTE_SYSTEM_CALL_RECONNECT_FAILURE': '024',
     'TRANSFER_INPUT': '040'
 }
 
@@ -149,14 +156,26 @@ class DAGManLogParser:
             'job_executing': re.compile(
                 rf'^001 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job executing on host:'
             ),
+            'job_evicted': re.compile(
+                rf'^004 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job was evicted\.'
+            ),
             'job_terminated': re.compile(
                 rf'^005 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job terminated\.'
+            ),
+            'image_size_changed': re.compile(
+                rf'^006 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Image size of job updated:'
+            ),
+            'job_aborted': re.compile(
+                rf'^009 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job was aborted\.'
             ),
             'job_held': re.compile(
                 rf'^012 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job was held\.'
             ),
             'job_released': re.compile(
                 rf'^013 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Job was released\.'
+            ),
+            'remote_error': re.compile(
+                rf'^021 \((\d+)\.\d+\.\d+\) {timestamp_pattern} (Error from starter|Message from starter)'
             ),
             'transfer_input_started': re.compile(
                 rf'^040 \((\d+)\.\d+\.\d+\) {timestamp_pattern} Started transferring input files'
@@ -471,8 +490,8 @@ class DAGStatusMonitor:
                         i += 1
                         continue
                     
-                    # Look for job events (000=submission, 001=execution, 005=termination, 012=held, 013=released, 040=transfer)
-                    event_match = re.match(r'^(000|001|005|012|013|040) \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                    # Look for job events (000=submission, 001=execution, 004=evicted, 005=termination, 006=image_size, 009=aborted, 012=held, 013=released, 021=remote_error, 022-024=remote_calls, 040=transfer)
+                    event_match = re.match(r'^(000|001|004|005|006|009|012|013|021|022|023|024|040) \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                     if event_match:
                         event_code = event_match.group(1)
                         cluster_id = int(event_match.group(2))
@@ -503,6 +522,9 @@ class DAGStatusMonitor:
                             self.metl_job_timing[cluster_id]['start_time'] = timestamp
                         elif event_code == '005':  # Job terminated
                             self.metl_job_timing[cluster_id]['end_time'] = timestamp
+                            # Mark job as completed when it terminates successfully
+                            self.metl_job_timing[cluster_id]['current_status'] = 'completed'
+                            self.metl_job_timing[cluster_id]['last_status_time'] = timestamp
                             
                             # Look for data transfer information in the following lines
                             j = i + 1
@@ -522,6 +544,19 @@ class DAGStatusMonitor:
                         elif event_code == '013':  # Job released
                             self.metl_job_timing[cluster_id]['released_time'] = timestamp
                             self._update_status_if_newer(cluster_id, timestamp, 'released')
+                        elif event_code == '004':  # Job evicted
+                            self.metl_job_timing[cluster_id]['evicted_time'] = timestamp
+                            self._update_status_if_newer(cluster_id, timestamp, 'evicted')
+                        elif event_code == '006':  # Image size changed (informational only)
+                            # Store image size updates but don't change job status
+                            self.metl_job_timing[cluster_id]['last_image_update'] = timestamp
+                        elif event_code == '009':  # Job aborted
+                            self.metl_job_timing[cluster_id]['aborted_time'] = timestamp
+                            self._update_status_if_newer(cluster_id, timestamp, 'aborted')
+                        elif event_code in ['021', '022', '023', '024']:  # Remote system call events
+                            # Store remote events but don't change job status
+                            event_key = f'remote_event_{event_code}'
+                            self.metl_job_timing[cluster_id][event_key] = timestamp
                         elif event_code == '040':  # Transfer events
                             if 'Started transferring input files' in line:
                                 self.metl_job_timing[cluster_id]['transfer_input_start'] = timestamp
@@ -774,6 +809,15 @@ class DAGStatusMonitor:
                         # Job finished transferring output but may not be marked complete yet
                         if not job.end_time:
                             job.status = JobStatus.COMPLETED
+                    elif metl_status == 'completed':
+                        # Job terminated successfully
+                        job.status = JobStatus.COMPLETED
+                    elif metl_status == 'evicted':
+                        # Job was evicted - goes back to IDLE (DAGMan will retry)
+                        job.status = JobStatus.IDLE
+                    elif metl_status == 'aborted':
+                        # Job was aborted - goes back to IDLE (DAGMan will retry)
+                        job.status = JobStatus.IDLE
                 
                 # Additional check: if job has start_time but no end_time and no specific status set,
                 # it should be RUNNING regardless of metl status
@@ -1103,6 +1147,18 @@ class DAGStatusMonitor:
                 job.status = JobStatus.TRANSFERRING
             elif event['event_type'] == 'transfer_input_finished':
                 job.status = JobStatus.IDLE
+            elif event['event_type'] == 'job_evicted':
+                # Job was evicted - goes back to IDLE (DAGMan will retry)
+                job.status = JobStatus.IDLE
+            elif event['event_type'] == 'job_aborted':
+                # Job was aborted - goes back to IDLE (DAGMan will retry)
+                job.status = JobStatus.IDLE
+            elif event['event_type'] == 'image_size_changed':
+                # Image size changes don't affect job status
+                pass
+            elif event['event_type'] == 'remote_error':
+                # Remote errors don't directly affect job status
+                pass
             
         # Update training run status
         if job.run_uuid is not None:
@@ -1390,6 +1446,49 @@ class DAGStatusMonitor:
         # But only show it if it's not already completed
         return job.status != JobStatus.COMPLETED
     
+    def _select_best_epoch_for_display(self, sorted_jobs: List[JobInfo]) -> JobInfo:
+        """Select the best epoch to display for live monitoring.
+        
+        Priority:
+        1. Show RUNNING/TRANSFERRING jobs (active work)
+        2. Show IDLE jobs that are queued (next to run) - unless no IDLE jobs remain
+        3. Show HELD jobs (problems that need attention)  
+        4. Show latest COMPLETED job (progress indicator when training is done)
+        
+        Args:
+            sorted_jobs: List of jobs sorted by epoch number (ascending)
+            
+        Returns:
+            The best job to display for this training run
+        """
+        if not sorted_jobs:
+            return None
+            
+        # Categorize jobs by status priority for display
+        active_jobs = [j for j in sorted_jobs if j.status in {JobStatus.RUNNING, JobStatus.TRANSFERRING}]
+        queued_jobs = [j for j in sorted_jobs if j.status == JobStatus.IDLE]
+        held_jobs = [j for j in sorted_jobs if j.status == JobStatus.HELD]
+        completed_jobs = [j for j in sorted_jobs if j.status == JobStatus.COMPLETED]
+        
+        # Priority 1: Show any actively running/transferring job (highest epoch)
+        if active_jobs:
+            return max(active_jobs, key=lambda x: x.epoch)
+        
+        # Priority 2: Show queued job that's ready to run (highest epoch) - unless no IDLE jobs remain
+        if queued_jobs:
+            return max(queued_jobs, key=lambda x: x.epoch)
+            
+        # Priority 3: Show held jobs (problems need attention)
+        if held_jobs:
+            return max(held_jobs, key=lambda x: x.epoch)
+            
+        # Priority 4: Show the latest completed job (progress indicator when training is done)
+        if completed_jobs:
+            return max(completed_jobs, key=lambda x: x.epoch)
+            
+        # Fallback: return the latest job regardless of status
+        return sorted_jobs[-1]
+    
     def create_status_table(self, verbose: bool = False, exclude_helper: bool = True, show_all: bool = False) -> Table:
         """Create a rich table showing current job status.
         
@@ -1431,10 +1530,13 @@ class DAGStatusMonitor:
         # Get currently queued cluster IDs from HTCondor
         queued_cluster_ids = self.get_queued_cluster_ids()
         
-        # Filter jobs: exclude helper jobs and optionally filter to active jobs only
+        # Filter jobs: exclude helper jobs, spurious clusters, and optionally filter to active jobs only
         filtered_jobs = []
         for job in self.jobs.values():
             if exclude_helper and job.name == "annex_helper":
+                continue
+            # Exclude spurious clusters (clusters with no DAG node mapping)
+            if job.name.startswith("cluster_"):
                 continue
             if not self._matches_run_filter(job):
                 continue
@@ -1456,7 +1558,7 @@ class DAGStatusMonitor:
                         jobs_by_run['no_uuid'] = []
                     jobs_by_run['no_uuid'].append(job)
             
-            # For each run, keep only the job with the highest epoch number
+            # For each run, intelligently choose which epoch to display
             latest_jobs = []
             for _, jobs in jobs_by_run.items():
                 if jobs:
@@ -1465,8 +1567,13 @@ class DAGStatusMonitor:
                     jobs_without_epochs = [j for j in jobs if j.epoch is None]
                     
                     if jobs_with_epochs:
-                        latest_job = max(jobs_with_epochs, key=lambda x: x.epoch)
-                        latest_jobs.append(latest_job)
+                        # Sort jobs by epoch number
+                        sorted_jobs = sorted(jobs_with_epochs, key=lambda x: x.epoch)
+                        
+                        # Smart epoch selection for better live monitoring
+                        selected_job = self._select_best_epoch_for_display(sorted_jobs)
+                        if selected_job:
+                            latest_jobs.append(selected_job)
                     elif jobs_without_epochs:
                         # If no epochs, just take the first job
                         latest_jobs.append(jobs_without_epochs[0])
@@ -1572,11 +1679,14 @@ class DAGStatusMonitor:
         # Get currently queued cluster IDs from HTCondor
         queued_cluster_ids = self.get_queued_cluster_ids()
         
-        # Filter jobs: exclude helper jobs and optionally filter to active jobs only
+        # Filter jobs: exclude helper jobs, spurious clusters, and optionally filter to active jobs only
         # For training summary, we always want ALL active jobs to get accurate counts
         filtered_jobs = []
         for job in self.jobs.values():
             if exclude_helper and job.name == "annex_helper":
+                continue
+            # Exclude spurious clusters (clusters with no DAG node mapping)
+            if job.name.startswith("cluster_"):
                 continue
             if not self._matches_run_filter(job):
                 continue
@@ -1716,10 +1826,13 @@ class DAGStatusMonitor:
         # Get currently queued cluster IDs from HTCondor
         queued_cluster_ids = self.get_queued_cluster_ids()
         
-        # Filter jobs: exclude helper jobs and optionally filter to active jobs only
+        # Filter jobs: exclude helper jobs, spurious clusters, and optionally filter to active jobs only
         filtered_jobs = []
         for job in self.jobs.values():
             if job.name == "annex_helper":
+                continue
+            # Exclude spurious clusters (clusters with no DAG node mapping)
+            if job.name.startswith("cluster_"):
                 continue
             if not self._matches_run_filter(job):
                 continue
@@ -1818,16 +1931,17 @@ class DAGStatusMonitor:
             self.console.print(f"[red]Error writing CSV file {output_file}: {e}[/red]")
     
     def monitor_once(self, verbose: bool = False, show_all: bool = False, show_progress: bool = False) -> None:
-        """Single monitoring cycle - process logs and update status.
+        """Single monitoring cycle - display current status without processing logs.
+        
+        Note: This function assumes process_log_entries() has already been called
+        to load the current state before calling this function.
         
         Args:
             verbose: Include HTCondor job IDs in output
             show_all: Show all jobs including planned but unsubmitted ones
             show_progress: Show training run progress table
         """
-        self.process_log_entries(incremental=True)
-        
-        # Display tables
+        # Display tables (no log processing - that should be done before calling this)
         job_table = self.create_status_table(verbose=verbose, show_all=show_all)
         summary_table = self.create_training_summary_table(show_all=show_all)
         
@@ -1960,15 +2074,16 @@ def main() -> None:
             print(f"Error in run filter: {e}", file=sys.stderr)
             sys.exit(1)
     
-    # Process entire log file initially
-    monitor.process_log_entries(incremental=False)
-    
     if args.debug_timing:
+        # Process entire log file initially for debug timing
+        monitor.process_log_entries(incremental=False)
         monitor.debug_timing_info()
         return
     
     if args.csv_output:
         try:
+            # Process entire log file initially for CSV export
+            monitor.process_log_entries(incremental=False)
             # Process rescue files to get complete timing and transfer data
             monitor.process_rescue_files()
             
@@ -1991,8 +2106,12 @@ def main() -> None:
     
     try:
         if args.once or not args.live:
+            # For once mode, do full processing here to avoid double processing
+            monitor.process_log_entries(incremental=False)
             monitor.monitor_once(verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
         else:
+            # For live mode, do full processing here and then monitor with incremental updates
+            monitor.process_log_entries(incremental=False)
             monitor.monitor_live(args.refresh_interval, verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
     except KeyboardInterrupt:
         print("\nMonitoring stopped by user")
