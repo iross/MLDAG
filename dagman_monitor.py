@@ -93,6 +93,11 @@ class JobInfo:
         resource_name: Target compute resource
         retries: Number of retry attempts
         last_event_time: Most recent log event timestamp
+        total_bytes_sent: Total bytes sent by job
+        total_bytes_received: Total bytes received by job
+        gpu_count: Number of GPUs assigned to job
+        gpu_device_name: GPU device name (e.g., "NVIDIA A100-SXM4-40GB")
+        gpu_memory_mb: GPU memory in megabytes
     """
     name: str
     status: JobStatus = JobStatus.UNKNOWN
@@ -107,6 +112,9 @@ class JobInfo:
     last_event_time: Optional[datetime] = None
     total_bytes_sent: int = 0
     total_bytes_received: int = 0
+    gpu_count: int = 0
+    gpu_device_name: str = ""
+    gpu_memory_mb: int = 0
 
 
 @dataclass
@@ -519,6 +527,11 @@ class DAGStatusMonitor:
                                     self.metl_job_timing[cluster_id]['dag_node_from_metl'] = dag_node_name
                         elif event_code == '001':  # Job executing
                             self.metl_job_timing[cluster_id]['start_time'] = timestamp
+                            
+                            # Parse GPU information from subsequent lines
+                            gpu_info = self._parse_gpu_info_from_metl(lines, i)
+                            if gpu_info:
+                                self.metl_job_timing[cluster_id].update(gpu_info)
                         elif event_code == '005':  # Job terminated
                             self.metl_job_timing[cluster_id]['end_time'] = timestamp
                             # Mark job as completed when it terminates successfully
@@ -577,6 +590,67 @@ class DAGStatusMonitor:
         except Exception as e:
             # Log error but don't fail the entire monitoring
             self.console.print(f"[yellow]Warning: Error parsing metl.log: {e}[/yellow]")
+
+    def _parse_gpu_info_from_metl(self, lines: List[str], start_index: int) -> Optional[Dict[str, Union[int, str]]]:
+        """Parse GPU information from metl.log job execution event.
+        
+        Args:
+            lines: List of log lines
+            start_index: Index of the job execution event line
+            
+        Returns:
+            Dictionary with GPU information or None if no GPU info found
+        """
+        gpu_info = {}
+        gpu_count = 0
+        device_names = set()
+        memory_values = set()
+        
+        # Look ahead through the following lines to find GPU information
+        j = start_index + 1
+        while j < len(lines) and not lines[j].strip().startswith('...'):
+            line = lines[j].strip()
+            
+            # Look for GPU count
+            gpu_count_match = re.search(r'GPUs = (\d+)', line)
+            if gpu_count_match:
+                gpu_count = int(gpu_count_match.group(1))
+            
+            # Look for GPU device information
+            gpu_device_match = re.search(r'GPUs_GPU_[a-f0-9]+ = \[(.*?)\]', line)
+            if gpu_device_match:
+                gpu_attributes = gpu_device_match.group(1)
+                
+                # Extract DeviceName
+                device_name_match = re.search(r'DeviceName = "([^"]+)"', gpu_attributes)
+                if device_name_match:
+                    device_names.add(device_name_match.group(1))
+                
+                # Extract GlobalMemoryMb
+                memory_match = re.search(r'GlobalMemoryMb = (\d+)', gpu_attributes)
+                if memory_match:
+                    memory_values.add(int(memory_match.group(1)))
+            
+            j += 1
+        
+        # Store GPU information if found
+        if gpu_count > 0:
+            gpu_info['gpu_count'] = gpu_count
+            
+            # For device name, use the first unique device name found
+            # If multiple different device types, join them with "+"
+            if device_names:
+                if len(device_names) == 1:
+                    gpu_info['gpu_device_name'] = list(device_names)[0]
+                else:
+                    gpu_info['gpu_device_name'] = " + ".join(sorted(device_names))
+            
+            # For memory, use the first value found (assuming all GPUs same memory)
+            # If different memory values, use the maximum
+            if memory_values:
+                gpu_info['gpu_memory_mb'] = max(memory_values)
+        
+        return gpu_info if gpu_info else None
 
     def _update_status_if_newer(self, cluster_id: int, timestamp: datetime, status: str) -> None:
         """Update the current status only if this timestamp is newer than the last status update."""
@@ -777,6 +851,13 @@ class DAGStatusMonitor:
                     job.total_bytes_sent = best_timing['total_bytes_sent']
                 if 'total_bytes_received' in best_timing:
                     job.total_bytes_received = best_timing['total_bytes_received']
+                # Apply GPU information
+                if 'gpu_count' in best_timing:
+                    job.gpu_count = best_timing['gpu_count']
+                if 'gpu_device_name' in best_timing:
+                    job.gpu_device_name = best_timing['gpu_device_name']
+                if 'gpu_memory_mb' in best_timing:
+                    job.gpu_memory_mb = best_timing['gpu_memory_mb']
                 # Also apply timing if not already set
                 if 'submit_time' in best_timing and not job.submit_time:
                     job.submit_time = best_timing['submit_time']
@@ -1525,6 +1606,12 @@ class DAGStatusMonitor:
         table.add_column("Targeted Resource", style="yellow", max_width=15)
         table.add_column("Duration", style="white")
         table.add_column("Status", style="magenta")
+        
+        # Add GPU columns for verbose mode
+        if verbose:
+            table.add_column("GPUs", justify="right", style="bright_blue", max_width=6)
+            table.add_column("DeviceName", style="bright_green", max_width=20)
+            table.add_column("GPU Mem (MB)", justify="right", style="bright_yellow", max_width=12)
 
         # Get currently queued cluster IDs from HTCondor
         queued_cluster_ids = self.get_queued_cluster_ids()
@@ -1643,6 +1730,18 @@ class DAGStatusMonitor:
                 duration,
                 status_style
             ]
+            
+            # Add GPU information for verbose mode
+            if verbose:
+                gpu_count_display = str(job.gpu_count) if job.gpu_count > 0 else ""
+                device_name_display = job.gpu_device_name or ""
+                gpu_memory_display = str(job.gpu_memory_mb) if job.gpu_memory_mb > 0 else ""
+                
+                row_data.extend([
+                    gpu_count_display,
+                    device_name_display,
+                    gpu_memory_display
+                ])
 
             table.add_row(*row_data)
 
@@ -1973,7 +2072,8 @@ class DAGStatusMonitor:
                 fieldnames = [
                     'Job Name', 'Run Number', 'Epoch', 'Run UUID', 'HTCondor Cluster ID',
                     'Targeted Resource', 'Status', 'Submit Time', 'Start Time', 'End Time',
-                    'Duration (seconds)', 'Duration (human)', 'Total Bytes Sent', 'Total Bytes Received'
+                    'Duration (seconds)', 'Duration (human)', 'Total Bytes Sent', 'Total Bytes Received',
+                    'Number of GPUs', 'DeviceName', 'GlobalMemoryMb'
                 ]
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
@@ -2078,7 +2178,10 @@ class DAGStatusMonitor:
                         'Duration (seconds)': actual_duration_seconds,
                         'Duration (human)': actual_duration_human,
                         'Total Bytes Sent': job.total_bytes_sent,
-                        'Total Bytes Received': job.total_bytes_received
+                        'Total Bytes Received': job.total_bytes_received,
+                        'Number of GPUs': job.gpu_count if job.gpu_count > 0 else "",
+                        'DeviceName': job.gpu_device_name or "",
+                        'GlobalMemoryMb': job.gpu_memory_mb if job.gpu_memory_mb > 0 else ""
                     })
 
             self.console.print(f"[green]CSV data exported to {output_file}[/green]")
