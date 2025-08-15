@@ -800,12 +800,12 @@ class DAGStatusMonitor:
                 if job.run_uuid:
                     self.update_training_run_status(job)
 
+            self.rescue_files_processed.add(rescue_file)
+
         # Apply metl.log timing and transfer data to all jobs that have it
         # This is separate from rescue file status since jobs may have completed
         # but been restarted, so they don't show as COMPLETED in rescue files
         self.apply_metl_data_to_all_jobs()
-
-        self.rescue_files_processed.add(rescue_file)
 
     def apply_metl_data_to_all_jobs(self) -> None:
         """Apply metl.log timing and transfer data to all jobs that have it.
