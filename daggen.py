@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import typer
 from typing_extensions import Annotated
 import textwrap
@@ -23,10 +24,10 @@ class Job(BaseModel):
     def get_submit_description(self, **template_vars) -> str:
         """
         Generate HTCondor submit description by filling in template variables.
-        
+
         Args:
             **template_vars: Key-value pairs to substitute in the template
-            
+
         Returns:
             Completed submit description string
         """
@@ -117,16 +118,38 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     dag_txt += "}\n"
     return dag_txt
 
+def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
+    """Create a shared submit description for OSPool resources"""
+    inner_txt = experiment.submit_template.format(resource=Resource(name="ospool", resource_type=ResourceType.OSPOOL))
+
+    # Hacky. Fix this.
+    if "queue" in inner_txt and inner_txt.strip().endswith("queue"):
+        inner_txt = inner_txt.strip().rstrip("queue")
+    
+    # OSPool resources will use TARGET.GLIDEIN_ResourceName variable instead of hardcoding
+    inner_txt += 'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"\n'
+    
+    if "wandb" in config:
+        inner_txt += f'environment = "WANDB_API_KEY={config["wandb"]["api_key"]}"\n'
+    inner_txt += 'queue\n'
+
+    inner_txt = textwrap.indent(inner_txt, "\t")
+
+    dag_txt = "SUBMIT-DESCRIPTION ospool_pretrain.sub {"
+    dag_txt += f"\n{inner_txt}"
+    dag_txt += "}\n"
+    return dag_txt
+
 app = typer.Typer()
 @app.command()
 def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")] = 'config.yaml'):
     config = yaml.safe_load(open(config, 'r'))
     experiment = read_from_config("Experiment.yaml")
     dag_txt = ''
-    
+
     num_epoch = experiment.vars['epochs']
     epochs_per_job = experiment.vars['epochs_per_job']
-    
+
     jobs_txt = ''
     vars_txt = ''
     edges_txt = ''
@@ -136,29 +159,38 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    dag_txt += textwrap.dedent(get_service()) 
+    dag_txt += textwrap.dedent(get_service())
 
-    # Grab the resources, if targeting is desired 
-    # resources = get_ospool_resources()
-    # resources = get_resources_from_yaml()
+    # Grab the resources, if targeting is desired
+    resources = get_ospool_resources()
+    resources += get_resources_from_yaml()
 
     # Create experiment permutations and expansion
     # TODO: It doesn't really make sense to do both resource and var expansions,
     # but should be mulled over a bit
-    experiment._add_var_permutations()
-    # experiment._add_resource_permutations(resources)
+    # experiment._add_var_permutations()
+    experiment._add_resource_permutations(resources)
 
     # Create job descriptions for each resource.
     resources = []
     resource_names = set()
+    ospool_resources = []
     for tr in experiment.training_runs:
         for resource in tr.resources:
             if resource.name in resource_names: continue
             resources.append(resource)
             resource_names.add(resource.name)
+            if resource.resource_type == ResourceType.OSPOOL:
+                ospool_resources.append(resource)
 
+    # Generate shared ospool submit description if there are any ospool resources
+    if ospool_resources:
+        dag_txt += get_ospool_submit_description(config, experiment)
+
+    # Generate individual submit descriptions for non-ospool resources
     for resource in resources:
-        dag_txt += get_submit_description(None, resource, config, experiment)
+        if resource.resource_type != ResourceType.OSPOOL:
+            dag_txt += get_submit_description(None, resource, config, experiment)
 
     i = 0
     for tr in experiment.training_runs: # for each shishkabob
@@ -171,8 +203,9 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             resource = tr.resources[j] if tr.resources else Resource(name="default")
             # input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
-            job = Job(name=f'{run_prefix}-train_epoch{j}', 
-                      submit=f"{resource.name}_pretrain.sub", epoch=epoch, 
+            submit_file = "ospool_pretrain.sub" if resource.resource_type == ResourceType.OSPOOL else f"{resource.name}_pretrain.sub"
+            job = Job(name=f'{run_prefix}-train_epoch{j}',
+                      submit=submit_file, epoch=epoch,
                       run_uuid=tr.run_uuid, tr_id=j)
 
             jobs_txt += textwrap.dedent(f'''\
@@ -196,7 +229,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
 
         dag_txt += jobs_txt + '\n' + vars_txt  + '\n' + edges_txt  + '\n' + script_txt + '\n'
-        
+
         # flush out each shishkabob
         jobs_txt = ''
         vars_txt = ''
