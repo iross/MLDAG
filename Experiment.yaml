@@ -10,7 +10,6 @@ submit_template: |
   universe = container
   container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time.sif
 
-
   request_disk = {resource.disk}
   request_memory = {resource.mem_mb}
   request_cpus = {resource.cpus}
@@ -31,7 +30,7 @@ submit_template: |
 
   transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
   if defined continue_from_checkpoint
-    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+      transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
   endif
   transfer_output_files = output
   should_transfer_files = YES
@@ -45,25 +44,21 @@ submit_template: |
 
   queue
 vars:
-    epochs: 
-      value: 30
-      type: value
-      description: "Number of epochs to train for"
-    epochs_per_job: 
-      value: 1
-      type: value
-      description: "Number of epochs to train in each job"
-    run_uuid:
-      value: str(uuid.uuid4()).split("-")[0]
-      type: function
-      description: "UUID for the run"
-    run_number:
-      stop: 1
-      type: range
-      description: "Number of runs to generate"
-    test:
-      start: 0
-      stop: 10
-      step: 1
-      type: range
-      description: "Test variable"
+  epochs:
+    value: 30
+    type: value
+    description: "Number of epochs to train for"
+  epochs_per_job:
+    value: 1
+    type: value
+    description: "Number of epochs to train in each job"
+  run_number:
+    stop: 1
+    type: range
+    description: "Number of runs to generate"
+  test:
+    start: 0
+    stop: 10
+    step: 1
+    type: range
+    description: "Test variable"
