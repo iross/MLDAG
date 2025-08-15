@@ -19,6 +19,7 @@ submit_template: |
 
   +is_resumable = true
   +JobDurationCategory = "Long"
+  +ProjectName = "PATh_MLSupplement"
 
   executable = /bin/bash
   transfer_executable = false
