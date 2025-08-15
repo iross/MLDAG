@@ -1,3 +1,5 @@
+resources.yaml
+*.request
 __pycache__/
 data/EventLog*
 data/gel_timestamp.txt
