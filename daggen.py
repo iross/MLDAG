@@ -106,7 +106,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     if resource.resource_type == ResourceType.OSPOOL:
         inner_txt += f'TARGET.GLIDEIN_ResourceName == "{resource.name}"\n'
     elif resource.resource_type == ResourceType.ANNEX:
-        inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex_$(run_uuid)"\n'
+        inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex"\n'
     if "wandb" in config:
         inner_txt += f'environment = "WANDB_API_KEY={config["wandb"]["api_key"]}"\n'
     inner_txt += 'queue\n'
