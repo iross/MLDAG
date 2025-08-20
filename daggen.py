@@ -66,7 +66,7 @@ def get_ospool_resources() -> dict:
 def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
     # {'VARS {job.eval_name} epoch="{job.epoch}" run_uuid="{job.training_run.run_uuid}" earlystop_marker_pathname="{job.training_run.run_prefix}.esm"' if EVAL else ''}
     vars_txt = textwrap.dedent(f"""\
-        VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
+        VARS {job.name} epoch="{job.epoch}" run_uuid="{job.run_uuid}" random_seed="{training_run.random_seed}" ResourceName="{resource.name}" {'continue_from_checkpoint="true"' if job.tr_id > 0 else ""}
         """)
     if len(training_run.vars.items()) > 0:
         vars_txt += textwrap.dedent(f"""\
@@ -125,10 +125,10 @@ def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
     # Hacky. Fix this.
     if "queue" in inner_txt and inner_txt.strip().endswith("queue"):
         inner_txt = inner_txt.strip().rstrip("queue")
-    
+
     # OSPool resources will use TARGET.GLIDEIN_ResourceName variable instead of hardcoding
     inner_txt += 'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"\n'
-    
+
     if "wandb" in config:
         inner_txt += f'environment = "WANDB_API_KEY={config["wandb"]["api_key"]}"\n'
     inner_txt += 'queue\n'
