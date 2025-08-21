@@ -692,12 +692,50 @@ class SimpleCSVGenerator:
                     raw_targeted_resource = job_dag_to_resource.get((job_name, dag_source), '')
                     attempt.targeted_resource = self._map_resource_name(raw_targeted_resource)
                 
+                # Filter out jobs that went directly from released to aborted without execution
+                # These likely sat idle until they were aborted
+                if self._should_filter_idle_aborted_job(attempt):
+                    continue
+                
+                # Filter out unmapped jobs that couldn't be linked to any DAG file
+                if attempt.dag_source == "unmapped":
+                    continue
+                
                 attempts.append(attempt)
         
         # Sort by job name, cluster ID, and attempt sequence
         attempts.sort(key=lambda x: (x.job_name, x.cluster_id, x.attempt_sequence))
         
         return attempts
+    
+    def _should_filter_idle_aborted_job(self, attempt: 'JobAttempt') -> bool:
+        """Check if this job should be filtered out as an idle aborted job.
+        
+        Filter out jobs that went from released to aborted without re-execution.
+        These typically sat idle until they were aborted.
+        
+        Args:
+            attempt: JobAttempt object to check
+            
+        Returns:
+            True if the job should be filtered out, False otherwise
+        """
+        # Check if job was released and then aborted
+        if (attempt.released_time and attempt.aborted_time and 
+            attempt.final_status == 'aborted'):
+            
+            # If the job was released but never re-executed (start_time is before released_time),
+            # then it sat idle from release until abort
+            if (attempt.start_time and attempt.released_time and 
+                attempt.start_time < attempt.released_time):
+                # Job was held during execution, released, but never re-executed before abort
+                return True
+            
+            # Also filter if there's no start time after being released
+            elif attempt.released_time and not attempt.start_time:
+                return True
+        
+        return False
     
     def _map_resource_name(self, resource_name: str) -> str:
         """Map resource names using dagman_monitor's logic: keep major resources, others become 'ospool'."""
