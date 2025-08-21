@@ -502,13 +502,24 @@ class SimpleCSVGenerator:
         for i in range(line_index + 1, min(line_index + 20, len(lines))):
             line = lines[i].strip()
             
-            bytes_sent_match = re.search(r'TotalBytesSent = (\d+)', line)
+            # Look for "Total Bytes Sent By Job" format
+            bytes_sent_match = re.search(r'(\d+)\s+-\s+Total Bytes Sent By Job', line)
             if bytes_sent_match:
                 attempt['total_bytes_sent'] = int(bytes_sent_match.group(1))
                 
-            bytes_received_match = re.search(r'TotalBytesReceived = (\d+)', line)
+            # Look for "Total Bytes Received By Job" format  
+            bytes_received_match = re.search(r'(\d+)\s+-\s+Total Bytes Received By Job', line)
             if bytes_received_match:
                 attempt['total_bytes_received'] = int(bytes_received_match.group(1))
+                
+            # Also check for alternative formats (legacy support)
+            legacy_sent_match = re.search(r'TotalBytesSent = (\d+)', line)
+            if legacy_sent_match:
+                attempt['total_bytes_sent'] = int(legacy_sent_match.group(1))
+                
+            legacy_received_match = re.search(r'TotalBytesReceived = (\d+)', line)
+            if legacy_received_match:
+                attempt['total_bytes_received'] = int(legacy_received_match.group(1))
     
     def _parse_gpu_info(self, lines: List[str], line_index: int, attempt: Dict[str, Any]):
         """Parse GPU information and resource info from lines following an execution event."""
