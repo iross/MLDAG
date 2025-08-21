@@ -40,12 +40,17 @@ class JobAttempt:
     gpu_count: int = 0
     gpu_device_name: str = ""
     gpu_memory_mb: int = 0
+    gpu_capability: str = ""
+    gpu_driver_version: str = ""
     
     # Additional event times
     held_time: Optional[datetime] = None
     released_time: Optional[datetime] = None
     evicted_time: Optional[datetime] = None
     aborted_time: Optional[datetime] = None
+    
+    # Resource information
+    targeted_resource: str = ""
 
 
 class SimpleCSVGenerator:
@@ -71,32 +76,56 @@ class SimpleCSVGenerator:
             if Path(dagman_out).exists():
                 self.dagman_out_files.append(dagman_out)
         
+        # Find corresponding .dag.nodes.log files (contain detailed GPU information)
+        self.nodes_log_files = []
+        for dag_file in self.dag_files:
+            nodes_log = f"{dag_file}.nodes.log"
+            if Path(nodes_log).exists():
+                self.nodes_log_files.append(nodes_log)
+        
         print(f"Found DAG files: {self.dag_files}")
         print(f"Found DAGMan output files: {self.dagman_out_files}")
+        print(f"Found DAG nodes log files: {self.nodes_log_files}")
     
-    def parse_dag_files(self) -> Dict[str, str]:
-        """Parse DAG files to extract job name to DAG source mapping.
+    def parse_dag_files(self) -> Tuple[Dict[str, str], Dict[Tuple[str, str], str]]:
+        """Parse DAG files to extract job name to DAG source mapping and resource names.
         
         Returns:
-            Dictionary mapping job names to DAG source names
+            Tuple of (job_to_dag_mapping, (job_name, dag_source)_to_resource_mapping)
         """
         job_to_dag = {}
+        job_dag_to_resource = {}
         
         for dag_file in self.dag_files:
             dag_source = Path(dag_file).stem
             
             with open(dag_file, 'r') as f:
-                for line in f:
+                content = f.read()
+                
+                # Parse JOB lines: JOB job_name submit_file
+                for line in content.splitlines():
                     line = line.strip()
-                    # Look for JOB lines: JOB job_name submit_file
                     if line.startswith('JOB '):
                         parts = line.split()
                         if len(parts) >= 2:
                             job_name = parts[1]
                             job_to_dag[job_name] = dag_source
+                
+                # Parse VARS lines to extract ResourceName for this specific DAG
+                vars_pattern = r'VARS\s+(\S+)\s+(.+)'
+                for match in re.finditer(vars_pattern, content, re.MULTILINE):
+                    job_name = match.group(1)
+                    vars_content = match.group(2)
+                    
+                    # Look for ResourceName="value" in the VARS line
+                    resource_match = re.search(r'ResourceName="([^"]*)"', vars_content)
+                    if resource_match:
+                        # Store with both job_name and dag_source as key
+                        job_dag_to_resource[(job_name, dag_source)] = resource_match.group(1)
         
         print(f"Found {len(job_to_dag)} jobs across {len(self.dag_files)} DAG files")
-        return job_to_dag
+        print(f"Found {len(job_dag_to_resource)} job-DAG resource mappings")
+        return job_to_dag, job_dag_to_resource
     
     def parse_dagman_out_files(self) -> Dict[str, Dict[int, str]]:
         """Parse DAGMan output files to create node-to-jobid mapping for each DAG.
@@ -191,6 +220,105 @@ class SimpleCSVGenerator:
                 print(f"  Found {len(rescued_clusters[dag_source])} rescued clusters for {dag_source}")
         
         return rescued_clusters
+    
+    def parse_nodes_log_files(self) -> Dict[int, Dict[str, Any]]:
+        """Parse DAG nodes log files to extract detailed GPU information.
+        
+        Returns:
+            Dictionary mapping cluster_id to GPU details dict
+        """
+        gpu_details = {}
+        
+        for nodes_log_file in self.nodes_log_files:
+            print(f"Parsing {nodes_log_file} for GPU details...")
+            
+            with open(nodes_log_file, 'r') as f:
+                lines = f.readlines()
+            
+            current_cluster = None
+            
+            for i, line in enumerate(lines):
+                line = line.strip()
+                
+                # Look for execution events to get cluster ID
+                exec_match = re.match(r'^001 \((\d+)\.\d+\.\d+\)', line)
+                if exec_match:
+                    current_cluster = int(exec_match.group(1))
+                    continue
+                
+                # Look for GPU detail lines (only if we have a current cluster)
+                if current_cluster and line.startswith('GPUs_GPU_') and ' = [' in line:
+                    # Parse GPU details from the line
+                    # Format: GPUs_GPU_xxxxx = [ Id = "GPU-xxxxx"; ... DeviceName = "NVIDIA A40"; ... ]
+                    
+                    details = self._parse_gpu_details_line(line)
+                    if details:
+                        if current_cluster not in gpu_details:
+                            gpu_details[current_cluster] = {
+                                'devices': [],
+                                'device_name': '',
+                                'capability': '',
+                                'memory_mb': 0,
+                                'driver_version': ''
+                            }
+                        
+                        gpu_details[current_cluster]['devices'].append(details)
+                        
+                        # Update aggregate info (use first GPU's info, or combine)
+                        if not gpu_details[current_cluster]['device_name']:
+                            gpu_details[current_cluster]['device_name'] = details.get('DeviceName', '')
+                            gpu_details[current_cluster]['capability'] = details.get('Capability', '')
+                            gpu_details[current_cluster]['memory_mb'] = details.get('GlobalMemoryMb', 0)
+                            gpu_details[current_cluster]['driver_version'] = details.get('DriverVersion', '')
+                        elif len(gpu_details[current_cluster]['devices']) > 1:
+                            # Multiple GPUs - just use device name without count prefix
+                            first_device = gpu_details[current_cluster]['devices'][0].get('DeviceName', 'Unknown')
+                            gpu_details[current_cluster]['device_name'] = first_device
+                            # For memory, sum all GPUs
+                            total_memory = sum(d.get('GlobalMemoryMb', 0) for d in gpu_details[current_cluster]['devices'])
+                            gpu_details[current_cluster]['memory_mb'] = total_memory
+            
+            print(f"  Found GPU details for {len([c for c in gpu_details])} clusters")
+        
+        return gpu_details
+    
+    def _parse_gpu_details_line(self, line: str) -> Optional[Dict[str, Any]]:
+        """Parse a GPU details line from nodes log file."""
+        try:
+            # Extract the content between [ and ]
+            bracket_match = re.search(r'\[(.*)\]', line)
+            if not bracket_match:
+                return None
+            
+            content = bracket_match.group(1)
+            
+            # Parse key-value pairs separated by semicolons
+            details = {}
+            pairs = [pair.strip() for pair in content.split(';')]
+            
+            for pair in pairs:
+                if '=' in pair:
+                    key, value = pair.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"')
+                    
+                    # Convert numeric values
+                    if key in ['GlobalMemoryMb', 'ClockMhz']:
+                        try:
+                            details[key] = int(float(value))
+                        except ValueError:
+                            details[key] = value
+                    elif key in ['Capability', 'DriverVersion']:
+                        try:
+                            details[key] = str(float(value))
+                        except ValueError:
+                            details[key] = value
+                    else:
+                        details[key] = value
+            
+            return details
+        except Exception:
+            return None
     
     def find_job_and_dag_for_cluster(self, cluster_id: int, dag_mappings: Dict[str, Dict[int, str]]) -> Tuple[str, str]:
         """Find the job name and DAG source for a given cluster ID.
@@ -291,7 +419,10 @@ class SimpleCSVGenerator:
                 'cluster_id': cluster_id,
                 'attempt_sequence': attempt_sequence,
                 'start_time': start_time,
-                'line_index': exec_event['line_index']
+                'line_index': exec_event['line_index'],
+                'gpu_capability': '',
+                'gpu_driver_version': '',
+                'actual_resource': ''
             }
             
             # Find events for this specific attempt
@@ -380,11 +511,39 @@ class SimpleCSVGenerator:
                 attempt['total_bytes_received'] = int(bytes_received_match.group(1))
     
     def _parse_gpu_info(self, lines: List[str], line_index: int, attempt: Dict[str, Any]):
-        """Parse GPU information from lines following an execution event."""
-        for i in range(line_index + 1, min(line_index + 10, len(lines))):
+        """Parse GPU information and resource info from lines following an execution event."""
+        gpu_details = []
+        
+        for i in range(line_index + 1, min(line_index + 20, len(lines))):
             line = lines[i].strip()
             
-            if 'DetectedGpus = ' in line:
+            # Look for AvailableGPUs = { GPUs_GPU_xxxxx, GPUs_GPU_yyyyy }
+            if 'AvailableGPUs = ' in line:
+                gpu_match = re.search(r'AvailableGPUs = \{ ([^}]+) \}', line)
+                if gpu_match:
+                    gpu_list_str = gpu_match.group(1)
+                    # Split by comma to count GPUs and get device names
+                    gpu_devices = [gpu.strip() for gpu in gpu_list_str.split(',')]
+                    attempt['gpu_count'] = len(gpu_devices)
+                    # Use the first GPU ID as device name (will be overridden by detailed parsing if available)
+                    attempt['gpu_device_name'] = gpu_devices[0]
+            
+            # Look for detailed GPU specifications: GPUs_GPU_xxxxx = [ ... ]
+            elif line.startswith('GPUs_GPU_') and ' = [' in line:
+                details = self._parse_gpu_details_line(line)
+                if details:
+                    gpu_details.append(details)
+            
+            # Look for GLIDEIN_ResourceName (indicates OSPool execution)
+            elif 'GLIDEIN_ResourceName = ' in line:
+                resource_match = re.search(r'GLIDEIN_ResourceName = "([^"]*)"', line)
+                if resource_match:
+                    # If there's a GLIDEIN_ResourceName, use it (indicates OSPool)
+                    attempt['actual_resource'] = resource_match.group(1)
+            
+            
+            # Keep legacy patterns in case they exist elsewhere
+            elif 'DetectedGpus = ' in line:
                 gpu_match = re.search(r'DetectedGpus = "(\d+)"', line)
                 if gpu_match:
                     attempt['gpu_count'] = int(gpu_match.group(1))
@@ -396,6 +555,25 @@ class SimpleCSVGenerator:
                 memory_match = re.search(r'CUDAGlobalMemoryMb = (\d+)', line)
                 if memory_match:
                     attempt['gpu_memory_mb'] = int(memory_match.group(1))
+        
+        # Process detailed GPU information if found
+        if gpu_details:
+            attempt['gpu_count'] = len(gpu_details)
+            
+            if len(gpu_details) == 1:
+                # Single GPU
+                details = gpu_details[0]
+                attempt['gpu_device_name'] = details.get('DeviceName', '')
+                attempt['gpu_memory_mb'] = details.get('GlobalMemoryMb', 0)
+                attempt['gpu_capability'] = details.get('Capability', '')
+                attempt['gpu_driver_version'] = details.get('DriverVersion', '')
+            else:
+                # Multiple GPUs - just use the device name without count prefix
+                first_gpu = gpu_details[0]
+                attempt['gpu_device_name'] = first_gpu.get('DeviceName', 'Unknown')
+                attempt['gpu_memory_mb'] = sum(d.get('GlobalMemoryMb', 0) for d in gpu_details)
+                attempt['gpu_capability'] = first_gpu.get('Capability', '')
+                attempt['gpu_driver_version'] = first_gpu.get('DriverVersion', '')
     
     def extract_job_name_from_metl(self, cluster_id: int) -> Optional[str]:
         """Try to extract job name from DAG Node info in metl.log submission events."""
@@ -414,9 +592,10 @@ class SimpleCSVGenerator:
     
     def generate_attempts(self) -> List[JobAttempt]:
         """Generate all JobAttempt objects."""
-        job_to_dag = self.parse_dag_files()
+        job_to_dag, job_dag_to_resource = self.parse_dag_files()
         dag_mappings = self.parse_dagman_out_files()
         rescued_clusters = self.parse_rescue_events()
+        gpu_details = self.parse_nodes_log_files()
         cluster_attempts = self.parse_metl_log()
         
         attempts = []
@@ -467,10 +646,22 @@ class SimpleCSVGenerator:
                 attempt.total_bytes_sent = attempt_data.get('total_bytes_sent', 0)
                 attempt.total_bytes_received = attempt_data.get('total_bytes_received', 0)
                 
-                # Fill in GPU data
+                # Fill in GPU data (from metl.log parsing)
                 attempt.gpu_count = attempt_data.get('gpu_count', 0)
                 attempt.gpu_device_name = attempt_data.get('gpu_device_name', '')
                 attempt.gpu_memory_mb = attempt_data.get('gpu_memory_mb', 0)
+                attempt.gpu_capability = attempt_data.get('gpu_capability', '')
+                attempt.gpu_driver_version = attempt_data.get('gpu_driver_version', '')
+                
+                # Override with detailed GPU info from nodes log if available
+                if cluster_id in gpu_details:
+                    details = gpu_details[cluster_id]
+                    attempt.gpu_device_name = details.get('device_name', attempt.gpu_device_name)
+                    attempt.gpu_memory_mb = details.get('memory_mb', attempt.gpu_memory_mb)
+                    attempt.gpu_capability = details.get('capability', '')
+                    attempt.gpu_driver_version = details.get('driver_version', '')
+                    if not attempt.gpu_count:  # If not set from metl.log
+                        attempt.gpu_count = len(details.get('devices', []))
                 
                 # Fill in event times
                 attempt.held_time = attempt_data.get('held_time')
@@ -478,12 +669,35 @@ class SimpleCSVGenerator:
                 attempt.evicted_time = attempt_data.get('evicted_time')
                 attempt.aborted_time = attempt_data.get('aborted_time')
                 
+                # Fill in resource information (use actual if available, otherwise targeted)
+                actual_resource = attempt_data.get('actual_resource', '')
+                
+                if actual_resource:
+                    # If there's a GLIDEIN_ResourceName, it indicates OSPool execution
+                    attempt.targeted_resource = self._map_resource_name(actual_resource)
+                else:
+                    # No GLIDEIN_ResourceName means it ran on the targeted resource
+                    # Look up the correct resource for this specific job-DAG combination
+                    raw_targeted_resource = job_dag_to_resource.get((job_name, dag_source), '')
+                    attempt.targeted_resource = self._map_resource_name(raw_targeted_resource)
+                
                 attempts.append(attempt)
         
         # Sort by job name, cluster ID, and attempt sequence
         attempts.sort(key=lambda x: (x.job_name, x.cluster_id, x.attempt_sequence))
         
         return attempts
+    
+    def _map_resource_name(self, resource_name: str) -> str:
+        """Map resource names using dagman_monitor's logic: keep major resources, others become 'ospool'."""
+        major_resources = {"expanse", "bridges2", "delta", "anvil"}
+        
+        if resource_name and resource_name.lower() in major_resources:
+            return resource_name
+        elif resource_name:
+            return "ospool"
+        else:
+            return ""
     
     def format_datetime(self, dt: Optional[datetime]) -> str:
         """Format datetime for CSV output."""
@@ -514,11 +728,11 @@ class SimpleCSVGenerator:
         
         fieldnames = [
             'Job Name', 'DAG Source', 'HTCondor Cluster ID', 'Attempt Sequence',
-            'Final Status', 'Submit Time', 'Start Time', 'End Time',
+            'Final Status', 'Targeted Resource', 'Submit Time', 'Start Time', 'End Time',
             'Execution Duration (seconds)', 'Execution Duration (human)',
             'Total Duration (seconds)', 'Total Duration (human)',
             'Total Bytes Sent', 'Total Bytes Received',
-            'Number of GPUs', 'GPU Device Name', 'GPU Memory MB',
+            'Number of GPUs', 'GPU Device Name', 'GPU Memory MB', 'GPU Capability', 'GPU Driver Version',
             'Held Time', 'Released Time', 'Evicted Time', 'Aborted Time'
         ]
         
@@ -550,6 +764,7 @@ class SimpleCSVGenerator:
                         'HTCondor Cluster ID': attempt.cluster_id,
                         'Attempt Sequence': attempt.attempt_sequence,
                         'Final Status': attempt.final_status or "",
+                        'Targeted Resource': attempt.targeted_resource,
                         'Submit Time': self.format_datetime(attempt.submit_time),
                         'Start Time': self.format_datetime(attempt.start_time),
                         'End Time': self.format_datetime(attempt.end_time),
@@ -562,6 +777,8 @@ class SimpleCSVGenerator:
                         'Number of GPUs': attempt.gpu_count,
                         'GPU Device Name': attempt.gpu_device_name,
                         'GPU Memory MB': attempt.gpu_memory_mb,
+                        'GPU Capability': attempt.gpu_capability,
+                        'GPU Driver Version': attempt.gpu_driver_version,
                         'Held Time': self.format_datetime(attempt.held_time),
                         'Released Time': self.format_datetime(attempt.released_time),
                         'Evicted Time': self.format_datetime(attempt.evicted_time),
