@@ -1,0 +1,198 @@
+# Rescue DAG file, created after running
+#   the global_pretraining_with_ospool_w_anvil.dag DAG file
+# Created 6/30/2025 15:34:27 UTC
+# Rescue DAG version: 2.0.1 (partial)
+#
+# Total number of Nodes: 150
+# Nodes premarked DONE: 38
+# Nodes that failed: 0
+#   <ENDLIST>
+
+DONE run0-train_epoch0
+RETRY run0-train_epoch0 3
+DONE run0-train_epoch1
+RETRY run0-train_epoch1 3
+DONE run0-train_epoch2
+RETRY run0-train_epoch2 3
+DONE run0-train_epoch3
+RETRY run0-train_epoch3 3
+RETRY run0-train_epoch4 3
+RETRY run0-train_epoch5 3
+RETRY run0-train_epoch6 3
+RETRY run0-train_epoch7 3
+RETRY run0-train_epoch8 3
+RETRY run0-train_epoch9 3
+RETRY run0-train_epoch10 3
+RETRY run0-train_epoch11 3
+RETRY run0-train_epoch12 3
+RETRY run0-train_epoch13 3
+RETRY run0-train_epoch14 3
+RETRY run0-train_epoch15 3
+RETRY run0-train_epoch16 3
+RETRY run0-train_epoch17 3
+RETRY run0-train_epoch18 3
+RETRY run0-train_epoch19 3
+RETRY run0-train_epoch20 3
+RETRY run0-train_epoch21 3
+RETRY run0-train_epoch22 3
+RETRY run0-train_epoch23 3
+RETRY run0-train_epoch24 3
+RETRY run0-train_epoch25 3
+RETRY run0-train_epoch26 3
+RETRY run0-train_epoch27 3
+RETRY run0-train_epoch28 3
+RETRY run0-train_epoch29 3
+DONE run1-train_epoch0
+RETRY run1-train_epoch0 3
+DONE run1-train_epoch1
+RETRY run1-train_epoch1 3
+DONE run1-train_epoch2
+RETRY run1-train_epoch2 3
+DONE run1-train_epoch3
+RETRY run1-train_epoch3 3
+DONE run1-train_epoch4
+RETRY run1-train_epoch4 3
+DONE run1-train_epoch5
+RETRY run1-train_epoch5 3
+RETRY run1-train_epoch6 3
+RETRY run1-train_epoch7 3
+RETRY run1-train_epoch8 3
+RETRY run1-train_epoch9 3
+RETRY run1-train_epoch10 3
+RETRY run1-train_epoch11 3
+RETRY run1-train_epoch12 3
+RETRY run1-train_epoch13 3
+RETRY run1-train_epoch14 3
+RETRY run1-train_epoch15 3
+RETRY run1-train_epoch16 3
+RETRY run1-train_epoch17 3
+RETRY run1-train_epoch18 3
+RETRY run1-train_epoch19 3
+RETRY run1-train_epoch20 3
+RETRY run1-train_epoch21 3
+RETRY run1-train_epoch22 3
+RETRY run1-train_epoch23 3
+RETRY run1-train_epoch24 3
+RETRY run1-train_epoch25 3
+RETRY run1-train_epoch26 3
+RETRY run1-train_epoch27 3
+RETRY run1-train_epoch28 3
+RETRY run1-train_epoch29 3
+DONE run2-train_epoch0
+RETRY run2-train_epoch0 3
+DONE run2-train_epoch1
+RETRY run2-train_epoch1 3
+DONE run2-train_epoch2
+RETRY run2-train_epoch2 3
+DONE run2-train_epoch3
+RETRY run2-train_epoch3 3
+DONE run2-train_epoch4
+RETRY run2-train_epoch4 3
+DONE run2-train_epoch5
+RETRY run2-train_epoch5 3
+DONE run2-train_epoch6
+RETRY run2-train_epoch6 3
+DONE run2-train_epoch7
+RETRY run2-train_epoch7 3
+DONE run2-train_epoch8
+RETRY run2-train_epoch8 3
+DONE run2-train_epoch9
+RETRY run2-train_epoch9 3
+DONE run2-train_epoch10
+RETRY run2-train_epoch10 3
+RETRY run2-train_epoch11 3
+RETRY run2-train_epoch12 3
+RETRY run2-train_epoch13 3
+RETRY run2-train_epoch14 3
+RETRY run2-train_epoch15 3
+RETRY run2-train_epoch16 3
+RETRY run2-train_epoch17 3
+RETRY run2-train_epoch18 3
+RETRY run2-train_epoch19 3
+RETRY run2-train_epoch20 3
+RETRY run2-train_epoch21 3
+RETRY run2-train_epoch22 3
+RETRY run2-train_epoch23 3
+RETRY run2-train_epoch24 3
+RETRY run2-train_epoch25 3
+RETRY run2-train_epoch26 3
+RETRY run2-train_epoch27 3
+RETRY run2-train_epoch28 3
+RETRY run2-train_epoch29 3
+DONE run3-train_epoch0
+RETRY run3-train_epoch0 3
+DONE run3-train_epoch1
+RETRY run3-train_epoch1 3
+DONE run3-train_epoch2
+RETRY run3-train_epoch2 3
+DONE run3-train_epoch3
+RETRY run3-train_epoch3 3
+DONE run3-train_epoch4
+RETRY run3-train_epoch4 3
+DONE run3-train_epoch5
+RETRY run3-train_epoch5 3
+DONE run3-train_epoch6
+RETRY run3-train_epoch6 3
+DONE run3-train_epoch7
+RETRY run3-train_epoch7 3
+RETRY run3-train_epoch8 3
+RETRY run3-train_epoch9 3
+RETRY run3-train_epoch10 3
+RETRY run3-train_epoch11 3
+RETRY run3-train_epoch12 3
+RETRY run3-train_epoch13 3
+RETRY run3-train_epoch14 3
+RETRY run3-train_epoch15 3
+RETRY run3-train_epoch16 3
+RETRY run3-train_epoch17 3
+RETRY run3-train_epoch18 3
+RETRY run3-train_epoch19 3
+RETRY run3-train_epoch20 3
+RETRY run3-train_epoch21 3
+RETRY run3-train_epoch22 3
+RETRY run3-train_epoch23 3
+RETRY run3-train_epoch24 3
+RETRY run3-train_epoch25 3
+RETRY run3-train_epoch26 3
+RETRY run3-train_epoch27 3
+RETRY run3-train_epoch28 3
+RETRY run3-train_epoch29 3
+DONE run4-train_epoch0
+RETRY run4-train_epoch0 3
+DONE run4-train_epoch1
+RETRY run4-train_epoch1 3
+DONE run4-train_epoch2
+RETRY run4-train_epoch2 3
+DONE run4-train_epoch3
+RETRY run4-train_epoch3 3
+DONE run4-train_epoch4
+RETRY run4-train_epoch4 3
+DONE run4-train_epoch5
+RETRY run4-train_epoch5 3
+DONE run4-train_epoch6
+RETRY run4-train_epoch6 3
+DONE run4-train_epoch7
+RETRY run4-train_epoch7 3
+DONE run4-train_epoch8
+RETRY run4-train_epoch8 3
+RETRY run4-train_epoch9 3
+RETRY run4-train_epoch10 3
+RETRY run4-train_epoch11 3
+RETRY run4-train_epoch12 3
+RETRY run4-train_epoch13 3
+RETRY run4-train_epoch14 3
+RETRY run4-train_epoch15 3
+RETRY run4-train_epoch16 3
+RETRY run4-train_epoch17 3
+RETRY run4-train_epoch18 3
+RETRY run4-train_epoch19 3
+RETRY run4-train_epoch20 3
+RETRY run4-train_epoch21 3
+RETRY run4-train_epoch22 3
+RETRY run4-train_epoch23 3
+RETRY run4-train_epoch24 3
+RETRY run4-train_epoch25 3
+RETRY run4-train_epoch26 3
+RETRY run4-train_epoch27 3
+RETRY run4-train_epoch28 3
+RETRY run4-train_epoch29 3
