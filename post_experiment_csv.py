@@ -42,6 +42,7 @@ class JobAttempt:
     gpu_memory_mb: int = 0
     gpu_capability: str = ""
     gpu_driver_version: str = ""
+    gpu_ecc_enabled: Optional[bool] = None
 
     # Additional event times
     held_time: Optional[datetime] = None
@@ -270,6 +271,7 @@ class SimpleCSVGenerator:
                             gpu_details[current_cluster]['capability'] = details.get('Capability', '')
                             gpu_details[current_cluster]['memory_mb'] = details.get('GlobalMemoryMb', 0)
                             gpu_details[current_cluster]['driver_version'] = details.get('DriverVersion', '')
+                            gpu_details[current_cluster]['ecc_enabled'] = details.get('ECCEnabled')
                         elif len(gpu_details[current_cluster]['devices']) > 1:
                             # Multiple GPUs - just use device name without count prefix
                             first_device = gpu_details[current_cluster]['devices'][0].get('DeviceName', 'Unknown')
@@ -313,6 +315,14 @@ class SimpleCSVGenerator:
                             details[key] = str(float(value))
                         except ValueError:
                             details[key] = value
+                    elif key == 'ECCEnabled':
+                        # Parse boolean values
+                        if value.lower() in ['true', '1', 'yes']:
+                            details[key] = True
+                        elif value.lower() in ['false', '0', 'no']:
+                            details[key] = False
+                        else:
+                            details[key] = None
                     else:
                         details[key] = value
 
@@ -422,6 +432,7 @@ class SimpleCSVGenerator:
                 'line_index': exec_event['line_index'],
                 'gpu_capability': '',
                 'gpu_driver_version': '',
+                'gpu_ecc_enabled': None,
                 'actual_resource': ''
             }
 
@@ -578,6 +589,7 @@ class SimpleCSVGenerator:
                 attempt['gpu_memory_mb'] = details.get('GlobalMemoryMb', 0)
                 attempt['gpu_capability'] = details.get('Capability', '')
                 attempt['gpu_driver_version'] = details.get('DriverVersion', '')
+                attempt['gpu_ecc_enabled'] = details.get('ECCEnabled')
             else:
                 # Multiple GPUs - just use the device name without count prefix
                 first_gpu = gpu_details[0]
@@ -585,6 +597,7 @@ class SimpleCSVGenerator:
                 attempt['gpu_memory_mb'] = sum(d.get('GlobalMemoryMb', 0) for d in gpu_details)
                 attempt['gpu_capability'] = first_gpu.get('Capability', '')
                 attempt['gpu_driver_version'] = first_gpu.get('DriverVersion', '')
+                attempt['gpu_ecc_enabled'] = first_gpu.get('ECCEnabled')
 
     def extract_job_name_from_metl(self, cluster_id: int) -> Optional[str]:
         """Try to extract job name from DAG Node info in metl.log submission events."""
@@ -663,6 +676,7 @@ class SimpleCSVGenerator:
                 attempt.gpu_memory_mb = attempt_data.get('gpu_memory_mb', 0)
                 attempt.gpu_capability = attempt_data.get('gpu_capability', '')
                 attempt.gpu_driver_version = attempt_data.get('gpu_driver_version', '')
+                attempt.gpu_ecc_enabled = attempt_data.get('gpu_ecc_enabled')
 
                 # Override with detailed GPU info from nodes log if available
                 if cluster_id in gpu_details:
@@ -671,6 +685,7 @@ class SimpleCSVGenerator:
                     attempt.gpu_memory_mb = details.get('memory_mb', attempt.gpu_memory_mb)
                     attempt.gpu_capability = details.get('capability', '')
                     attempt.gpu_driver_version = details.get('driver_version', '')
+                    attempt.gpu_ecc_enabled = details.get('ecc_enabled', attempt.gpu_ecc_enabled)
                     if not attempt.gpu_count:  # If not set from metl.log
                         attempt.gpu_count = len(details.get('devices', []))
 
@@ -781,7 +796,7 @@ class SimpleCSVGenerator:
             'Execution Duration (seconds)', 'Execution Duration (human)',
             'Total Duration (seconds)', 'Total Duration (human)',
             'Total Bytes Sent', 'Total Bytes Received',
-            'Number of GPUs', 'GPU Device Name', 'GPU Memory MB', 'GPU Capability', 'GPU Driver Version',
+            'Number of GPUs', 'GPU Device Name', 'GPU Memory MB', 'GPU Capability', 'GPU Driver Version', 'GPU ECC Enabled',
             'Held Time', 'Released Time', 'Evicted Time', 'Aborted Time'
         ]
 
@@ -797,7 +812,7 @@ class SimpleCSVGenerator:
             job_attempts[job_name].sort(key=lambda x: (x.cluster_id, x.attempt_sequence))
 
         with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
             writer.writeheader()
 
             for job_name, job_attempt_list in sorted(job_attempts.items()):
@@ -828,6 +843,7 @@ class SimpleCSVGenerator:
                         'GPU Memory MB': attempt.gpu_memory_mb,
                         'GPU Capability': attempt.gpu_capability,
                         'GPU Driver Version': attempt.gpu_driver_version,
+                        'GPU ECC Enabled': attempt.gpu_ecc_enabled,
                         'Held Time': self.format_datetime(attempt.held_time),
                         'Released Time': self.format_datetime(attempt.released_time),
                         'Evicted Time': self.format_datetime(attempt.evicted_time),
