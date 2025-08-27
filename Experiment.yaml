@@ -28,6 +28,7 @@ submit_template: |
   transfer_executable = false
   arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
 
+  preserve_relative_paths = true
   transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
   if defined continue_from_checkpoint
       transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
@@ -53,7 +54,7 @@ vars:
     type: value
     description: "Number of epochs to train in each job"
   run_number:
-    stop: 1
+    stop: 5
     type: range
     description: "Number of runs to generate"
   test:
