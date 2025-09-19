@@ -98,6 +98,7 @@ class JobInfo:
         gpu_count: Number of GPUs assigned to job
         gpu_device_name: GPU device name (e.g., "NVIDIA A100-SXM4-40GB")
         gpu_memory_mb: GPU memory in megabytes
+        glidein_resource: GlideinResource name from actual execution host
     """
     name: str
     status: JobStatus = JobStatus.UNKNOWN
@@ -115,6 +116,7 @@ class JobInfo:
     gpu_count: int = 0
     gpu_device_name: str = ""
     gpu_memory_mb: int = 0
+    glidein_resource: Optional[str] = None
 
 
 @dataclass
@@ -308,6 +310,9 @@ class DAGStatusMonitor:
         # Track last processed position in log file for incremental parsing
         self.last_log_position = 0
         self.last_metl_log_position = 0
+
+        # State tracking for real-time parsing of multi-line events
+        self.pending_glidein_lookup: Optional[int] = None  # Cluster ID waiting for GLIDEIN_ResourceName
 
         # Cluster ID to DAG node name mapping
         self.cluster_to_dagnode: Dict[int, str] = {}
@@ -527,11 +532,16 @@ class DAGStatusMonitor:
                                     self.metl_job_timing[cluster_id]['dag_node_from_metl'] = dag_node_name
                         elif event_code == '001':  # Job executing
                             self.metl_job_timing[cluster_id]['start_time'] = timestamp
-                            
-                            # Parse GPU information from subsequent lines
+
+                            # Parse GPU information and GlideinResource from subsequent lines
                             gpu_info = self._parse_gpu_info_from_metl(lines, i)
                             if gpu_info:
                                 self.metl_job_timing[cluster_id].update(gpu_info)
+
+                            # Parse GLIDEIN_ResourceName from the same lines
+                            glidein_resource = self._parse_glidein_resource_from_metl(lines, i)
+                            if glidein_resource:
+                                self.metl_job_timing[cluster_id]['glidein_resource'] = glidein_resource
                         elif event_code == '005':  # Job terminated
                             self.metl_job_timing[cluster_id]['end_time'] = timestamp
                             # Mark job as completed when it terminates successfully
@@ -651,6 +661,30 @@ class DAGStatusMonitor:
                 gpu_info['gpu_memory_mb'] = max(memory_values)
         
         return gpu_info if gpu_info else None
+
+    def _parse_glidein_resource_from_metl(self, lines: List[str], start_index: int) -> Optional[str]:
+        """Parse GLIDEIN_ResourceName from metl.log starter message event.
+
+        Args:
+            lines: List of log lines
+            start_index: Index of the 021 starter message event line
+
+        Returns:
+            GLIDEIN_ResourceName if found, None otherwise
+        """
+        # Look ahead through the following lines to find GLIDEIN_ResourceName
+        j = start_index + 1
+        while j < len(lines) and not lines[j].strip().startswith('...'):
+            line = lines[j].strip()
+
+            # Look for GLIDEIN_ResourceName = "value"
+            glidein_match = re.search(r'GLIDEIN_ResourceName\s*=\s*"([^"]+)"', line)
+            if glidein_match:
+                return glidein_match.group(1)
+
+            j += 1
+
+        return None
 
     def _update_status_if_newer(self, cluster_id: int, timestamp: datetime, status: str) -> None:
         """Update the current status only if this timestamp is newer than the last status update."""
@@ -858,6 +892,9 @@ class DAGStatusMonitor:
                     job.gpu_device_name = best_timing['gpu_device_name']
                 if 'gpu_memory_mb' in best_timing:
                     job.gpu_memory_mb = best_timing['gpu_memory_mb']
+                # Apply GlideinResource information
+                if 'glidein_resource' in best_timing:
+                    job.glidein_resource = best_timing['glidein_resource']
                 # Also apply timing if not already set
                 if 'submit_time' in best_timing and not job.submit_time:
                     job.submit_time = best_timing['submit_time']
@@ -2123,7 +2160,7 @@ class DAGStatusMonitor:
             with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
                 fieldnames = [
                     'Job Name', 'Run Number', 'Epoch', 'Run UUID', 'HTCondor Cluster ID',
-                    'Targeted Resource', 'Status', 'Submit Time', 'Start Time', 'End Time',
+                    'Targeted Resource', 'GlideinResource', 'Status', 'Submit Time', 'Start Time', 'End Time',
                     'Duration (seconds)', 'Duration (human)', 'Total Bytes Sent', 'Total Bytes Received',
                     'Number of GPUs', 'DeviceName', 'GlobalMemoryMb'
                 ]
@@ -2194,6 +2231,7 @@ class DAGStatusMonitor:
                     actual_gpu_count = job.gpu_count
                     actual_gpu_device_name = job.gpu_device_name
                     actual_gpu_memory_mb = job.gpu_memory_mb
+                    actual_glidein_resource = job.glidein_resource
 
                     if (job.status == JobStatus.COMPLETED and
                         duration_seconds and duration_seconds.isdigit() and
@@ -2218,8 +2256,8 @@ class DAGStatusMonitor:
                             if hidden_timing:
                                 actual_start_time = hidden_timing['start_time']
                                 actual_end_time = hidden_timing['end_time']
-                            
-                            # Get GPU info from the actual compute job
+
+                            # Get GPU info and GlideinResource from the actual compute job
                             hidden_cluster_int = int(hidden_cid)
                             if hidden_cluster_int in self.metl_job_timing:
                                 hidden_job_timing = self.metl_job_timing[hidden_cluster_int]
@@ -2229,6 +2267,8 @@ class DAGStatusMonitor:
                                     actual_gpu_device_name = hidden_job_timing['gpu_device_name']
                                 if 'gpu_memory_mb' in hidden_job_timing:
                                     actual_gpu_memory_mb = hidden_job_timing['gpu_memory_mb']
+                                if 'glidein_resource' in hidden_job_timing:
+                                    actual_glidein_resource = hidden_job_timing['glidein_resource']
 
                     writer.writerow({
                         'Job Name': job.name,
@@ -2237,6 +2277,7 @@ class DAGStatusMonitor:
                         'Run UUID': job.run_uuid or "",
                         'HTCondor Cluster ID': actual_cluster_id if actual_cluster_id is not None else "",
                         'Targeted Resource': resource_name,
+                        'GlideinResource': actual_glidein_resource or "",
                         'Status': job.status.value,
                         'Submit Time': submit_time_str,
                         'Start Time': actual_start_time,
@@ -2361,9 +2402,25 @@ class DAGStatusMonitor:
                     timestamp = self._parse_timestamp(timestamp_str)
                     if timestamp and cluster_id in self.cluster_to_dagnode:
                         dag_node = self.cluster_to_dagnode[cluster_id]
-                        if dag_node not in self.metl_job_timing:
-                            self.metl_job_timing[dag_node] = {}
-                        self.metl_job_timing[dag_node]['start_time'] = timestamp
+                        if cluster_id not in self.metl_job_timing:
+                            self.metl_job_timing[cluster_id] = {}
+                        self.metl_job_timing[cluster_id]['start_time'] = timestamp
+                        # Set up to look for GLIDEIN_ResourceName in subsequent lines
+                        self.pending_glidein_lookup = cluster_id
+
+            elif self.pending_glidein_lookup and 'GLIDEIN_ResourceName' in line:
+                # Look for GLIDEIN_ResourceName = "value"
+                glidein_match = re.search(r'GLIDEIN_ResourceName\s*=\s*"([^"]+)"', line)
+                if glidein_match:
+                    cluster_id = self.pending_glidein_lookup
+                    glidein_resource = glidein_match.group(1)
+
+                    if cluster_id not in self.metl_job_timing:
+                        self.metl_job_timing[cluster_id] = {}
+                    self.metl_job_timing[cluster_id]['glidein_resource'] = glidein_resource
+
+                    # Clear the pending lookup
+                    self.pending_glidein_lookup = None
 
             elif ' 005 ' in line:  # Job terminated
                 match = re.search(r'Cluster (\d+) Proc \d+ \.\.\.\s+(.+)', line)
@@ -2374,9 +2431,9 @@ class DAGStatusMonitor:
                     timestamp = self._parse_timestamp(timestamp_str)
                     if timestamp and cluster_id in self.cluster_to_dagnode:
                         dag_node = self.cluster_to_dagnode[cluster_id]
-                        if dag_node not in self.metl_job_timing:
-                            self.metl_job_timing[dag_node] = {}
-                        self.metl_job_timing[dag_node]['end_time'] = timestamp
+                        if cluster_id not in self.metl_job_timing:
+                            self.metl_job_timing[cluster_id] = {}
+                        self.metl_job_timing[cluster_id]['end_time'] = timestamp
 
         except Exception as e:
             # Silently handle parsing errors for malformed lines
