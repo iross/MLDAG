@@ -2279,6 +2279,109 @@ class DAGStatusMonitor:
             training_table = self.create_training_run_table()
             self.console.print(training_table)
 
+    def _follow_log_file(self, log_file: Path) -> None:
+        """Follow log file like tail -f and process lines as they arrive.
+
+        Args:
+            log_file: Path to the log file to follow
+        """
+        try:
+            # Start tail -f process
+            process = subprocess.Popen(
+                ['tail', '-f', str(log_file)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=1  # Line buffered
+            )
+
+            self.tail_process = process  # Store for cleanup
+
+            while True:
+                # Check if process is still running
+                if process.poll() is not None:
+                    break
+
+                line = process.stdout.readline()
+                if line:
+                    line = line.strip()
+                    if line and line != '...':
+                        # Process the line immediately for metl.log
+                        if log_file.name == 'metl.log':
+                            self._process_metl_line(line)
+                        else:
+                            # Process DAG log line
+                            event = self.parser.parse_log_line(line)
+                            if event:
+                                self._process_event(event)
+                else:
+                    time.sleep(0.1)  # Brief pause if no data
+
+        except Exception as e:
+            self.console.print(f"[red]Error following log file {log_file}: {e}[/red]")
+        finally:
+            if hasattr(self, 'tail_process') and self.tail_process:
+                self.tail_process.terminate()
+                self.tail_process.wait()
+
+    def _process_metl_line(self, line: str) -> None:
+        """Process a single line from metl.log in real-time."""
+        # Parse timing information from metl.log line
+        self._parse_metl_log_line(line)
+
+        # Apply updates to jobs immediately
+        self.apply_metl_data_to_all_jobs()
+
+    def _parse_metl_log_line(self, line: str) -> None:
+        """Parse a single metl.log line for timing information."""
+        try:
+            # Extract event data from the line
+            if ' 000 ' in line:  # Job submitted
+                match = re.search(r'Cluster (\d+) Proc \d+ \.\.\.\s+(.+)', line)
+                if match:
+                    cluster_id = int(match.group(1))
+                    timestamp_str = match.group(2).strip()
+
+                    # Parse the timestamp
+                    timestamp = self._parse_timestamp(timestamp_str)
+                    if timestamp:
+                        # Look for DAG node in subsequent lines or stored mapping
+                        if cluster_id in self.cluster_to_dagnode:
+                            dag_node = self.cluster_to_dagnode[cluster_id]
+                            if dag_node not in self.metl_job_timing:
+                                self.metl_job_timing[dag_node] = {}
+                            self.metl_job_timing[dag_node]['submit_time'] = timestamp
+
+            elif ' 001 ' in line:  # Job executing
+                match = re.search(r'Cluster (\d+) Proc \d+ \.\.\.\s+(.+)', line)
+                if match:
+                    cluster_id = int(match.group(1))
+                    timestamp_str = match.group(2).strip()
+
+                    timestamp = self._parse_timestamp(timestamp_str)
+                    if timestamp and cluster_id in self.cluster_to_dagnode:
+                        dag_node = self.cluster_to_dagnode[cluster_id]
+                        if dag_node not in self.metl_job_timing:
+                            self.metl_job_timing[dag_node] = {}
+                        self.metl_job_timing[dag_node]['start_time'] = timestamp
+
+            elif ' 005 ' in line:  # Job terminated
+                match = re.search(r'Cluster (\d+) Proc \d+ \.\.\.\s+(.+)', line)
+                if match:
+                    cluster_id = int(match.group(1))
+                    timestamp_str = match.group(2).strip()
+
+                    timestamp = self._parse_timestamp(timestamp_str)
+                    if timestamp and cluster_id in self.cluster_to_dagnode:
+                        dag_node = self.cluster_to_dagnode[cluster_id]
+                        if dag_node not in self.metl_job_timing:
+                            self.metl_job_timing[dag_node] = {}
+                        self.metl_job_timing[dag_node]['end_time'] = timestamp
+
+        except Exception as e:
+            # Silently handle parsing errors for malformed lines
+            pass
+
     def monitor_live(self, refresh_interval: float = 2.0, verbose: bool = False, show_all: bool = False, show_progress: bool = False) -> None:
         """Live monitoring with rich display updates.
 
@@ -2288,13 +2391,14 @@ class DAGStatusMonitor:
             show_all: Show all jobs including planned but unsubmitted ones
             show_progress: Show training run progress table
         """
+        # Do initial full processing
+        self.process_log_entries(incremental=False)
+
         with Live(self.create_status_table(verbose=verbose, show_all=show_all),
                  refresh_per_second=1/refresh_interval) as live:
             try:
                 while True:
-                    self.process_log_entries(incremental=True)
-
-                    # Update display with tables
+                    # Update display with current state
                     job_table = self.create_status_table(verbose=verbose, show_all=show_all)
                     summary_table = self.create_training_summary_table(show_all=show_all)
 
@@ -2309,6 +2413,59 @@ class DAGStatusMonitor:
 
             except KeyboardInterrupt:
                 self.console.print("\n[yellow]Monitoring stopped by user[/yellow]")
+
+    def monitor_live_tail(self, verbose: bool = False, show_all: bool = False, show_progress: bool = False) -> None:
+        """Live monitoring using tail -f for real-time log following.
+
+        This method is optimized for actively written log files and provides
+        more responsive updates than the polling-based monitor_live method.
+
+        Args:
+            verbose: Include HTCondor job IDs in output
+            show_all: Show all jobs including planned but unsubmitted ones
+            show_progress: Show training run progress table
+        """
+        import threading
+
+        # Do initial full processing
+        self.process_log_entries(incremental=False)
+
+        # Start background thread to follow metl.log
+        metl_log_path = Path("metl.log")
+        tail_thread = None
+
+        if metl_log_path.exists():
+            def follow_metl_log():
+                self._follow_log_file(metl_log_path)
+
+            tail_thread = threading.Thread(target=follow_metl_log, daemon=True)
+            tail_thread.start()
+
+        # Display updates every 0.5 seconds for more responsive UI
+        with Live(self.create_status_table(verbose=verbose, show_all=show_all),
+                 refresh_per_second=2) as live:
+            try:
+                while True:
+                    # Update display with current state
+                    job_table = self.create_status_table(verbose=verbose, show_all=show_all)
+                    summary_table = self.create_training_summary_table(show_all=show_all)
+
+                    if show_progress and self.training_runs:
+                        training_table = self.create_training_run_table()
+                        tables = Columns([job_table, summary_table, training_table])
+                    else:
+                        tables = Columns([job_table, summary_table])
+
+                    live.update(tables)
+                    time.sleep(0.5)  # More frequent updates
+
+            except KeyboardInterrupt:
+                self.console.print("\n[yellow]Monitoring stopped by user[/yellow]")
+            finally:
+                # Clean up tail process
+                if hasattr(self, 'tail_process') and self.tail_process:
+                    self.tail_process.terminate()
+                    self.tail_process.wait()
 
     def debug_timing_info(self) -> None:
         """Debug method to show timing information extraction."""
@@ -2374,6 +2531,8 @@ def main() -> None:
                             "Examples: --filter-runs 1,3,5 or --filter-runs abc123,def456 or --filter-runs 1,abc123")
     parser.add_argument("--csv-output", action="store_true",
                        help="Export job status data to CSV file with timestamp and exit")
+    parser.add_argument("--tail", action="store_true",
+                       help="Use tail -f for real-time log following (recommended for actively written logs)")
 
     args = parser.parse_args()
 
@@ -2434,6 +2593,9 @@ def main() -> None:
             # For once mode, do full processing here to avoid double processing
             monitor.process_log_entries(incremental=False)
             monitor.monitor_once(verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
+        elif args.tail:
+            # Use tail -f based monitoring for actively written logs
+            monitor.monitor_live_tail(verbose=args.verbose, show_all=args.show_all, show_progress=args.show_progress)
         else:
             # For live mode, do full processing here and then monitor with incremental updates
             monitor.process_log_entries(incremental=False)
