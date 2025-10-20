@@ -502,12 +502,29 @@ class SimpleCSVGenerator:
             pre_exec_transfers = [e for e in cluster_events
                                  if e['event_code'] == '040' and e['timestamp'] <= start_time]
 
-            # Process transfer events that happened before execution (in reverse chronological order)
+            # Two-pass approach: first find "Finished", then find matching "Started"
+            transfer_end_time = None
+            transfer_start_time = None
+
+            # Pass 1: Find the most recent "Finished" event
             for transfer_event in reversed(pre_exec_transfers):
-                self._parse_transfer_timing(lines, transfer_event['line_index'], attempt)
-                # Only process the most recent transfer completion before execution
-                if attempt.get('transfer_input_end_time'):
+                line_text = lines[transfer_event['line_index']].strip()
+                if 'Finished transferring input files' in line_text:
+                    transfer_end_time = transfer_event['timestamp']
                     break
+
+            # Pass 2: If we found a "Finished", find the matching "Started" before it
+            if transfer_end_time:
+                for transfer_event in reversed(pre_exec_transfers):
+                    line_text = lines[transfer_event['line_index']].strip()
+                    if 'Started transferring input files' in line_text and transfer_event['timestamp'] <= transfer_end_time:
+                        transfer_start_time = transfer_event['timestamp']
+                        break
+
+                # Store the times if we found both
+                if transfer_start_time and transfer_end_time:
+                    attempt['transfer_input_start_time'] = transfer_start_time
+                    attempt['transfer_input_end_time'] = transfer_end_time
 
             for event in attempt_events:
                 if event['event_code'] == '005':  # Termination
