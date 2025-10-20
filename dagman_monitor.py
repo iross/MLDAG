@@ -2590,6 +2590,8 @@ def main() -> None:
                        help="Export job status data to CSV file with timestamp and exit")
     parser.add_argument("--tail", action="store_true",
                        help="Use tail -f for real-time log following (recommended for actively written logs)")
+    parser.add_argument("--detect-hidden-compute", action="store_true",
+                       help="Enable detection of hidden compute work from failed jobs (status 85). Only needed for specific experimental setups.")
 
     args = parser.parse_args()
 

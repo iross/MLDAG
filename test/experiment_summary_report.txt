@@ -1,0 +1,54 @@
+EXPERIMENT ANALYSIS SUMMARY REPORT
+==================================================
+
+Analysis Period: 2025-08-20 to 2025-09-30
+Total Job Attempts: 386
+Unique Jobs: 120
+
+RESOURCE UTILIZATION:
+--------------------
+EXPANSE:
+  • Successful Jobs: 19 (100.0%)
+  • Computation Time: 107.4 hours
+  • Time Efficiency: 12.3%
+
+OSPOOL:
+  • Successful Jobs: 116 (100.0%)
+  • Computation Time: 1,206.8 hours
+  • Time Efficiency: 22.3%
+
+DELTA:
+  • Successful Jobs: 7 (100.0%)
+  • Computation Time: 56.1 hours
+  • Time Efficiency: 8.2%
+
+BRIDGES2:
+  • Successful Jobs: 3 (100.0%)
+  • Computation Time: 18.1 hours
+  • Time Efficiency: 2.8%
+
+OVERALL METRICS:
+---------------
+Total Success Rate: 100.0%
+Total Computation Time: 1,388.5 hours
+Overall Time Efficiency: 100.0%
+
+GPU UTILIZATION:
+----------------
+Total GPU Hours: 2,558.9
+GPU Types Used: 5
+
+NVIDIA A100-SXM4-40GB: 2.0 jobs, 100.0% success rate
+NVIDIA A100-SXM4-80GB: 47.0 jobs, 100.0% success rate
+NVIDIA A40: 5.0 jobs, 100.0% success rate
+NVIDIA H200: 87.0 jobs, 100.0% success rate
+Tesla V100-SXM2-32GB: 22.0 jobs, 100.0% success rate
+
+DATA TRANSFER:
+-------------
+Total Data Transferred: 6,635.1 GB
+
+bridges2: 15.6 GB (4.0 jobs)
+delta: 54.7 GB (13.0 jobs)
+expanse: 130.0 GB (36.0 jobs)
+ospool: 6,434.8 GB (224.0 jobs)

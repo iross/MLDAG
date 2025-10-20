@@ -1,0 +1,61 @@
+EXPERIMENT ANALYSIS SUMMARY REPORT
+==================================================
+
+Analysis Period: 2025-04-16 to 2025-08-16
+Total Job Attempts: 936
+Unique Jobs: 470
+
+RESOURCE UTILIZATION:
+--------------------
+OSPOOL:
+  • Successful Epochs: 558 (100.0%)
+  • Computation Time: 2,295.1 hours
+  • Time Efficiency: 19.7%
+
+EXPANSE:
+  • Successful Epochs: 14 (100.0%)
+  • Computation Time: 203.6 hours
+  • Time Efficiency: 17.8%
+
+DELTA:
+  • Successful Epochs: 13 (100.0%)
+  • Computation Time: 308.1 hours
+  • Time Efficiency: 16.2%
+
+BRIDGES2:
+  • Successful Epochs: 7 (100.0%)
+  • Computation Time: 31.3 hours
+  • Time Efficiency: 5.5%
+
+ANVIL:
+  • Successful Epochs: 8 (100.0%)
+  • Computation Time: 202.1 hours
+  • Time Efficiency: 41.7%
+
+OVERALL METRICS:
+---------------
+Total Success Rate: 100.0%
+Total Computation Time: 3,040.2 hours
+Overall Time Efficiency: 100.0%
+
+GPU UTILIZATION:
+----------------
+Total GPU Hours: 5,318.6
+GPU Types Used: 6
+
+NVIDIA A100-PCIE-40GB: 6.0 jobs, 100.0% success rate
+NVIDIA A100-SXM4-40GB: 38.0 jobs, 100.0% success rate
+NVIDIA A100-SXM4-80GB: 73.0 jobs, 100.0% success rate
+NVIDIA A40: 108.0 jobs, 100.0% success rate
+NVIDIA RTX A5000: 354.0 jobs, 100.0% success rate
+Tesla V100-SXM2-32GB: 41.0 jobs, 100.0% success rate
+
+DATA TRANSFER:
+-------------
+Total Data Transferred: 18,386.2 GB
+
+anvil: 15.0 GB (8.0 jobs)
+bridges2: 24.3 GB (7.0 jobs)
+delta: 32.7 GB (15.0 jobs)
+expanse: 25.7 GB (17.0 jobs)
+ospool: 18,269.3 GB (640.0 jobs)
