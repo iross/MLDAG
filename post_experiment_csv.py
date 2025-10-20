@@ -505,19 +505,23 @@ class SimpleCSVGenerator:
             # Two-pass approach: first find "Finished", then find matching "Started"
             transfer_end_time = None
             transfer_start_time = None
+            transfer_end_index = None
 
             # Pass 1: Find the most recent "Finished" event
-            for transfer_event in reversed(pre_exec_transfers):
+            for i, transfer_event in enumerate(reversed(pre_exec_transfers)):
                 line_text = lines[transfer_event['line_index']].strip()
                 if 'Finished transferring input files' in line_text:
                     transfer_end_time = transfer_event['timestamp']
+                    transfer_end_index = len(pre_exec_transfers) - 1 - i  # Convert reversed index to forward index
                     break
 
             # Pass 2: If we found a "Finished", find the matching "Started" before it
-            if transfer_end_time:
-                for transfer_event in reversed(pre_exec_transfers):
+            # Only search BEFORE the "Finished" event to ensure we get the matching pair
+            if transfer_end_time is not None and transfer_end_index is not None:
+                for j in range(transfer_end_index - 1, -1, -1):  # Search backwards from just before the Finished event
+                    transfer_event = pre_exec_transfers[j]
                     line_text = lines[transfer_event['line_index']].strip()
-                    if 'Started transferring input files' in line_text and transfer_event['timestamp'] <= transfer_end_time:
+                    if 'Started transferring input files' in line_text:
                         transfer_start_time = transfer_event['timestamp']
                         break
 
@@ -558,9 +562,8 @@ class SimpleCSVGenerator:
                     attempt['released_time'] = event['timestamp']
                     if attempt.get('final_status') == 'held':
                         attempt['final_status'] = 'released'
-                elif event['event_code'] == '040':  # File transfer
-                    # Parse the transfer details from the line
-                    self._parse_transfer_timing(lines, event['line_index'], attempt)
+                # Note: event 040 (file transfer) is now handled before this loop
+                # to ensure we match start/end pairs correctly
 
             # Parse GPU info from execution line
             self._parse_gpu_info(lines, exec_event['line_index'], attempt)
