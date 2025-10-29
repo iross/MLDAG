@@ -56,6 +56,7 @@ class JobAttempt:
 
     # Resource information
     targeted_resource: str = ""
+    glidein_resource_name: str = ""  # OSPool specific: actual resource name from GLIDEIN_ResourceName
 
     # Training information
     epochs_completed: int = 1  # Default to 1 for regular epoch-based jobs
@@ -257,6 +258,22 @@ class SimpleCSVGenerator:
                     current_cluster = int(exec_match.group(1))
                     continue
 
+                # Look for GLIDEIN_ResourceName (OSPool jobs only)
+                if current_cluster and line.startswith('GLIDEIN_ResourceName ='):
+                    # Parse: GLIDEIN_ResourceName = "CHTC-Spark-CE1"
+                    glidein_match = re.match(r'GLIDEIN_ResourceName\s*=\s*"([^"]+)"', line)
+                    if glidein_match:
+                        if current_cluster not in gpu_details:
+                            gpu_details[current_cluster] = {
+                                'devices': [],
+                                'device_name': '',
+                                'capability': '',
+                                'memory_mb': 0,
+                                'driver_version': '',
+                                'glidein_resource_name': ''
+                            }
+                        gpu_details[current_cluster]['glidein_resource_name'] = glidein_match.group(1)
+
                 # Look for GPU detail lines (only if we have a current cluster)
                 if current_cluster and line.startswith('GPUs_GPU_') and ' = [' in line:
                     # Parse GPU details from the line
@@ -270,7 +287,8 @@ class SimpleCSVGenerator:
                                 'device_name': '',
                                 'capability': '',
                                 'memory_mb': 0,
-                                'driver_version': ''
+                                'driver_version': '',
+                                'glidein_resource_name': ''
                             }
 
                         gpu_details[current_cluster]['devices'].append(details)
@@ -530,6 +548,27 @@ class SimpleCSVGenerator:
                     attempt['transfer_input_start_time'] = transfer_start_time
                     attempt['transfer_input_end_time'] = transfer_end_time
 
+            # Parse GLIDEIN_ResourceName from the event 001 block
+            # Look in the lines immediately following this execution event
+            exec_line_index = exec_event['line_index']
+            glidein_resource_name = ''
+            # Check up to 30 lines after the event 001 line for GLIDEIN_ResourceName
+            for offset in range(1, 31):
+                if exec_line_index + offset < len(lines):
+                    check_line = lines[exec_line_index + offset].strip()
+                    # Stop if we hit another event (starts with a number followed by space and parenthesis)
+                    if re.match(r'^\d{3} \(', check_line):
+                        break
+                    # Look for GLIDEIN_ResourceName
+                    if check_line.startswith('GLIDEIN_ResourceName ='):
+                        glidein_match = re.match(r'GLIDEIN_ResourceName\s*=\s*"([^"]+)"', check_line)
+                        if glidein_match:
+                            glidein_resource_name = glidein_match.group(1)
+                            break
+
+            if glidein_resource_name:
+                attempt['glidein_resource_name'] = glidein_resource_name
+
             for event in attempt_events:
                 if event['event_code'] == '005':  # Termination
                     attempt['end_time'] = event['timestamp']
@@ -708,6 +747,12 @@ class SimpleCSVGenerator:
                     attempt['actual_resource'] = "delta"
                 elif "expanse.sdsc.edu" in log_content:
                     attempt['actual_resource'] = "expanse"
+                elif "ec2.internal" in log_content or ".amazonaws.com" in log_content:
+                    attempt['actual_resource'] = "aws"
+                elif "bridges2.psc.edu" in log_content:
+                    attempt['actual_resource'] = "bridges2"
+                elif "anvil.rcac.purdue.edu" in log_content:
+                    attempt['actual_resource'] = "anvil"
 
                 # Extract GPU information
                 gpu_match = re.search(r'AvailableGPUs = \{ ([^}]+) \}', log_content)
@@ -802,12 +847,18 @@ class SimpleCSVGenerator:
         for i in range(max(0, line_index - 5), min(line_index + 20, len(lines))):
             line = lines[i].strip()
 
-            # Look for resource information in host connection strings
+            # Look for resource information in host connection strings and SlotName
             if not attempt.get('actual_resource'):
                 if "delta.ncsa.illinois.edu" in line:
                     attempt['actual_resource'] = "delta"
                 elif "expanse.sdsc.edu" in line:
                     attempt['actual_resource'] = "expanse"
+                elif "ec2.internal" in line or ".amazonaws.com" in line:
+                    attempt['actual_resource'] = "aws"
+                elif "bridges2.psc.edu" in line:
+                    attempt['actual_resource'] = "bridges2"
+                elif "anvil.rcac.purdue.edu" in line:
+                    attempt['actual_resource'] = "anvil"
 
         for i in range(line_index + 1, min(line_index + 20, len(lines))):
             line = lines[i].strip()
@@ -969,6 +1020,7 @@ class SimpleCSVGenerator:
                     attempt.gpu_capability = details.get('capability', '')
                     attempt.gpu_driver_version = details.get('driver_version', '')
                     attempt.gpu_ecc_enabled = details.get('ecc_enabled', attempt.gpu_ecc_enabled)
+                    attempt.glidein_resource_name = details.get('glidein_resource_name', '')
                     if not attempt.gpu_count:  # If not set from metl.log
                         attempt.gpu_count = len(details.get('devices', []))
 
@@ -981,6 +1033,10 @@ class SimpleCSVGenerator:
                 # Fill in transfer timing
                 attempt.transfer_input_start_time = attempt_data.get('transfer_input_start_time')
                 attempt.transfer_input_end_time = attempt_data.get('transfer_input_end_time')
+
+                # Fill in GLIDEIN_ResourceName from metl.log if not already set from nodes.log
+                if not attempt.glidein_resource_name:
+                    attempt.glidein_resource_name = attempt_data.get('glidein_resource_name', '')
 
                 # Fill in training information
                 attempt.epochs_completed = attempt_data.get('epochs_completed', 1)
@@ -1054,7 +1110,7 @@ class SimpleCSVGenerator:
 
     def _map_resource_name(self, resource_name: str) -> str:
         """Map resource names using dagman_monitor's logic: keep major resources, others become 'ospool'."""
-        major_resources = {"expanse", "bridges2", "delta", "anvil"}
+        major_resources = {"expanse", "bridges2", "delta", "anvil", "aws"}
 
         if resource_name and resource_name.lower() in major_resources:
             return resource_name
@@ -1092,7 +1148,7 @@ class SimpleCSVGenerator:
 
         fieldnames = [
             'Job Name', 'DAG Source', 'HTCondor Cluster ID', 'Attempt Sequence',
-            'Final Status', 'Targeted Resource', 'Submit Time', 'Start Time', 'End Time',
+            'Final Status', 'Targeted Resource', 'GLIDEIN Resource Name', 'Submit Time', 'Start Time', 'End Time',
             'Execution Duration (seconds)', 'Execution Duration (human)',
             'Total Duration (seconds)', 'Total Duration (human)',
             'Total Bytes Sent', 'Total Bytes Received',
@@ -1134,6 +1190,7 @@ class SimpleCSVGenerator:
                         'Attempt Sequence': attempt.attempt_sequence,
                         'Final Status': attempt.final_status or "",
                         'Targeted Resource': attempt.targeted_resource,
+                        'GLIDEIN Resource Name': attempt.glidein_resource_name,
                         'Submit Time': self.format_datetime(attempt.submit_time),
                         'Start Time': self.format_datetime(attempt.start_time),
                         'End Time': self.format_datetime(attempt.end_time),
