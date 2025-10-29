@@ -896,17 +896,19 @@ class DAGStatusMonitor:
                     # Apply GlideinResource information
                     if 'glidein_resource' in best_timing:
                         job.glidein_resource = best_timing['glidein_resource']
-                    # Also apply timing if not already set
+                    # Apply timing (only submit_time and end_time here - start_time handled below)
                     if 'submit_time' in best_timing and not job.submit_time:
                         job.submit_time = best_timing['submit_time']
-                    if 'start_time' in best_timing and not job.start_time:
-                        job.start_time = best_timing['start_time']
                     if 'end_time' in best_timing and not job.end_time:
                         job.end_time = best_timing['end_time']
                     if best_cluster_id and not job.cluster_id:
                         job.cluster_id = best_cluster_id
 
                     job._metl_static_data_applied = True
+
+                # ALWAYS update start_time to handle re-executions after hold/evict/failure
+                if 'start_time' in best_timing:
+                    job.start_time = best_timing['start_time']
 
                 # ALWAYS apply current status from metl.log (for real-time updates)
                 if 'current_status' in best_timing:
