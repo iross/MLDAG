@@ -874,40 +874,41 @@ class DAGStatusMonitor:
             dag_relevant_timing[job_name].sort(key=lambda x: x[0], reverse=True)
 
         for job in self.jobs.values():
-            if hasattr(job, '_metl_data_applied'):
-                continue
-
             # Get the best (most recent) timing info for this job
             timing_entries = dag_relevant_timing.get(job.name, [])
             if timing_entries:
                 best_cluster_id, best_timing = timing_entries[0]
 
-                # Apply the best timing and transfer information found
-                if 'total_bytes_sent' in best_timing:
-                    job.total_bytes_sent = best_timing['total_bytes_sent']
-                if 'total_bytes_received' in best_timing:
-                    job.total_bytes_received = best_timing['total_bytes_received']
-                # Apply GPU information
-                if 'gpu_count' in best_timing:
-                    job.gpu_count = best_timing['gpu_count']
-                if 'gpu_device_name' in best_timing:
-                    job.gpu_device_name = best_timing['gpu_device_name']
-                if 'gpu_memory_mb' in best_timing:
-                    job.gpu_memory_mb = best_timing['gpu_memory_mb']
-                # Apply GlideinResource information
-                if 'glidein_resource' in best_timing:
-                    job.glidein_resource = best_timing['glidein_resource']
-                # Also apply timing if not already set
-                if 'submit_time' in best_timing and not job.submit_time:
-                    job.submit_time = best_timing['submit_time']
-                if 'start_time' in best_timing and not job.start_time:
-                    job.start_time = best_timing['start_time']
-                if 'end_time' in best_timing and not job.end_time:
-                    job.end_time = best_timing['end_time']
-                if best_cluster_id and not job.cluster_id:
-                    job.cluster_id = best_cluster_id
+                # Apply static data only once (performance optimization)
+                if not hasattr(job, '_metl_static_data_applied'):
+                    # Apply the best timing and transfer information found
+                    if 'total_bytes_sent' in best_timing:
+                        job.total_bytes_sent = best_timing['total_bytes_sent']
+                    if 'total_bytes_received' in best_timing:
+                        job.total_bytes_received = best_timing['total_bytes_received']
+                    # Apply GPU information
+                    if 'gpu_count' in best_timing:
+                        job.gpu_count = best_timing['gpu_count']
+                    if 'gpu_device_name' in best_timing:
+                        job.gpu_device_name = best_timing['gpu_device_name']
+                    if 'gpu_memory_mb' in best_timing:
+                        job.gpu_memory_mb = best_timing['gpu_memory_mb']
+                    # Apply GlideinResource information
+                    if 'glidein_resource' in best_timing:
+                        job.glidein_resource = best_timing['glidein_resource']
+                    # Also apply timing if not already set
+                    if 'submit_time' in best_timing and not job.submit_time:
+                        job.submit_time = best_timing['submit_time']
+                    if 'start_time' in best_timing and not job.start_time:
+                        job.start_time = best_timing['start_time']
+                    if 'end_time' in best_timing and not job.end_time:
+                        job.end_time = best_timing['end_time']
+                    if best_cluster_id and not job.cluster_id:
+                        job.cluster_id = best_cluster_id
 
-                # Apply current status from metl.log if available (most authoritative)
+                    job._metl_static_data_applied = True
+
+                # ALWAYS apply current status from metl.log (for real-time updates)
                 if 'current_status' in best_timing:
                     metl_status = best_timing['current_status']
                     if metl_status == 'held':
@@ -945,8 +946,6 @@ class DAGStatusMonitor:
                 # it should be RUNNING regardless of metl status
                 elif job.start_time and not job.end_time and job.status == JobStatus.IDLE:
                     job.status = JobStatus.RUNNING
-
-                job._metl_data_applied = True
 
     def _filter_cluster_mapping_to_current_dag(self) -> None:
         """Filter cluster_to_dagnode mapping to only include clusters from this DAG.
