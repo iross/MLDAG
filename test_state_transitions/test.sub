@@ -1,0 +1,5 @@
+# Dummy submit file
+universe = vanilla
+executable = /bin/echo
+arguments = test
+queue
