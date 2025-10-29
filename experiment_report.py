@@ -953,6 +953,114 @@ class ExperimentAnalyzer:
         # Print date range
         print(f"Time period: {min_date} to {max_date} ({(max_date - min_date).days + 1} days)")
 
+    def plot_epochs_trained_per_day(self):
+        """Generate bar plot showing the number of epochs trained per day."""
+        # Filter for successfully completed jobs with end times and epoch information
+        completed_data = self.df[
+            (self.df['Final Status'].isin(['completed', 'checkpointed'])) &
+            (self.df['End Time'].notna()) &
+            (self.df['Epoch'].notna()) &
+            (self.df['Epochs Completed'].notna()) &
+            (self.df['Epochs Completed'] > 0)
+        ].copy()
+
+        if completed_data.empty:
+            print("No completed epoch data found for epochs per day analysis")
+            return
+
+        # Convert End Time to datetime and extract date
+        completed_data['End Date'] = completed_data['End Time'].dt.date
+
+        # For each job completion, count the epochs completed on that day
+        daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
+
+        # Get date range
+        min_date = daily_epochs['End Date'].min()
+        max_date = daily_epochs['End Date'].max()
+        date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+
+        # Create complete date series for each resource
+        resources = daily_epochs['Targeted Resource'].unique()
+
+        # Create figure
+        fig, ax = plt.subplots(1, 1, figsize=(14, 8))
+
+        # Get consistent colors for resources
+        colors = self.get_resource_colors(resources)
+
+        # Prepare data for stacked bar chart
+        resource_data = {}
+        for resource in resources:
+            resource_subset = daily_epochs[daily_epochs['Targeted Resource'] == resource]
+            # Create a complete date series with zeros for missing dates
+            resource_series = pd.Series(0, index=date_range)
+            # Fill in actual epoch counts
+            for _, row in resource_subset.iterrows():
+                resource_series[pd.Timestamp(row['End Date'])] = row['Epochs Completed']
+            resource_data[resource] = resource_series
+
+        # Create stacked bar chart
+        bottom = pd.Series(0, index=date_range)
+        for i, resource in enumerate(resources):
+            formatted_resource = self.format_resource_name(resource)
+            ax.bar(resource_data[resource].index, resource_data[resource].values,
+                   bottom=bottom, label=formatted_resource, color=colors[i], alpha=0.8)
+            bottom += resource_data[resource]
+
+        # Customize the plot
+        ax.set_title('Epochs Trained Per Day by Resource', fontsize=16, pad=20, fontweight='bold')
+        ax.set_xlabel('Date', fontsize=14, fontweight='bold')
+        ax.set_ylabel('Number of Epochs Trained', fontsize=14, fontweight='bold')
+
+        # Format x-axis
+        ax.tick_params(axis='x', rotation=45, labelsize=11)
+        ax.tick_params(axis='y', labelsize=11)
+
+        # Add grid
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5, axis='y')
+        ax.set_axisbelow(True)
+
+        # Add legend
+        legend = ax.legend(bbox_to_anchor=(1.02, 1), loc='upper left',
+                          frameon=True, fancybox=True, shadow=True, fontsize=11)
+        legend.get_title().set_fontweight('bold')
+
+        # Format dates on x-axis
+        import matplotlib.dates as mdates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(date_range)//10)))
+
+        # Enhance plot borders
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+            spine.set_color('darkgray')
+
+        plt.tight_layout()
+        plt.subplots_adjust(right=0.85)  # Make room for legend
+
+        self.save_figure(fig, 'epochs_trained_per_day')
+
+        # Print summary statistics
+        print("\nEpochs Trained Per Day Summary:")
+        total_epochs_by_day = bottom
+        days_with_epochs = (total_epochs_by_day > 0).sum()
+        total_epochs = int(total_epochs_by_day.sum())
+        avg_epochs_per_active_day = total_epochs / days_with_epochs if days_with_epochs > 0 else 0
+        max_epochs_day = total_epochs_by_day.max()
+        max_epochs_date = total_epochs_by_day[total_epochs_by_day == max_epochs_day].index[0].date()
+
+        print(f"Total epochs trained: {total_epochs}")
+        print(f"Days with epoch completions: {days_with_epochs} out of {len(date_range)} days")
+        print(f"Average epochs per active day: {avg_epochs_per_active_day:.1f}")
+        print(f"Peak day: {max_epochs_date} with {int(max_epochs_day)} epochs")
+
+        # Print breakdown by resource
+        print("\nEpochs per day by resource:")
+        for resource in resources:
+            total_resource_epochs = resource_data[resource].sum()
+            formatted_resource = self.format_resource_name(resource)
+            print(f"{formatted_resource}: {int(total_resource_epochs)} total epochs")
+
     def plot_gpu_hours_over_time(self):
         """Generate cumulative GPU hours utilized over time visualization."""
         # Filter for GPU jobs with execution time data
@@ -1257,6 +1365,169 @@ class ExperimentAnalyzer:
         print("\nBy Resource:")
         print(timing_by_resource.to_string())
 
+    def plot_transfer_input_timing_over_time(self):
+        """Generate scatter plot of input file transfer duration over time by resource."""
+        transfer_timing = self.analyze_transfer_input_timing()
+
+        if not transfer_timing['has_data']:
+            print("No transfer input timing data found for time series analysis")
+            return
+
+        raw_data = transfer_timing['raw_data'].copy()
+
+        # Use End Time if available, otherwise use Start Time
+        if 'End Time' in raw_data.columns and raw_data['End Time'].notna().any():
+            raw_data['Event Time'] = raw_data['End Time']
+        elif 'Start Time' in raw_data.columns and raw_data['Start Time'].notna().any():
+            raw_data['Event Time'] = raw_data['Start Time']
+        else:
+            print("No time data available for transfer timing over time plot")
+            return
+
+        # Filter out rows with no time
+        raw_data = raw_data[raw_data['Event Time'].notna()].copy()
+
+        if raw_data.empty:
+            print("No transfer timing data with valid times")
+            return
+
+        # For OSPool, use GLIDEIN Resource Name; for others, use Targeted Resource
+        def get_site_label(row):
+            if row['Targeted Resource'].lower() == 'ospool':
+                glidein = row.get('GLIDEIN Resource Name', 'Unknown')
+                if pd.isna(glidein) or glidein == '':
+                    return 'Unknown'
+                return glidein
+            else:
+                return row['Targeted Resource']
+
+        def get_site_group(row):
+            if row['Targeted Resource'].lower() == 'ospool':
+                return 'OSPool'
+            else:
+                return row['Targeted Resource']
+
+        raw_data['Site'] = raw_data.apply(get_site_label, axis=1)
+        raw_data['Group'] = raw_data.apply(get_site_group, axis=1)
+
+        # Create figure
+        fig, ax = plt.subplots(1, 1, figsize=(16, 10))
+
+        # Group sites by resource group and sort
+        grouped_sites = {}
+        for group in sorted(raw_data['Group'].unique()):
+            group_sites = sorted(raw_data[raw_data['Group'] == group]['Site'].unique())
+            grouped_sites[group] = group_sites
+
+        # Flatten to get ordered list of sites
+        sites = []
+        for group in sorted(grouped_sites.keys()):
+            sites.extend(grouped_sites[group])
+
+        # Use highly saturated, vibrant colors
+        n_sites = len(sites)
+
+        # Define a custom palette of highly saturated, distinct colors
+        vibrant_colors = [
+            '#FF0000',  # Bright Red
+            '#00FF00',  # Bright Lime
+            '#0000FF',  # Bright Blue
+            '#FFFF00',  # Bright Yellow
+            '#00FFFF',  # Bright Cyan
+            '#FF00FF',  # Bright Magenta
+            '#FF8000',  # Bright Orange
+            '#8000FF',  # Bright Purple
+            '#00FF80',  # Bright Spring Green
+            '#FF0099',  # Bright Deep Pink
+            '#99FF00',  # Bright Yellow-Green
+            '#0099FF',  # Bright Sky Blue
+            '#FF6600',  # Bright Red-Orange
+            '#6600FF',  # Bright Violet
+            '#00FF66',  # Bright Sea Green
+            '#CC0000',  # Dark Red
+            '#FF9900',  # Bright Tangerine
+            '#9900FF',  # Bright Electric Purple
+            '#00FFCC',  # Bright Turquoise
+            '#FFCC00',  # Bright Gold
+        ]
+
+        # If we have more sites than predefined colors, generate additional ones
+        if n_sites <= len(vibrant_colors):
+            colors = vibrant_colors[:n_sites]
+        else:
+            # Use tab20 for many sites
+            colors = sns.color_palette("tab20", n_sites)
+
+        # Create scatter plot for each site with grouped labels
+        for i, site in enumerate(sites):
+            site_data = raw_data[raw_data['Site'] == site]
+            group = raw_data[raw_data['Site'] == site]['Group'].iloc[0]
+
+            # Create label with group prefix for OSPool sites
+            if group == 'OSPool':
+                label = f"OSPool: {site}"
+            else:
+                label = site
+
+            ax.scatter(site_data['Event Time'],
+                      site_data['Transfer Input Duration (minutes)'],
+                      label=label,
+                      color=colors[i],
+                      alpha=0.85,
+                      s=80,
+                      edgecolors='black',
+                      linewidth=0.5)
+
+        # Customize the plot
+        ax.set_title('Input File Transfer Duration Over Time by Site', fontsize=16, pad=20, fontweight='bold')
+        ax.set_xlabel('Date', fontsize=14, fontweight='bold')
+        ax.set_ylabel('Transfer Duration (minutes)', fontsize=14, fontweight='bold')
+
+        # Format x-axis
+        ax.tick_params(axis='x', rotation=45, labelsize=11)
+        ax.tick_params(axis='y', labelsize=11)
+
+        # Add grid
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        ax.set_axisbelow(True)
+
+        # Add legend with multiple columns if many sites
+        if n_sites > 10:
+            ncol = 2
+        else:
+            ncol = 1
+        legend = ax.legend(loc='best', frameon=True, fancybox=True, shadow=True,
+                          fontsize=9, ncol=ncol, markerscale=1.2)
+        legend.get_title().set_fontweight('bold')
+
+        # Format dates on x-axis
+        import matplotlib.dates as mdates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+        # Determine appropriate date interval based on data range
+        date_range = (raw_data['Event Time'].max() - raw_data['Event Time'].min()).days
+        if date_range > 30:
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, date_range//10)))
+        else:
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, date_range//5)))
+
+        # Enhance plot borders
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+            spine.set_color('darkgray')
+
+        plt.tight_layout()
+
+        self.save_figure(fig, 'transfer_input_timing_over_time')
+
+        # Print summary statistics
+        print("\nInput Transfer Duration Over Time Summary:")
+        for site in sites:
+            site_data = raw_data[raw_data['Site'] == site]
+            print(f"{site}: {len(site_data)} transfers, "
+                  f"median: {site_data['Transfer Input Duration (minutes)'].median():.1f} min, "
+                  f"mean: {site_data['Transfer Input Duration (minutes)'].mean():.1f} min")
+
     def plot_data_transfer_analysis(self):
         """Generate data transfer analysis plots."""
         transfer_analysis = self.analyze_data_transfer()
@@ -1417,6 +1688,9 @@ class ExperimentAnalyzer:
             print("\n5b. Generating epochs completed over time plot (September only)...")
             self.plot_epochs_completed_over_time_september()
 
+            print("\n5c. Generating epochs trained per day plot...")
+            self.plot_epochs_trained_per_day()
+
             print("\n6. Generating GPU hours over time plot...")
             self.plot_gpu_hours_over_time()
 
@@ -1428,6 +1702,9 @@ class ExperimentAnalyzer:
 
             print("\n8. Generating input file transfer timing analysis...")
             self.plot_transfer_input_timing()
+
+            print("\n8b. Generating input file transfer timing over time plot...")
+            self.plot_transfer_input_timing_over_time()
 
             print("\n9. Generating summary report...")
             self.generate_summary_report()
