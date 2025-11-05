@@ -24,7 +24,7 @@ pproc/logs
 
 EventLog*
 *.h5
-*.csv
+*.csvcp
 pipeline.dag*
 nodes.dag.status
 resources.yaml
@@ -58,3 +58,5 @@ node_modules/
 CLAUDE.md
 # tasks.json
 # tasks/
+#
+2025-*
