@@ -142,6 +142,19 @@ class CachePerformanceAnalyzer:
             if col in df.columns:
                 df = df[df[col].notna()].copy()
 
+        # Remove duplicate records (same ClusterId, TransferStartTime, Endpoint, TransferUrl)
+        # These are ES duplicates, not real retries
+        dedup_cols = ['ClusterId', 'TransferStartTime', 'Endpoint']
+        if 'TransferUrl' in df.columns:
+            dedup_cols.append('TransferUrl')
+
+        initial_count = len(df)
+        df = df.drop_duplicates(subset=dedup_cols, keep='first').copy()
+        duplicates_removed = initial_count - len(df)
+
+        if duplicates_removed > 0:
+            print(f"Removed {duplicates_removed:,} duplicate records ({duplicates_removed/initial_count*100:.1f}%)")
+
         # Filter by minimum duration
         if self.min_duration > 0 and 'AttemptTime' in df.columns:
             df = df[df['AttemptTime'] > self.min_duration].copy()
@@ -406,7 +419,6 @@ class CachePerformanceAnalyzer:
             return
 
         print(f"\nTotal slow transfers: {len(slow_transfers):,} ({len(slow_transfers)/len(self.df)*100:.1f}% of all transfers)")
-        print(f"Total time spent on slow transfers: {slow_transfers['AttemptTime'].sum()/3600:.1f} hours")
         print()
 
         # Group by cache endpoint
@@ -422,20 +434,27 @@ class CachePerformanceAnalyzer:
         cache_analysis.columns = ['Count', 'Total (s)', 'Mean (s)', 'Median (s)', 'Max (s)', 'Unique Jobs']
         cache_analysis = cache_analysis.sort_values('Count', ascending=False)
 
-        # Add percentage column
-        cache_analysis['% of Slow'] = (cache_analysis['Count'] / len(slow_transfers) * 100).round(1)
+        # Add total transfer count for each cache from full dataset
+        total_transfers_by_cache = self.df.groupby('Endpoint').size()
+        cache_analysis['Total Transfers'] = cache_analysis.index.map(total_transfers_by_cache)
 
-        print("=" * 100)
+        # Calculate percentage of transfers that are slow for each cache
+        cache_analysis['% Slow'] = (cache_analysis['Count'] / cache_analysis['Total Transfers'] * 100).round(1)
+
+        # Calculate percentage of all slow transfers
+        cache_analysis['% of Total Slow'] = (cache_analysis['Count'] / len(slow_transfers) * 100).round(1)
+
+        print("=" * 135)
         print("SLOW TRANSFERS BY CACHE")
-        print("=" * 100)
-        print(f"\n{'Cache Endpoint':<50} {'Count':<8} {'% Slow':<8} {'Total (h)':<10} {'Mean (s)':<10} {'Max (s)':<10} {'Jobs':<8}")
-        print("-" * 100)
+        print("=" * 135)
+        print(f"\n{'Cache Endpoint':<50} {'Slow':<8} {'Total':<8} {'% Slow':<9} {'% Total':<9} {'Mean (s)':<10} {'Max (s)':<10}")
+        print("-" * 135)
 
         for endpoint, row in cache_analysis.head(20).iterrows():
             endpoint_short = endpoint[:47] + '...' if len(endpoint) > 50 else endpoint
-            print(f"{endpoint_short:<50} {int(row['Count']):<8} {row['% of Slow']:<8.1f} "
-                  f"{row['Total (s)']/3600:<10.1f} {row['Mean (s)']:<10.1f} "
-                  f"{row['Max (s)']:<10.1f} {int(row['Unique Jobs']):<8}")
+            print(f"{endpoint_short:<50} {int(row['Count']):<8} {int(row['Total Transfers']):<8} {row['% Slow']:<9.1f} {row['% of Total Slow']:<9.1f} "
+                  f"{row['Mean (s)']:<10.1f} "
+                  f"{row['Max (s)']:<10.1f}")
 
         # Detailed analysis for top problematic caches
         print("\n" + "=" * 100)
@@ -451,7 +470,6 @@ class CachePerformanceAnalyzer:
             print(f"Cache: {cache}")
             print(f"{'─' * 100}")
             print(f"Slow transfers: {len(cache_slow):,} (threshold: >{threshold_seconds}s)")
-            print(f"Total time: {cache_slow['AttemptTime'].sum()/3600:.1f} hours")
             print(f"Average duration: {cache_slow['AttemptTime'].mean():.1f}s ({cache_slow['AttemptTime'].mean()/60:.1f} min)")
 
             # Time distribution
@@ -460,8 +478,9 @@ class CachePerformanceAnalyzer:
 
                 # Group by date
                 if 'Date' in cache_slow.columns:
-                    date_counts = cache_slow.groupby('Date').size().sort_values(ascending=False)
-                    print(f"\nDates with most slow transfers:")
+                    # date_counts = cache_slow.groupby('Date').size().sort_values(ascending=False)
+                    date_counts = cache_slow.groupby('Date').size()
+                    print(f"\nDates with slow transfers:")
                     for date, count in date_counts.head(10).items():
                         date_data = cache_slow[cache_slow['Date'] == date]
                         avg_duration = date_data['AttemptTime'].mean()
@@ -484,14 +503,35 @@ class CachePerformanceAnalyzer:
 
             # Show a few example transfers
             print(f"\nExample slow transfers (showing 5 slowest):")
-            examples = cache_slow.nlargest(5, 'AttemptTime')[['TransferStartTime', 'AttemptTime', 'Site', 'ClusterId']].copy()
+
+            # Include TransferUrl and Attempt if available
+            cols_to_show = ['TransferStartTime', 'AttemptTime', 'Site', 'ClusterId']
+            if 'TransferUrl' in cache_slow.columns:
+                cols_to_show.append('TransferUrl')
+            if 'Attempt' in cache_slow.columns:
+                cols_to_show.append('Attempt')
+
+            examples = cache_slow.nlargest(5, 'AttemptTime')[cols_to_show].copy()
             examples['AttemptTimeMin'] = (examples['AttemptTime'] / 60).round(1)
-            print(f"  {'Start Time':<20} {'Duration (min)':<15} {'Site':<25} {'Cluster ID':<12}")
-            print(f"  {'-'*72}")
+
+            print(f"  {'Start Time':<20} {'Duration (min)':<15} {'Site':<25} {'Cluster ID':<12} {'Att':<5} {'File URL':<50}")
+            print(f"  {'-'*127}")
             for _, row in examples.iterrows():
                 start_time = row['TransferStartTime'].strftime('%Y-%m-%d %H:%M:%S') if pd.notna(row['TransferStartTime']) else 'N/A'
                 site = str(row['Site'])[:22] + '...' if len(str(row['Site'])) > 25 else str(row['Site'])
-                print(f"  {start_time:<20} {row['AttemptTimeMin']:<15.1f} {site:<25} {row['ClusterId']:<12}")
+
+                # Get attempt number
+                attempt = str(int(row['Attempt'])) if 'Attempt' in row and pd.notna(row['Attempt']) else '-'
+
+                # Extract filename from URL if available
+                file_url = ''
+                if 'TransferUrl' in row and pd.notna(row['TransferUrl']) and row['TransferUrl']:
+                    url = str(row['TransferUrl'])
+                    # Extract just the filename from the URL
+                    filename = url.split('/')[-1]
+                    file_url = filename[:47] + '...' if len(filename) > 50 else filename
+
+                print(f"  {start_time:<20} {row['AttemptTimeMin']:<15.1f} {site:<25} {row['ClusterId']:<12} {attempt:<5} {file_url:<50}")
 
         # Summary by site (destination)
         if 'Site' in slow_transfers.columns:
