@@ -6,7 +6,12 @@ Generates comprehensive analysis and visualizations of HPC experiment results
 from CSV data produced by post_experiment_csv.py.
 
 Usage:
-    python experiment_report.py [input.csv] [--output-dir reports/]
+    python experiment_report.py [input.csv] [--output-dir reports/] [--month 1-12]
+
+Examples:
+    python experiment_report.py                          # All data, default output
+    python experiment_report.py --month 10               # Include October monthly report
+    python experiment_report.py --month 9 --output-dir sep_reports/
 """
 
 import argparse
@@ -830,8 +835,18 @@ class ExperimentAnalyzer:
         # Print date range
         print(f"Time period: {min_date} to {max_date} ({(max_date - min_date).days + 1} days)")
 
-    def plot_epochs_completed_over_time_september(self):
-        """Generate cumulative epochs completed over time visualization for September only."""
+    def plot_epochs_completed_over_time_monthly(self, month: int):
+        """Generate cumulative epochs completed over time visualization for a specific month.
+
+        Args:
+            month: Month number (1-12) to filter data for
+        """
+        month_names = {
+            1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
+            7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
+        }
+        month_name = month_names.get(month, f'Month-{month}')
+
         # Filter for successfully completed jobs with end times and epoch information
         completed_data = self.df[
             (self.df['Final Status'].isin(['completed', 'checkpointed'])) &
@@ -848,13 +863,13 @@ class ExperimentAnalyzer:
         # Convert End Time to datetime and extract date
         completed_data['End Date'] = completed_data['End Time'].dt.date
 
-        # Filter for September only (any year, but typically 2024)
+        # Filter for specified month only (any year, but typically 2024)
         completed_data = completed_data[
-            (completed_data['End Time'].dt.month == 9)
+            (completed_data['End Time'].dt.month == month)
         ].copy()
 
         if completed_data.empty:
-            print("No completed epoch data found for September")
+            print(f"No completed epoch data found for {month_name}")
             return
 
         # For each job completion, count the epochs completed on that day
@@ -905,7 +920,7 @@ class ExperimentAnalyzer:
                label='Total (All Resources)', color='black', linewidth=3.5, marker='s', markersize=5)
 
         # Customize the plot
-        ax.set_title('Cumulative Epochs Completed Over Time by Resource (September)', fontsize=16, pad=20, fontweight='bold')
+        ax.set_title(f'Cumulative Epochs Completed Over Time by Resource ({month_name})', fontsize=16, pad=20, fontweight='bold')
         ax.set_xlabel('Date', fontsize=14, fontweight='bold')
         ax.set_ylabel('Cumulative Epochs Completed', fontsize=14, fontweight='bold')
 
@@ -935,10 +950,12 @@ class ExperimentAnalyzer:
         plt.tight_layout()
         plt.subplots_adjust(right=0.85)  # Make room for legend
 
-        self.save_figure(fig, 'epochs_completed_over_time_september')
+        # Save with month name in filename
+        filename = f'epochs_completed_over_time_{month_name.lower()}'
+        self.save_figure(fig, filename)
 
         # Print summary statistics
-        print("\nEpochs Completed Over Time Summary (September):")
+        print(f"\nEpochs Completed Over Time Summary ({month_name}):")
         total_epochs_by_resource = {}
         for resource in resources:
             if resource in cumulative_data:
@@ -1178,8 +1195,18 @@ class ExperimentAnalyzer:
         avg_daily_gpu_hours = total_all_gpu_hours / ((max_date - min_date).days + 1)
         print(f"Average daily GPU hours: {avg_daily_gpu_hours:.1f} GPU hours/day")
 
-    def plot_gpu_hours_over_time_september(self):
-        """Generate cumulative GPU hours utilized over time visualization for September only."""
+    def plot_gpu_hours_over_time_monthly(self, month: int):
+        """Generate cumulative GPU hours utilized over time visualization for a specific month.
+
+        Args:
+            month: Month number (1-12) to filter data for
+        """
+        month_names = {
+            1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
+            7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
+        }
+        month_name = month_names.get(month, f'Month-{month}')
+
         # Filter for GPU jobs with execution time data
         gpu_data = self.df[
             (self.df['Number of GPUs'] > 0) &
@@ -1199,13 +1226,13 @@ class ExperimentAnalyzer:
         # Convert End Time to datetime and extract date
         gpu_data['End Date'] = gpu_data['End Time'].dt.date
 
-        # Filter for September only (any year, but typically 2024)
+        # Filter for specified month only (any year, but typically 2024)
         gpu_data = gpu_data[
-            (gpu_data['End Time'].dt.month == 9)
+            (gpu_data['End Time'].dt.month == month)
         ].copy()
 
         if gpu_data.empty:
-            print("No GPU usage data found for September")
+            print(f"No GPU usage data found for {month_name}")
             return
 
         # For each job completion, sum the GPU hours used on that day
@@ -1256,7 +1283,7 @@ class ExperimentAnalyzer:
                label='Total (All Resources)', color='black', linewidth=3.5, marker='s', markersize=5)
 
         # Customize the plot
-        ax.set_title('Cumulative GPU Hours Utilized Over Time by Resource (September)', fontsize=16, pad=20, fontweight='bold')
+        ax.set_title(f'Cumulative GPU Hours Utilized Over Time by Resource ({month_name})', fontsize=16, pad=20, fontweight='bold')
         ax.set_xlabel('Date', fontsize=14, fontweight='bold')
         ax.set_ylabel('Cumulative GPU Hours', fontsize=14, fontweight='bold')
 
@@ -1283,10 +1310,13 @@ class ExperimentAnalyzer:
             spine.set_color('darkgray')
 
         plt.tight_layout()
-        self.save_figure(fig, 'gpu_hours_over_time_september')
+
+        # Save with month name in filename
+        filename = f'gpu_hours_over_time_{month_name.lower()}'
+        self.save_figure(fig, filename)
 
         # Print summary statistics
-        print("\nGPU Hours Over Time Summary (September):")
+        print(f"\nGPU Hours Over Time Summary ({month_name}):")
         total_gpu_hours_by_resource = {}
         for resource in resources:
             if resource in cumulative_data:
@@ -1665,8 +1695,12 @@ class ExperimentAnalyzer:
         print(f"Summary report saved: {report_file}")
         print("\n" + report_text)
 
-    def generate_all_reports(self):
-        """Generate all analysis reports and visualizations."""
+    def generate_all_reports(self, monthly_report_month: Optional[int] = None):
+        """Generate all analysis reports and visualizations.
+
+        Args:
+            monthly_report_month: Optional month (1-12) for generating monthly-specific reports
+        """
         print("\nGenerating experiment analysis reports...")
 
         try:
@@ -1685,8 +1719,14 @@ class ExperimentAnalyzer:
             print("\n5. Generating epochs completed over time plot...")
             self.plot_epochs_completed_over_time()
 
-            print("\n5b. Generating epochs completed over time plot (September only)...")
-            self.plot_epochs_completed_over_time_september()
+            if monthly_report_month is not None:
+                month_names = {
+                    1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
+                    7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
+                }
+                month_name = month_names.get(monthly_report_month, f'Month-{monthly_report_month}')
+                print(f"\n5b. Generating epochs completed over time plot ({month_name} only)...")
+                self.plot_epochs_completed_over_time_monthly(monthly_report_month)
 
             print("\n5c. Generating epochs trained per day plot...")
             self.plot_epochs_trained_per_day()
@@ -1694,8 +1734,9 @@ class ExperimentAnalyzer:
             print("\n6. Generating GPU hours over time plot...")
             self.plot_gpu_hours_over_time()
 
-            print("\n6b. Generating GPU hours over time plot (September only)...")
-            self.plot_gpu_hours_over_time_september()
+            if monthly_report_month is not None:
+                print(f"\n6b. Generating GPU hours over time plot ({month_name} only)...")
+                self.plot_gpu_hours_over_time_monthly(monthly_report_month)
 
             print("\n7. Generating data transfer analysis plots...")
             self.plot_data_transfer_analysis()
@@ -1731,6 +1772,12 @@ Examples:
 
   # Specify custom output directory
   python experiment_report.py --output-dir /path/to/reports/
+
+  # Generate monthly reports for October
+  python experiment_report.py --month 10
+
+  # Generate monthly reports for September with custom output
+  python experiment_report.py job_summary.csv --month 9 --output-dir september_reports/
         """
     )
 
@@ -1738,6 +1785,8 @@ Examples:
                        help="Input CSV file path (default: job_summary.csv)")
     parser.add_argument("--output-dir", default="reports",
                        help="Output directory for reports (default: reports)")
+    parser.add_argument("--month", type=int, choices=range(1, 13), metavar="1-12",
+                       help="Generate monthly reports for specific month (1-12, e.g., 10 for October)")
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Enable verbose output")
 
@@ -1746,7 +1795,7 @@ Examples:
     try:
         # Create analyzer and generate reports
         analyzer = ExperimentAnalyzer(args.input_file, args.output_dir)
-        analyzer.generate_all_reports()
+        analyzer.generate_all_reports(monthly_report_month=args.month)
 
     except FileNotFoundError as e:
         print(f"❌ Error: {e}")
