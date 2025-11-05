@@ -2,23 +2,38 @@
 """
 Compare transfer attempts by matching on end times.
 
-This script matches individual transfer attempts from full.csv with ES transfer
-records by comparing Transfer Input End Time (CSV) with AttemptEndTime (ES).
+This script automates the full workflow:
+1. Uses find_slow_transfers.py to identify slow transfer cluster IDs
+2. Uses query.py to fetch ES data for those clusters
+3. Compares CSV and ES data to analyze coverage
 
 Usage:
-    python3 compare_transfer_attempts.py [cluster_id]
+    python3 compare_transfer_attempts.py [--threshold SECONDS] [--input CSV_FILE] [--cluster CLUSTER_ID]
 
-    If cluster_id is provided, only analyze that specific cluster.
-    Otherwise, analyze all clusters from slow_transfers file.
+Examples:
+    # Use default threshold (300s) and input file (full.csv)
+    python3 compare_transfer_attempts.py
+
+    # Custom threshold of 10 minutes
+    python3 compare_transfer_attempts.py --threshold 600
+
+    # Custom input file and threshold
+    python3 compare_transfer_attempts.py --threshold 1800 --input job_summary.csv
+
+    # Analyze specific cluster ID
+    python3 compare_transfer_attempts.py --cluster 12345
 """
 
 import sys
 import csv
+import argparse
+import subprocess
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
-from query import ES_HOST, ES_USER, ES_PASS, ES_INDEX, read_job_ids, get_query
+from query import ES_HOST, ES_USER, ES_PASS, ES_INDEX, get_query
 
 
 def parse_timestamp(ts_str):
@@ -476,59 +491,139 @@ def print_cluster_comparison(csv_attempts, es_attempts):
         print()
 
 
+def find_slow_transfers(threshold, input_file):
+    """Run find_slow_transfers.py to get cluster IDs.
+
+    Args:
+        threshold: Transfer duration threshold in seconds
+        input_file: CSV file to search
+
+    Returns:
+        List of cluster IDs
+    """
+    print(f"Finding slow transfers (threshold: {threshold}s, file: {input_file})...")
+
+    # Run find_slow_transfers.py
+    result = subprocess.run(
+        ['python3', 'find_slow_transfers.py', str(threshold), input_file],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print(f"ERROR running find_slow_transfers.py: {result.stderr}")
+        sys.exit(1)
+
+    # Parse cluster IDs from stdout (one per line)
+    cluster_ids = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+
+    # Print the summary that was sent to stderr
+    if result.stderr:
+        print(result.stderr.strip())
+
+    return cluster_ids
+
+
+def fetch_es_data(job_ids):
+    """Query Elasticsearch and return CSV data as a temporary file.
+
+    Args:
+        job_ids: List of cluster IDs to query
+
+    Returns:
+        Path to temporary CSV file with ES data
+    """
+    print(f"Querying Elasticsearch for {len(job_ids)} cluster IDs...")
+
+    client = Elasticsearch(ES_HOST, basic_auth=(ES_USER, ES_PASS))
+    query = get_query(job_ids)
+
+    # Create temporary file for ES data
+    temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv')
+
+    # Write CSV header
+    fields = query['body']['_source']
+    temp_file.write(','.join(fields) + '\n')
+
+    # Fetch and write data
+    doc_count = 0
+    for doc in scan(client=client, query=query.pop("body"), **query):
+        source = doc["_source"]
+        row = [str(source.get(field, "UNKNOWN")) for field in fields]
+        temp_file.write(','.join(row) + '\n')
+        doc_count += 1
+
+    temp_file.close()
+    print(f"Fetched {doc_count} ES records")
+
+    return temp_file.name
+
+
 def main():
     """Main entry point."""
     # Parse command-line arguments
-    specific_cluster_id = None
-    if len(sys.argv) > 1:
-        specific_cluster_id = sys.argv[1].strip()
+    parser = argparse.ArgumentParser(
+        description="Compare transfer attempts between CSV and Elasticsearch",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument('--threshold', type=int, default=300,
+                       help='Transfer duration threshold in seconds (default: 300)')
+    parser.add_argument('--input', default='full.csv',
+                       help='Input CSV file to analyze (default: full.csv)')
+    parser.add_argument('--cluster',
+                       help='Analyze specific cluster ID only')
+
+    args = parser.parse_args()
+
+    # Print header
+    if args.cluster:
         print("=" * 100)
-        print(f"TRANSFER ATTEMPT ANALYSIS FOR CLUSTER {specific_cluster_id}")
+        print(f"TRANSFER ATTEMPT ANALYSIS FOR CLUSTER {args.cluster}")
         print("=" * 100)
         print()
+        job_ids = [args.cluster]
     else:
         print("=" * 100)
-        print("TRANSFER ATTEMPT MATCHING ANALYSIS")
+        print("AUTOMATED TRANSFER ATTEMPT MATCHING ANALYSIS")
         print("=" * 100)
         print()
 
-    # Read job IDs
-    if specific_cluster_id:
-        print(f"Analyzing specific cluster: {specific_cluster_id}")
-        job_ids = [specific_cluster_id]
-    else:
-        print("Reading slow_transfers file...")
-        job_ids = read_job_ids()
-        print(f"Found {len(job_ids)} jobs")
+        # Step 1: Find slow transfers
+        job_ids = find_slow_transfers(args.threshold, args.input)
+        if not job_ids:
+            print("No slow transfers found. Exiting.")
+            sys.exit(0)
+
     print()
 
-    # Read CSV attempts
-    print("Reading CSV attempts from full.csv...")
-    csv_attempts = read_csv_attempts(job_ids)
+    # Step 2: Read CSV attempts
+    print(f"Reading CSV attempts from {args.input}...")
+    csv_attempts = read_csv_attempts(job_ids, args.input)
     total_csv_attempts = sum(len(atts) for atts in csv_attempts.values())
     print(f"Found {total_csv_attempts} CSV attempts across {len(csv_attempts)} jobs")
     print()
 
-    # Query ES attempts
-    print("Querying ES attempts...")
+    # Step 3: Query ES attempts
+    print("Querying Elasticsearch for transfer attempts...")
     es_attempts = query_es_attempts(job_ids)
     total_es_attempts = sum(len(atts) for atts in es_attempts.values())
     print(f"Found {total_es_attempts} ES attempts across {len(es_attempts)} jobs")
     print()
 
     # If specific cluster requested and found no data, exit
-    if specific_cluster_id and not csv_attempts and not es_attempts:
-        print(f"ERROR: No data found for cluster {specific_cluster_id}")
-        print("This cluster may not exist in full.csv or Elasticsearch.")
+    if args.cluster and not csv_attempts and not es_attempts:
+        print(f"ERROR: No data found for cluster {args.cluster}")
+        print(f"This cluster may not exist in {args.input} or Elasticsearch.")
         sys.exit(1)
 
-    # Match attempts
+    # Step 4: Match attempts
     print("Matching attempts by end time...")
     matches = match_attempts(csv_attempts, es_attempts)
     print()
 
+    # Step 5: Print results
     # For specific cluster, just show cluster comparison
-    if specific_cluster_id:
+    if args.cluster:
         print_cluster_comparison(csv_attempts, es_attempts)
     else:
         # Print window-filtered report
