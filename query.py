@@ -22,6 +22,7 @@ FIELDS = [
     "TransferEndTime",
     "TransferUrl",
     "AttemptTime",
+    "machineattrname0",
     "machineattrglidein_site0",
     "Endpoint"
 ]
