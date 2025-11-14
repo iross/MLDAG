@@ -58,5 +58,7 @@ node_modules/
 CLAUDE.md
 # tasks.json
 # tasks/
-#
+progress/
 2025-*
+*path_monthly
+*reports/
