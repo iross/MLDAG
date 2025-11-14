@@ -1,0 +1,1767 @@
+#SUBMIT-DESCRIPTION annex_helper.sub {
+#    universe = local
+#    executable = /home/ian.ross/MLDAG/.venv/bin/python
+#    arguments = annex_helper.py watch --interval 60
+#    queue
+#}
+#SERVICE annex_helper annex_helper.sub
+SUBMIT-DESCRIPTION ospool_pretrain.sub {
+	universe = container
+	container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time_2025-10-10.sif
+
+	request_disk = 100GB
+    request_memory = 80000
+    retry_request_memory = 120000
+	request_cpus = 8
+	# request_gpus = 1
+	# gpus_minimum_memory = 63000
+    require_gpus = GlobalMemoryMb >= 32000
+    request_gpus = 1 + (GPUs_GlobalMemoryMB < 64000) ?: 0
+
+	gpus_minimum_capability = 7.5
+	gpus_maximum_capability = 8.99
+
+	#environment = "WANDB_API_KEY=123"
+	environment = "WANDB_API_KEY=c138f48f6e4bb65c5fb3a4641d9e4be6981686df"
+
+	+is_resumable = true
+	+JobDurationCategory = "Medium"
+	+ProjectName = "PATh_MLSupplement"
+
+	executable = /bin/bash
+	transfer_executable = false
+	arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
+
+	preserve_relative_paths = true
+	transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+	if defined continue_from_checkpoint
+	    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+	endif
+	transfer_output_files = output
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT_OR_EVICT
+
+	output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+	error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+	stream_output = true
+	stream_error = true
+	log = metl.log
+    priority = $(epoch)
+
+	TARGET.GLIDEIN_ResourceName == "$(ResourceName)"
+	queue
+}
+SUBMIT-DESCRIPTION expanse_pretrain.sub {
+	universe = container
+	container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time_2025-10-10.sif
+
+	request_disk = 100GB
+	request_memory = 220000
+	request_cpus = 8
+	request_gpus = 4
+	gpus_minimum_memory = 32000
+	gpus_minimum_capability = 7.0
+	gpus_maximum_capability = 8.9
+
+	#environment = "WANDB_API_KEY=123"
+	environment = "WANDB_API_KEY=c138f48f6e4bb65c5fb3a4641d9e4be6981686df"
+
+	+is_resumable = true
+	+JobDurationCategory = "Long"
+	+ProjectName = "PATh_MLSupplement"
+
+	executable = /bin/bash
+	transfer_executable = false
+	arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
+
+	preserve_relative_paths = true
+	transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+	if defined continue_from_checkpoint
+	    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+	endif
+	transfer_output_files = output
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT_OR_EVICT
+
+	output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+	error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+	stream_output = true
+	stream_error = true
+	log = metl.log
+
+	MY.TargetAnnexName = "expanse_annex"
+	queue
+}
+SUBMIT-DESCRIPTION bridges2_pretrain.sub {
+	universe = container
+	container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time_2025-10-10.sif
+
+	request_disk = 100GB
+	request_memory = 220000
+	request_cpus = 16
+	request_gpus = 4
+	gpus_minimum_memory = 32000
+	gpus_minimum_capability = 7.0
+	gpus_maximum_capability = 8.9
+
+	#environment = "WANDB_API_KEY=123"
+	environment = "WANDB_API_KEY=c138f48f6e4bb65c5fb3a4641d9e4be6981686df"
+
+	+is_resumable = true
+	+JobDurationCategory = "Long"
+	+ProjectName = "PATh_MLSupplement"
+
+	executable = /bin/bash
+	transfer_executable = false
+	arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
+
+	preserve_relative_paths = true
+	transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+	if defined continue_from_checkpoint
+	    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+	endif
+	transfer_output_files = output
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT_OR_EVICT
+
+	output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+	error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+	stream_output = true
+	stream_error = true
+	log = metl.log
+
+	MY.TargetAnnexName = "bridges2_annex"
+	queue
+}
+SUBMIT-DESCRIPTION anvil_pretrain.sub {
+	universe = container
+	container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time_2025-10-10.sif
+
+	request_disk = 100GB
+	request_memory = 65536
+	request_cpus = 8
+	request_gpus = 4
+	gpus_minimum_memory = 63000
+	gpus_minimum_capability = 7.5
+	gpus_maximum_capability = 8.9
+
+	#environment = "WANDB_API_KEY=123"
+	environment = "WANDB_API_KEY=c138f48f6e4bb65c5fb3a4641d9e4be6981686df"
+
+	+is_resumable = true
+	+JobDurationCategory = "Long"
+	+ProjectName = "PATh_MLSupplement"
+
+	executable = /bin/bash
+	transfer_executable = false
+	arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
+
+	preserve_relative_paths = true
+	transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+	if defined continue_from_checkpoint
+	    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+	endif
+	transfer_output_files = output
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT_OR_EVICT
+
+	output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+	error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+	stream_output = true
+	stream_error = true
+	log = metl.log
+
+	MY.TargetAnnexName = "anvil_annex"
+	queue
+}
+SUBMIT-DESCRIPTION aws_pretrain.sub {
+	universe = container
+	container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time_2025-10-10.sif
+
+	request_disk = 100GB
+	request_memory = 180000
+	request_cpus = 16
+	request_gpus = 2
+	gpus_minimum_memory = 20000
+	gpus_minimum_capability = 7.5
+	gpus_maximum_capability = 8.9
+
+	#environment = "WANDB_API_KEY=123"
+	environment = "WANDB_API_KEY=c138f48f6e4bb65c5fb3a4641d9e4be6981686df"
+
+	+is_resumable = true
+	+JobDurationCategory = "Long"
+	+ProjectName = "PATh_MLSupplement"
+
+	executable = /bin/bash
+	transfer_executable = false
+	arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
+
+	preserve_relative_paths = true
+	transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+	if defined continue_from_checkpoint
+	    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+	endif
+	transfer_output_files = output
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT_OR_EVICT
+
+	output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+	error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+	stream_output = true
+	stream_error = true
+	log = metl.log
+
+	MY.TargetAnnexName = "aws"
+	queue
+}
+SUBMIT-DESCRIPTION delta_pretrain.sub {
+	universe = container
+	container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time_2025-10-10.sif
+
+	request_disk = 100GB
+	request_memory = 220000
+	request_cpus = 8
+	request_gpus = 4
+	gpus_minimum_memory = 32000
+	gpus_minimum_capability = 7.5
+	gpus_maximum_capability = 8.9
+
+	#environment = "WANDB_API_KEY=123"
+	environment = "WANDB_API_KEY=c138f48f6e4bb65c5fb3a4641d9e4be6981686df"
+
+	+is_resumable = true
+	+JobDurationCategory = "Long"
+	+ProjectName = "PATh_MLSupplement"
+
+	executable = /bin/bash
+	transfer_executable = false
+	arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
+
+	preserve_relative_paths = true
+	transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+	if defined continue_from_checkpoint
+	    transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
+	endif
+	transfer_output_files = output
+	should_transfer_files = YES
+	when_to_transfer_output = ON_EXIT_OR_EVICT
+
+	output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
+	error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
+	stream_output = true
+	stream_error = true
+	log = metl.log
+
+	MY.TargetAnnexName = "delta_annex"
+	queue
+}
+JOB run0-train_epoch0 expanse_pretrain.sub
+JOB run0-train_epoch1 expanse_pretrain.sub
+JOB run0-train_epoch2 expanse_pretrain.sub
+JOB run0-train_epoch3 expanse_pretrain.sub
+JOB run0-train_epoch4 ospool_pretrain.sub
+JOB run0-train_epoch5 ospool_pretrain.sub
+JOB run0-train_epoch6 expanse_pretrain.sub
+JOB run0-train_epoch7 ospool_pretrain.sub
+JOB run0-train_epoch8 ospool_pretrain.sub
+JOB run0-train_epoch9 ospool_pretrain.sub
+JOB run0-train_epoch10 ospool_pretrain.sub
+JOB run0-train_epoch11 bridges2_pretrain.sub
+JOB run0-train_epoch12 ospool_pretrain.sub
+JOB run0-train_epoch13 ospool_pretrain.sub
+JOB run0-train_epoch14 ospool_pretrain.sub
+JOB run0-train_epoch15 expanse_pretrain.sub
+JOB run0-train_epoch16 expanse_pretrain.sub
+JOB run0-train_epoch17 ospool_pretrain.sub
+JOB run0-train_epoch18 delta_pretrain.sub
+JOB run0-train_epoch19 ospool_pretrain.sub
+JOB run0-train_epoch20 ospool_pretrain.sub
+JOB run0-train_epoch21 ospool_pretrain.sub
+JOB run0-train_epoch22 ospool_pretrain.sub
+JOB run0-train_epoch23 ospool_pretrain.sub
+JOB run0-train_epoch24 ospool_pretrain.sub
+JOB run0-train_epoch25 expanse_pretrain.sub
+JOB run0-train_epoch26 expanse_pretrain.sub
+JOB run0-train_epoch27 expanse_pretrain.sub
+JOB run0-train_epoch28 expanse_pretrain.sub
+JOB run0-train_epoch29 expanse_pretrain.sub
+
+VARS run0-train_epoch0 epoch="1" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" 
+VARS run0-train_epoch1 epoch="2" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch2 epoch="3" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch3 epoch="4" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch4 epoch="5" run_uuid="e68502e5" random_seed="22769" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run0-train_epoch5 epoch="6" run_uuid="e68502e5" random_seed="22769" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run0-train_epoch6 epoch="7" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch7 epoch="8" run_uuid="e68502e5" random_seed="22769" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch8 epoch="9" run_uuid="e68502e5" random_seed="22769" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run0-train_epoch9 epoch="10" run_uuid="e68502e5" random_seed="22769" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run0-train_epoch10 epoch="11" run_uuid="e68502e5" random_seed="22769" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run0-train_epoch11 epoch="12" run_uuid="e68502e5" random_seed="22769" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run0-train_epoch12 epoch="13" run_uuid="e68502e5" random_seed="22769" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run0-train_epoch13 epoch="14" run_uuid="e68502e5" random_seed="22769" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch14 epoch="15" run_uuid="e68502e5" random_seed="22769" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch15 epoch="16" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch16 epoch="17" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch17 epoch="18" run_uuid="e68502e5" random_seed="22769" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch18 epoch="19" run_uuid="e68502e5" random_seed="22769" ResourceName="delta" continue_from_checkpoint="true"
+VARS run0-train_epoch19 epoch="20" run_uuid="e68502e5" random_seed="22769" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch20 epoch="21" run_uuid="e68502e5" random_seed="22769" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch21 epoch="22" run_uuid="e68502e5" random_seed="22769" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run0-train_epoch22 epoch="23" run_uuid="e68502e5" random_seed="22769" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch23 epoch="24" run_uuid="e68502e5" random_seed="22769" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch24 epoch="25" run_uuid="e68502e5" random_seed="22769" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run0-train_epoch25 epoch="26" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch26 epoch="27" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch27 epoch="28" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch28 epoch="29" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run0-train_epoch29 epoch="30" run_uuid="e68502e5" random_seed="22769" ResourceName="expanse" continue_from_checkpoint="true"
+
+
+PARENT run0-train_epoch0 CHILD run0-train_epoch1
+PARENT run0-train_epoch1 CHILD run0-train_epoch2
+PARENT run0-train_epoch2 CHILD run0-train_epoch3
+PARENT run0-train_epoch3 CHILD run0-train_epoch4
+PARENT run0-train_epoch4 CHILD run0-train_epoch5
+PARENT run0-train_epoch5 CHILD run0-train_epoch6
+PARENT run0-train_epoch6 CHILD run0-train_epoch7
+PARENT run0-train_epoch7 CHILD run0-train_epoch8
+PARENT run0-train_epoch8 CHILD run0-train_epoch9
+PARENT run0-train_epoch9 CHILD run0-train_epoch10
+PARENT run0-train_epoch10 CHILD run0-train_epoch11
+PARENT run0-train_epoch11 CHILD run0-train_epoch12
+PARENT run0-train_epoch12 CHILD run0-train_epoch13
+PARENT run0-train_epoch13 CHILD run0-train_epoch14
+PARENT run0-train_epoch14 CHILD run0-train_epoch15
+PARENT run0-train_epoch15 CHILD run0-train_epoch16
+PARENT run0-train_epoch16 CHILD run0-train_epoch17
+PARENT run0-train_epoch17 CHILD run0-train_epoch18
+PARENT run0-train_epoch18 CHILD run0-train_epoch19
+PARENT run0-train_epoch19 CHILD run0-train_epoch20
+PARENT run0-train_epoch20 CHILD run0-train_epoch21
+PARENT run0-train_epoch21 CHILD run0-train_epoch22
+PARENT run0-train_epoch22 CHILD run0-train_epoch23
+PARENT run0-train_epoch23 CHILD run0-train_epoch24
+PARENT run0-train_epoch24 CHILD run0-train_epoch25
+PARENT run0-train_epoch25 CHILD run0-train_epoch26
+PARENT run0-train_epoch26 CHILD run0-train_epoch27
+PARENT run0-train_epoch27 CHILD run0-train_epoch28
+PARENT run0-train_epoch28 CHILD run0-train_epoch29
+SCRIPT PRE run0-train_epoch6 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run0-train_epoch11 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run0-train_epoch15 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run0-train_epoch16 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run0-train_epoch18 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run0-train_epoch28 pre_request_annex.sh anvil anvil_annex
+
+JOB run1-train_epoch0 ospool_pretrain.sub
+JOB run1-train_epoch1 expanse_pretrain.sub
+JOB run1-train_epoch2 expanse_pretrain.sub
+JOB run1-train_epoch3 ospool_pretrain.sub
+JOB run1-train_epoch4 ospool_pretrain.sub
+JOB run1-train_epoch5 ospool_pretrain.sub
+JOB run1-train_epoch6 ospool_pretrain.sub
+JOB run1-train_epoch7 ospool_pretrain.sub
+JOB run1-train_epoch8 ospool_pretrain.sub
+JOB run1-train_epoch9 ospool_pretrain.sub
+JOB run1-train_epoch10 delta_pretrain.sub
+JOB run1-train_epoch11 ospool_pretrain.sub
+JOB run1-train_epoch12 expanse_pretrain.sub
+JOB run1-train_epoch13 expanse_pretrain.sub
+JOB run1-train_epoch14 bridges2_pretrain.sub
+JOB run1-train_epoch15 ospool_pretrain.sub
+JOB run1-train_epoch16 expanse_pretrain.sub
+JOB run1-train_epoch17 ospool_pretrain.sub
+JOB run1-train_epoch18 ospool_pretrain.sub
+JOB run1-train_epoch19 expanse_pretrain.sub
+JOB run1-train_epoch20 ospool_pretrain.sub
+JOB run1-train_epoch21 ospool_pretrain.sub
+JOB run1-train_epoch22 ospool_pretrain.sub
+JOB run1-train_epoch23 ospool_pretrain.sub
+JOB run1-train_epoch24 expanse_pretrain.sub
+JOB run1-train_epoch25 bridges2_pretrain.sub
+JOB run1-train_epoch26 ospool_pretrain.sub
+JOB run1-train_epoch27 ospool_pretrain.sub
+JOB run1-train_epoch28 ospool_pretrain.sub
+JOB run1-train_epoch29 delta_pretrain.sub
+
+VARS run1-train_epoch0 epoch="1" run_uuid="b2f60292" random_seed="241423" ResourceName="MTState-Tempest-CE1" 
+VARS run1-train_epoch1 epoch="2" run_uuid="b2f60292" random_seed="241423" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run1-train_epoch2 epoch="3" run_uuid="b2f60292" random_seed="241423" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run1-train_epoch3 epoch="4" run_uuid="b2f60292" random_seed="241423" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run1-train_epoch4 epoch="5" run_uuid="b2f60292" random_seed="241423" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run1-train_epoch5 epoch="6" run_uuid="b2f60292" random_seed="241423" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run1-train_epoch6 epoch="7" run_uuid="b2f60292" random_seed="241423" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run1-train_epoch7 epoch="8" run_uuid="b2f60292" random_seed="241423" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run1-train_epoch8 epoch="9" run_uuid="b2f60292" random_seed="241423" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run1-train_epoch9 epoch="10" run_uuid="b2f60292" random_seed="241423" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run1-train_epoch10 epoch="11" run_uuid="b2f60292" random_seed="241423" ResourceName="delta" continue_from_checkpoint="true"
+VARS run1-train_epoch11 epoch="12" run_uuid="b2f60292" random_seed="241423" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run1-train_epoch12 epoch="13" run_uuid="b2f60292" random_seed="241423" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run1-train_epoch13 epoch="14" run_uuid="b2f60292" random_seed="241423" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run1-train_epoch14 epoch="15" run_uuid="b2f60292" random_seed="241423" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run1-train_epoch15 epoch="16" run_uuid="b2f60292" random_seed="241423" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run1-train_epoch16 epoch="17" run_uuid="b2f60292" random_seed="241423" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run1-train_epoch17 epoch="18" run_uuid="b2f60292" random_seed="241423" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run1-train_epoch18 epoch="19" run_uuid="b2f60292" random_seed="241423" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run1-train_epoch19 epoch="20" run_uuid="b2f60292" random_seed="241423" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run1-train_epoch20 epoch="21" run_uuid="b2f60292" random_seed="241423" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run1-train_epoch21 epoch="22" run_uuid="b2f60292" random_seed="241423" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run1-train_epoch22 epoch="23" run_uuid="b2f60292" random_seed="241423" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run1-train_epoch23 epoch="24" run_uuid="b2f60292" random_seed="241423" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run1-train_epoch24 epoch="25" run_uuid="b2f60292" random_seed="241423" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run1-train_epoch25 epoch="26" run_uuid="b2f60292" random_seed="241423" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run1-train_epoch26 epoch="27" run_uuid="b2f60292" random_seed="241423" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run1-train_epoch27 epoch="28" run_uuid="b2f60292" random_seed="241423" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run1-train_epoch28 epoch="29" run_uuid="b2f60292" random_seed="241423" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run1-train_epoch29 epoch="30" run_uuid="b2f60292" random_seed="241423" ResourceName="delta" continue_from_checkpoint="true"
+
+
+PARENT run1-train_epoch0 CHILD run1-train_epoch1
+PARENT run1-train_epoch1 CHILD run1-train_epoch2
+PARENT run1-train_epoch2 CHILD run1-train_epoch3
+PARENT run1-train_epoch3 CHILD run1-train_epoch4
+PARENT run1-train_epoch4 CHILD run1-train_epoch5
+PARENT run1-train_epoch5 CHILD run1-train_epoch6
+PARENT run1-train_epoch6 CHILD run1-train_epoch7
+PARENT run1-train_epoch7 CHILD run1-train_epoch8
+PARENT run1-train_epoch8 CHILD run1-train_epoch9
+PARENT run1-train_epoch9 CHILD run1-train_epoch10
+PARENT run1-train_epoch10 CHILD run1-train_epoch11
+PARENT run1-train_epoch11 CHILD run1-train_epoch12
+PARENT run1-train_epoch12 CHILD run1-train_epoch13
+PARENT run1-train_epoch13 CHILD run1-train_epoch14
+PARENT run1-train_epoch14 CHILD run1-train_epoch15
+PARENT run1-train_epoch15 CHILD run1-train_epoch16
+PARENT run1-train_epoch16 CHILD run1-train_epoch17
+PARENT run1-train_epoch17 CHILD run1-train_epoch18
+PARENT run1-train_epoch18 CHILD run1-train_epoch19
+PARENT run1-train_epoch19 CHILD run1-train_epoch20
+PARENT run1-train_epoch20 CHILD run1-train_epoch21
+PARENT run1-train_epoch21 CHILD run1-train_epoch22
+PARENT run1-train_epoch22 CHILD run1-train_epoch23
+PARENT run1-train_epoch23 CHILD run1-train_epoch24
+PARENT run1-train_epoch24 CHILD run1-train_epoch25
+PARENT run1-train_epoch25 CHILD run1-train_epoch26
+PARENT run1-train_epoch26 CHILD run1-train_epoch27
+PARENT run1-train_epoch27 CHILD run1-train_epoch28
+PARENT run1-train_epoch28 CHILD run1-train_epoch29
+SCRIPT PRE run1-train_epoch10 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run1-train_epoch12 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run1-train_epoch14 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run1-train_epoch16 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run1-train_epoch19 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run1-train_epoch24 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run1-train_epoch25 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run1-train_epoch29 pre_request_annex.sh delta delta_annex
+
+JOB run2-train_epoch0 expanse_pretrain.sub
+JOB run2-train_epoch1 expanse_pretrain.sub
+JOB run2-train_epoch2 expanse_pretrain.sub
+JOB run2-train_epoch3 ospool_pretrain.sub
+JOB run2-train_epoch4 ospool_pretrain.sub
+JOB run2-train_epoch5 ospool_pretrain.sub
+JOB run2-train_epoch6 ospool_pretrain.sub
+JOB run2-train_epoch7 ospool_pretrain.sub
+JOB run2-train_epoch8 ospool_pretrain.sub
+JOB run2-train_epoch9 aws_pretrain.sub
+JOB run2-train_epoch10 ospool_pretrain.sub
+JOB run2-train_epoch11 ospool_pretrain.sub
+JOB run2-train_epoch12 ospool_pretrain.sub
+JOB run2-train_epoch13 ospool_pretrain.sub
+JOB run2-train_epoch14 ospool_pretrain.sub
+JOB run2-train_epoch15 ospool_pretrain.sub
+JOB run2-train_epoch16 ospool_pretrain.sub
+JOB run2-train_epoch17 bridges2_pretrain.sub
+JOB run2-train_epoch18 ospool_pretrain.sub
+JOB run2-train_epoch19 ospool_pretrain.sub
+JOB run2-train_epoch20 ospool_pretrain.sub
+JOB run2-train_epoch21 ospool_pretrain.sub
+JOB run2-train_epoch22 bridges2_pretrain.sub
+JOB run2-train_epoch23 bridges2_pretrain.sub
+JOB run2-train_epoch24 ospool_pretrain.sub
+JOB run2-train_epoch25 ospool_pretrain.sub
+JOB run2-train_epoch26 ospool_pretrain.sub
+JOB run2-train_epoch27 ospool_pretrain.sub
+JOB run2-train_epoch28 ospool_pretrain.sub
+JOB run2-train_epoch29 expanse_pretrain.sub
+
+VARS run2-train_epoch0 epoch="1" run_uuid="d4b0af7e" random_seed="901647" ResourceName="expanse" 
+VARS run2-train_epoch1 epoch="2" run_uuid="d4b0af7e" random_seed="901647" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run2-train_epoch2 epoch="3" run_uuid="d4b0af7e" random_seed="901647" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run2-train_epoch3 epoch="4" run_uuid="d4b0af7e" random_seed="901647" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run2-train_epoch4 epoch="5" run_uuid="d4b0af7e" random_seed="901647" ResourceName="ospool" continue_from_checkpoint="true"
+VARS run2-train_epoch5 epoch="6" run_uuid="d4b0af7e" random_seed="901647" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch6 epoch="7" run_uuid="d4b0af7e" random_seed="901647" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run2-train_epoch7 epoch="8" run_uuid="d4b0af7e" random_seed="901647" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch8 epoch="9" run_uuid="d4b0af7e" random_seed="901647" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch9 epoch="10" run_uuid="d4b0af7e" random_seed="901647" ResourceName="aws" continue_from_checkpoint="true"
+VARS run2-train_epoch10 epoch="11" run_uuid="d4b0af7e" random_seed="901647" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run2-train_epoch11 epoch="12" run_uuid="d4b0af7e" random_seed="901647" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch12 epoch="13" run_uuid="d4b0af7e" random_seed="901647" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch13 epoch="14" run_uuid="d4b0af7e" random_seed="901647" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run2-train_epoch14 epoch="15" run_uuid="d4b0af7e" random_seed="901647" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run2-train_epoch15 epoch="16" run_uuid="d4b0af7e" random_seed="901647" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run2-train_epoch16 epoch="17" run_uuid="d4b0af7e" random_seed="901647" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run2-train_epoch17 epoch="18" run_uuid="d4b0af7e" random_seed="901647" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run2-train_epoch18 epoch="19" run_uuid="d4b0af7e" random_seed="901647" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run2-train_epoch19 epoch="20" run_uuid="d4b0af7e" random_seed="901647" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch20 epoch="21" run_uuid="d4b0af7e" random_seed="901647" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch21 epoch="22" run_uuid="d4b0af7e" random_seed="901647" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run2-train_epoch22 epoch="23" run_uuid="d4b0af7e" random_seed="901647" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run2-train_epoch23 epoch="24" run_uuid="d4b0af7e" random_seed="901647" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run2-train_epoch24 epoch="25" run_uuid="d4b0af7e" random_seed="901647" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run2-train_epoch25 epoch="26" run_uuid="d4b0af7e" random_seed="901647" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run2-train_epoch26 epoch="27" run_uuid="d4b0af7e" random_seed="901647" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run2-train_epoch27 epoch="28" run_uuid="d4b0af7e" random_seed="901647" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run2-train_epoch28 epoch="29" run_uuid="d4b0af7e" random_seed="901647" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run2-train_epoch29 epoch="30" run_uuid="d4b0af7e" random_seed="901647" ResourceName="expanse" continue_from_checkpoint="true"
+
+
+PARENT run2-train_epoch0 CHILD run2-train_epoch1
+PARENT run2-train_epoch1 CHILD run2-train_epoch2
+PARENT run2-train_epoch2 CHILD run2-train_epoch3
+PARENT run2-train_epoch3 CHILD run2-train_epoch4
+PARENT run2-train_epoch4 CHILD run2-train_epoch5
+PARENT run2-train_epoch5 CHILD run2-train_epoch6
+PARENT run2-train_epoch6 CHILD run2-train_epoch7
+PARENT run2-train_epoch7 CHILD run2-train_epoch8
+PARENT run2-train_epoch8 CHILD run2-train_epoch9
+PARENT run2-train_epoch9 CHILD run2-train_epoch10
+PARENT run2-train_epoch10 CHILD run2-train_epoch11
+PARENT run2-train_epoch11 CHILD run2-train_epoch12
+PARENT run2-train_epoch12 CHILD run2-train_epoch13
+PARENT run2-train_epoch13 CHILD run2-train_epoch14
+PARENT run2-train_epoch14 CHILD run2-train_epoch15
+PARENT run2-train_epoch15 CHILD run2-train_epoch16
+PARENT run2-train_epoch16 CHILD run2-train_epoch17
+PARENT run2-train_epoch17 CHILD run2-train_epoch18
+PARENT run2-train_epoch18 CHILD run2-train_epoch19
+PARENT run2-train_epoch19 CHILD run2-train_epoch20
+PARENT run2-train_epoch20 CHILD run2-train_epoch21
+PARENT run2-train_epoch21 CHILD run2-train_epoch22
+PARENT run2-train_epoch22 CHILD run2-train_epoch23
+PARENT run2-train_epoch23 CHILD run2-train_epoch24
+PARENT run2-train_epoch24 CHILD run2-train_epoch25
+PARENT run2-train_epoch25 CHILD run2-train_epoch26
+PARENT run2-train_epoch26 CHILD run2-train_epoch27
+PARENT run2-train_epoch27 CHILD run2-train_epoch28
+PARENT run2-train_epoch28 CHILD run2-train_epoch29
+SCRIPT PRE run2-train_epoch1 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run2-train_epoch2 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run2-train_epoch4 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run2-train_epoch9 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run2-train_epoch17 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run2-train_epoch22 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run2-train_epoch23 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run2-train_epoch29 pre_request_annex.sh expanse expanse_annex
+
+JOB run3-train_epoch0 ospool_pretrain.sub
+JOB run3-train_epoch1 expanse_pretrain.sub
+JOB run3-train_epoch2 expanse_pretrain.sub
+JOB run3-train_epoch3 ospool_pretrain.sub
+JOB run3-train_epoch4 ospool_pretrain.sub
+JOB run3-train_epoch5 ospool_pretrain.sub
+JOB run3-train_epoch6 ospool_pretrain.sub
+JOB run3-train_epoch7 ospool_pretrain.sub
+JOB run3-train_epoch8 ospool_pretrain.sub
+JOB run3-train_epoch9 ospool_pretrain.sub
+JOB run3-train_epoch10 ospool_pretrain.sub
+JOB run3-train_epoch11 delta_pretrain.sub
+JOB run3-train_epoch12 ospool_pretrain.sub
+JOB run3-train_epoch13 ospool_pretrain.sub
+JOB run3-train_epoch14 ospool_pretrain.sub
+JOB run3-train_epoch15 ospool_pretrain.sub
+JOB run3-train_epoch16 ospool_pretrain.sub
+JOB run3-train_epoch17 ospool_pretrain.sub
+JOB run3-train_epoch18 ospool_pretrain.sub
+JOB run3-train_epoch19 ospool_pretrain.sub
+JOB run3-train_epoch20 ospool_pretrain.sub
+JOB run3-train_epoch21 ospool_pretrain.sub
+JOB run3-train_epoch22 ospool_pretrain.sub
+JOB run3-train_epoch23 aws_pretrain.sub
+JOB run3-train_epoch24 aws_pretrain.sub
+JOB run3-train_epoch25 aws_pretrain.sub
+JOB run3-train_epoch26 aws_pretrain.sub
+JOB run3-train_epoch27 aws_pretrain.sub
+JOB run3-train_epoch28 aws_pretrain.sub
+JOB run3-train_epoch29 aws_pretrain.sub
+
+VARS run3-train_epoch0 epoch="1" run_uuid="01378e4a" random_seed="126084" ResourceName="GP-ARGO-ksu-backfill" 
+VARS run3-train_epoch1 epoch="2" run_uuid="01378e4a" random_seed="126084" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run3-train_epoch2 epoch="3" run_uuid="01378e4a" random_seed="126084" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run3-train_epoch3 epoch="4" run_uuid="01378e4a" random_seed="126084" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run3-train_epoch4 epoch="5" run_uuid="01378e4a" random_seed="126084" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run3-train_epoch5 epoch="6" run_uuid="01378e4a" random_seed="126084" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run3-train_epoch6 epoch="7" run_uuid="01378e4a" random_seed="126084" ResourceName="ospool" continue_from_checkpoint="true"
+VARS run3-train_epoch7 epoch="8" run_uuid="01378e4a" random_seed="126084" ResourceName="ospool" continue_from_checkpoint="true"
+VARS run3-train_epoch8 epoch="9" run_uuid="01378e4a" random_seed="126084" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run3-train_epoch9 epoch="10" run_uuid="01378e4a" random_seed="126084" ResourceName="ospool" continue_from_checkpoint="true"
+VARS run3-train_epoch10 epoch="11" run_uuid="01378e4a" random_seed="126084" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run3-train_epoch11 epoch="12" run_uuid="01378e4a" random_seed="126084" ResourceName="delta" continue_from_checkpoint="true"
+VARS run3-train_epoch12 epoch="13" run_uuid="01378e4a" random_seed="126084" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run3-train_epoch13 epoch="14" run_uuid="01378e4a" random_seed="126084" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run3-train_epoch14 epoch="15" run_uuid="01378e4a" random_seed="126084" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run3-train_epoch15 epoch="16" run_uuid="01378e4a" random_seed="126084" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run3-train_epoch16 epoch="17" run_uuid="01378e4a" random_seed="126084" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run3-train_epoch17 epoch="18" run_uuid="01378e4a" random_seed="126084" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run3-train_epoch18 epoch="19" run_uuid="01378e4a" random_seed="126084" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run3-train_epoch19 epoch="20" run_uuid="01378e4a" random_seed="126084" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run3-train_epoch20 epoch="21" run_uuid="01378e4a" random_seed="126084" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run3-train_epoch21 epoch="22" run_uuid="01378e4a" random_seed="126084" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run3-train_epoch22 epoch="23" run_uuid="01378e4a" random_seed="126084" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run3-train_epoch23 epoch="24" run_uuid="01378e4a" random_seed="126084" ResourceName="aws" continue_from_checkpoint="true"
+VARS run3-train_epoch24 epoch="25" run_uuid="01378e4a" random_seed="126084" ResourceName="aws" continue_from_checkpoint="true"
+VARS run3-train_epoch25 epoch="26" run_uuid="01378e4a" random_seed="126084" ResourceName="aws" continue_from_checkpoint="true"
+VARS run3-train_epoch26 epoch="27" run_uuid="01378e4a" random_seed="126084" ResourceName="aws" continue_from_checkpoint="true"
+VARS run3-train_epoch27 epoch="28" run_uuid="01378e4a" random_seed="126084" ResourceName="aws" continue_from_checkpoint="true"
+VARS run3-train_epoch28 epoch="29" run_uuid="01378e4a" random_seed="126084" ResourceName="aws" continue_from_checkpoint="true"
+VARS run3-train_epoch29 epoch="30" run_uuid="01378e4a" random_seed="126084" ResourceName="aws" continue_from_checkpoint="true"
+
+
+PARENT run3-train_epoch0 CHILD run3-train_epoch1
+PARENT run3-train_epoch1 CHILD run3-train_epoch2
+PARENT run3-train_epoch2 CHILD run3-train_epoch3
+PARENT run3-train_epoch3 CHILD run3-train_epoch4
+PARENT run3-train_epoch4 CHILD run3-train_epoch5
+PARENT run3-train_epoch5 CHILD run3-train_epoch6
+PARENT run3-train_epoch6 CHILD run3-train_epoch7
+PARENT run3-train_epoch7 CHILD run3-train_epoch8
+PARENT run3-train_epoch8 CHILD run3-train_epoch9
+PARENT run3-train_epoch9 CHILD run3-train_epoch10
+PARENT run3-train_epoch10 CHILD run3-train_epoch11
+PARENT run3-train_epoch11 CHILD run3-train_epoch12
+PARENT run3-train_epoch12 CHILD run3-train_epoch13
+PARENT run3-train_epoch13 CHILD run3-train_epoch14
+PARENT run3-train_epoch14 CHILD run3-train_epoch15
+PARENT run3-train_epoch15 CHILD run3-train_epoch16
+PARENT run3-train_epoch16 CHILD run3-train_epoch17
+PARENT run3-train_epoch17 CHILD run3-train_epoch18
+PARENT run3-train_epoch18 CHILD run3-train_epoch19
+PARENT run3-train_epoch19 CHILD run3-train_epoch20
+PARENT run3-train_epoch20 CHILD run3-train_epoch21
+PARENT run3-train_epoch21 CHILD run3-train_epoch22
+PARENT run3-train_epoch22 CHILD run3-train_epoch23
+PARENT run3-train_epoch23 CHILD run3-train_epoch24
+PARENT run3-train_epoch24 CHILD run3-train_epoch25
+PARENT run3-train_epoch25 CHILD run3-train_epoch26
+PARENT run3-train_epoch26 CHILD run3-train_epoch27
+PARENT run3-train_epoch27 CHILD run3-train_epoch28
+PARENT run3-train_epoch28 CHILD run3-train_epoch29
+SCRIPT PRE run3-train_epoch2 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run3-train_epoch6 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run3-train_epoch7 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run3-train_epoch9 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run3-train_epoch11 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run3-train_epoch23 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run3-train_epoch24 pre_request_annex.sh delta delta_annex
+
+JOB run4-train_epoch0 expanse_pretrain.sub
+JOB run4-train_epoch1 delta_pretrain.sub
+JOB run4-train_epoch2 ospool_pretrain.sub
+JOB run4-train_epoch3 ospool_pretrain.sub
+JOB run4-train_epoch4 ospool_pretrain.sub
+JOB run4-train_epoch5 ospool_pretrain.sub
+JOB run4-train_epoch6 expanse_pretrain.sub
+JOB run4-train_epoch7 ospool_pretrain.sub
+JOB run4-train_epoch8 ospool_pretrain.sub
+JOB run4-train_epoch9 ospool_pretrain.sub
+JOB run4-train_epoch10 ospool_pretrain.sub
+JOB run4-train_epoch11 ospool_pretrain.sub
+JOB run4-train_epoch12 ospool_pretrain.sub
+JOB run4-train_epoch13 ospool_pretrain.sub
+JOB run4-train_epoch14 ospool_pretrain.sub
+JOB run4-train_epoch15 bridges2_pretrain.sub
+JOB run4-train_epoch16 bridges2_pretrain.sub
+JOB run4-train_epoch17 bridges2_pretrain.sub
+JOB run4-train_epoch18 ospool_pretrain.sub
+JOB run4-train_epoch19 ospool_pretrain.sub
+JOB run4-train_epoch20 ospool_pretrain.sub
+JOB run4-train_epoch21 aws_pretrain.sub
+JOB run4-train_epoch22 aws_pretrain.sub
+JOB run4-train_epoch23 aws_pretrain.sub
+JOB run4-train_epoch24 aws_pretrain.sub
+JOB run4-train_epoch25 aws_pretrain.sub
+JOB run4-train_epoch26 aws_pretrain.sub
+JOB run4-train_epoch27 aws_pretrain.sub
+JOB run4-train_epoch28 aws_pretrain.sub
+JOB run4-train_epoch29 aws_pretrain.sub
+
+VARS run4-train_epoch0 epoch="1" run_uuid="f045a936" random_seed="268487" ResourceName="expanse" 
+VARS run4-train_epoch1 epoch="2" run_uuid="f045a936" random_seed="268487" ResourceName="delta" continue_from_checkpoint="true"
+VARS run4-train_epoch2 epoch="3" run_uuid="f045a936" random_seed="268487" ResourceName="ospool" continue_from_checkpoint="true"
+VARS run4-train_epoch3 epoch="4" run_uuid="f045a936" random_seed="268487" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run4-train_epoch4 epoch="5" run_uuid="f045a936" random_seed="268487" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run4-train_epoch5 epoch="6" run_uuid="f045a936" random_seed="268487" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run4-train_epoch6 epoch="7" run_uuid="f045a936" random_seed="268487" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run4-train_epoch7 epoch="8" run_uuid="f045a936" random_seed="268487" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run4-train_epoch8 epoch="9" run_uuid="f045a936" random_seed="268487" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run4-train_epoch9 epoch="10" run_uuid="f045a936" random_seed="268487" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run4-train_epoch10 epoch="11" run_uuid="f045a936" random_seed="268487" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run4-train_epoch11 epoch="12" run_uuid="f045a936" random_seed="268487" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run4-train_epoch12 epoch="13" run_uuid="f045a936" random_seed="268487" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run4-train_epoch13 epoch="14" run_uuid="f045a936" random_seed="268487" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run4-train_epoch14 epoch="15" run_uuid="f045a936" random_seed="268487" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run4-train_epoch15 epoch="16" run_uuid="f045a936" random_seed="268487" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run4-train_epoch16 epoch="17" run_uuid="f045a936" random_seed="268487" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run4-train_epoch17 epoch="18" run_uuid="f045a936" random_seed="268487" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run4-train_epoch18 epoch="19" run_uuid="f045a936" random_seed="268487" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run4-train_epoch19 epoch="20" run_uuid="f045a936" random_seed="268487" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run4-train_epoch20 epoch="21" run_uuid="f045a936" random_seed="268487" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run4-train_epoch21 epoch="22" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch22 epoch="23" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch23 epoch="24" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch24 epoch="25" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch25 epoch="26" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch26 epoch="27" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch27 epoch="28" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch28 epoch="29" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+VARS run4-train_epoch29 epoch="30" run_uuid="f045a936" random_seed="268487" ResourceName="aws" continue_from_checkpoint="true"
+
+
+PARENT run4-train_epoch0 CHILD run4-train_epoch1
+PARENT run4-train_epoch1 CHILD run4-train_epoch2
+PARENT run4-train_epoch2 CHILD run4-train_epoch3
+PARENT run4-train_epoch3 CHILD run4-train_epoch4
+PARENT run4-train_epoch4 CHILD run4-train_epoch5
+PARENT run4-train_epoch5 CHILD run4-train_epoch6
+PARENT run4-train_epoch6 CHILD run4-train_epoch7
+PARENT run4-train_epoch7 CHILD run4-train_epoch8
+PARENT run4-train_epoch8 CHILD run4-train_epoch9
+PARENT run4-train_epoch9 CHILD run4-train_epoch10
+PARENT run4-train_epoch10 CHILD run4-train_epoch11
+PARENT run4-train_epoch11 CHILD run4-train_epoch12
+PARENT run4-train_epoch12 CHILD run4-train_epoch13
+PARENT run4-train_epoch13 CHILD run4-train_epoch14
+PARENT run4-train_epoch14 CHILD run4-train_epoch15
+PARENT run4-train_epoch15 CHILD run4-train_epoch16
+PARENT run4-train_epoch16 CHILD run4-train_epoch17
+PARENT run4-train_epoch17 CHILD run4-train_epoch18
+PARENT run4-train_epoch18 CHILD run4-train_epoch19
+PARENT run4-train_epoch19 CHILD run4-train_epoch20
+PARENT run4-train_epoch20 CHILD run4-train_epoch21
+PARENT run4-train_epoch21 CHILD run4-train_epoch22
+PARENT run4-train_epoch22 CHILD run4-train_epoch23
+PARENT run4-train_epoch23 CHILD run4-train_epoch24
+PARENT run4-train_epoch24 CHILD run4-train_epoch25
+PARENT run4-train_epoch25 CHILD run4-train_epoch26
+PARENT run4-train_epoch26 CHILD run4-train_epoch27
+PARENT run4-train_epoch27 CHILD run4-train_epoch28
+PARENT run4-train_epoch28 CHILD run4-train_epoch29
+SCRIPT PRE run4-train_epoch1 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run4-train_epoch2 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run4-train_epoch6 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run4-train_epoch15 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run4-train_epoch17 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run4-train_epoch21 pre_request_annex.sh aws aws_annex
+
+JOB run5-train_epoch0 expanse_pretrain.sub
+JOB run5-train_epoch1 expanse_pretrain.sub
+JOB run5-train_epoch2 expanse_pretrain.sub
+JOB run5-train_epoch3 delta_pretrain.sub
+JOB run5-train_epoch4 ospool_pretrain.sub
+JOB run5-train_epoch5 ospool_pretrain.sub
+JOB run5-train_epoch6 anvil_pretrain.sub
+JOB run5-train_epoch7 aws_pretrain.sub
+JOB run5-train_epoch8 ospool_pretrain.sub
+JOB run5-train_epoch9 ospool_pretrain.sub
+JOB run5-train_epoch10 ospool_pretrain.sub
+JOB run5-train_epoch11 ospool_pretrain.sub
+JOB run5-train_epoch12 ospool_pretrain.sub
+JOB run5-train_epoch13 bridges2_pretrain.sub
+JOB run5-train_epoch14 expanse_pretrain.sub
+JOB run5-train_epoch15 ospool_pretrain.sub
+JOB run5-train_epoch16 ospool_pretrain.sub
+JOB run5-train_epoch17 ospool_pretrain.sub
+JOB run5-train_epoch18 ospool_pretrain.sub
+JOB run5-train_epoch19 ospool_pretrain.sub
+JOB run5-train_epoch20 ospool_pretrain.sub
+JOB run5-train_epoch21 ospool_pretrain.sub
+JOB run5-train_epoch22 aws_pretrain.sub
+JOB run5-train_epoch23 ospool_pretrain.sub
+JOB run5-train_epoch24 ospool_pretrain.sub
+JOB run5-train_epoch25 ospool_pretrain.sub
+JOB run5-train_epoch26 ospool_pretrain.sub
+JOB run5-train_epoch27 anvil_pretrain.sub
+JOB run5-train_epoch28 ospool_pretrain.sub
+JOB run5-train_epoch29 aws_pretrain.sub
+
+VARS run5-train_epoch0 epoch="1" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" 
+VARS run5-train_epoch1 epoch="2" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch2 epoch="3" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch3 epoch="4" run_uuid="8e6a33ff" random_seed="352968" ResourceName="delta" continue_from_checkpoint="true"
+VARS run5-train_epoch4 epoch="5" run_uuid="8e6a33ff" random_seed="352968" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run5-train_epoch5 epoch="6" run_uuid="8e6a33ff" random_seed="352968" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run5-train_epoch6 epoch="7" run_uuid="8e6a33ff" random_seed="352968" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run5-train_epoch7 epoch="8" run_uuid="8e6a33ff" random_seed="352968" ResourceName="aws" continue_from_checkpoint="true"
+VARS run5-train_epoch8 epoch="9" run_uuid="8e6a33ff" random_seed="352968" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run5-train_epoch9 epoch="10" run_uuid="8e6a33ff" random_seed="352968" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run5-train_epoch10 epoch="11" run_uuid="8e6a33ff" random_seed="352968" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run5-train_epoch11 epoch="12" run_uuid="8e6a33ff" random_seed="352968" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run5-train_epoch12 epoch="13" run_uuid="8e6a33ff" random_seed="352968" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run5-train_epoch13 epoch="14" run_uuid="8e6a33ff" random_seed="352968" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run5-train_epoch14 epoch="15" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch15 epoch="16" run_uuid="8e6a33ff" random_seed="352968" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run5-train_epoch16 epoch="17" run_uuid="8e6a33ff" random_seed="352968" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run5-train_epoch17 epoch="18" run_uuid="8e6a33ff" random_seed="352968" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run5-train_epoch18 epoch="19" run_uuid="8e6a33ff" random_seed="352968" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run5-train_epoch19 epoch="20" run_uuid="8e6a33ff" random_seed="352968" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run5-train_epoch20 epoch="21" run_uuid="8e6a33ff" random_seed="352968" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run5-train_epoch21 epoch="22" run_uuid="8e6a33ff" random_seed="352968" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run5-train_epoch22 epoch="23" run_uuid="8e6a33ff" random_seed="352968" ResourceName="aws" continue_from_checkpoint="true"
+VARS run5-train_epoch23 epoch="24" run_uuid="8e6a33ff" random_seed="352968" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run5-train_epoch24 epoch="25" run_uuid="8e6a33ff" random_seed="352968" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run5-train_epoch25 epoch="26" run_uuid="8e6a33ff" random_seed="352968" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run5-train_epoch26 epoch="27" run_uuid="8e6a33ff" random_seed="352968" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run5-train_epoch27 epoch="28" run_uuid="8e6a33ff" random_seed="352968" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run5-train_epoch28 epoch="29" run_uuid="8e6a33ff" random_seed="352968" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run5-train_epoch29 epoch="30" run_uuid="8e6a33ff" random_seed="352968" ResourceName="aws" continue_from_checkpoint="true"
+
+
+PARENT run5-train_epoch0 CHILD run5-train_epoch1
+PARENT run5-train_epoch1 CHILD run5-train_epoch2
+PARENT run5-train_epoch2 CHILD run5-train_epoch3
+PARENT run5-train_epoch3 CHILD run5-train_epoch4
+PARENT run5-train_epoch4 CHILD run5-train_epoch5
+PARENT run5-train_epoch5 CHILD run5-train_epoch6
+PARENT run5-train_epoch6 CHILD run5-train_epoch7
+PARENT run5-train_epoch7 CHILD run5-train_epoch8
+PARENT run5-train_epoch8 CHILD run5-train_epoch9
+PARENT run5-train_epoch9 CHILD run5-train_epoch10
+PARENT run5-train_epoch10 CHILD run5-train_epoch11
+PARENT run5-train_epoch11 CHILD run5-train_epoch12
+PARENT run5-train_epoch12 CHILD run5-train_epoch13
+PARENT run5-train_epoch13 CHILD run5-train_epoch14
+PARENT run5-train_epoch14 CHILD run5-train_epoch15
+PARENT run5-train_epoch15 CHILD run5-train_epoch16
+PARENT run5-train_epoch16 CHILD run5-train_epoch17
+PARENT run5-train_epoch17 CHILD run5-train_epoch18
+PARENT run5-train_epoch18 CHILD run5-train_epoch19
+PARENT run5-train_epoch19 CHILD run5-train_epoch20
+PARENT run5-train_epoch20 CHILD run5-train_epoch21
+PARENT run5-train_epoch21 CHILD run5-train_epoch22
+PARENT run5-train_epoch22 CHILD run5-train_epoch23
+PARENT run5-train_epoch23 CHILD run5-train_epoch24
+PARENT run5-train_epoch24 CHILD run5-train_epoch25
+PARENT run5-train_epoch25 CHILD run5-train_epoch26
+PARENT run5-train_epoch26 CHILD run5-train_epoch27
+PARENT run5-train_epoch27 CHILD run5-train_epoch28
+PARENT run5-train_epoch28 CHILD run5-train_epoch29
+SCRIPT PRE run5-train_epoch3 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run5-train_epoch6 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run5-train_epoch7 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run5-train_epoch13 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run5-train_epoch14 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run5-train_epoch22 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run5-train_epoch27 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run5-train_epoch29 pre_request_annex.sh aws aws_annex
+
+JOB run6-train_epoch0 ospool_pretrain.sub
+JOB run6-train_epoch1 ospool_pretrain.sub
+JOB run6-train_epoch2 ospool_pretrain.sub
+JOB run6-train_epoch3 ospool_pretrain.sub
+JOB run6-train_epoch4 aws_pretrain.sub
+JOB run6-train_epoch5 ospool_pretrain.sub
+JOB run6-train_epoch6 ospool_pretrain.sub
+JOB run6-train_epoch7 ospool_pretrain.sub
+JOB run6-train_epoch8 ospool_pretrain.sub
+JOB run6-train_epoch9 ospool_pretrain.sub
+JOB run6-train_epoch10 ospool_pretrain.sub
+JOB run6-train_epoch11 ospool_pretrain.sub
+JOB run6-train_epoch12 bridges2_pretrain.sub
+JOB run6-train_epoch13 ospool_pretrain.sub
+JOB run6-train_epoch14 expanse_pretrain.sub
+JOB run6-train_epoch15 ospool_pretrain.sub
+JOB run6-train_epoch16 anvil_pretrain.sub
+JOB run6-train_epoch17 ospool_pretrain.sub
+JOB run6-train_epoch18 ospool_pretrain.sub
+JOB run6-train_epoch19 ospool_pretrain.sub
+JOB run6-train_epoch20 ospool_pretrain.sub
+JOB run6-train_epoch21 ospool_pretrain.sub
+JOB run6-train_epoch22 anvil_pretrain.sub
+JOB run6-train_epoch23 aws_pretrain.sub
+JOB run6-train_epoch24 ospool_pretrain.sub
+JOB run6-train_epoch25 ospool_pretrain.sub
+JOB run6-train_epoch26 expanse_pretrain.sub
+JOB run6-train_epoch27 ospool_pretrain.sub
+JOB run6-train_epoch28 ospool_pretrain.sub
+JOB run6-train_epoch29 ospool_pretrain.sub
+
+VARS run6-train_epoch0 epoch="1" run_uuid="5eebdaf5" random_seed="821704" ResourceName="ospool" 
+VARS run6-train_epoch1 epoch="2" run_uuid="5eebdaf5" random_seed="821704" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch2 epoch="3" run_uuid="5eebdaf5" random_seed="821704" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run6-train_epoch3 epoch="4" run_uuid="5eebdaf5" random_seed="821704" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run6-train_epoch4 epoch="5" run_uuid="5eebdaf5" random_seed="821704" ResourceName="aws" continue_from_checkpoint="true"
+VARS run6-train_epoch5 epoch="6" run_uuid="5eebdaf5" random_seed="821704" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch6 epoch="7" run_uuid="5eebdaf5" random_seed="821704" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch7 epoch="8" run_uuid="5eebdaf5" random_seed="821704" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run6-train_epoch8 epoch="9" run_uuid="5eebdaf5" random_seed="821704" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run6-train_epoch9 epoch="10" run_uuid="5eebdaf5" random_seed="821704" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run6-train_epoch10 epoch="11" run_uuid="5eebdaf5" random_seed="821704" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run6-train_epoch11 epoch="12" run_uuid="5eebdaf5" random_seed="821704" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch12 epoch="13" run_uuid="5eebdaf5" random_seed="821704" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run6-train_epoch13 epoch="14" run_uuid="5eebdaf5" random_seed="821704" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run6-train_epoch14 epoch="15" run_uuid="5eebdaf5" random_seed="821704" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run6-train_epoch15 epoch="16" run_uuid="5eebdaf5" random_seed="821704" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run6-train_epoch16 epoch="17" run_uuid="5eebdaf5" random_seed="821704" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run6-train_epoch17 epoch="18" run_uuid="5eebdaf5" random_seed="821704" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run6-train_epoch18 epoch="19" run_uuid="5eebdaf5" random_seed="821704" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch19 epoch="20" run_uuid="5eebdaf5" random_seed="821704" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch20 epoch="21" run_uuid="5eebdaf5" random_seed="821704" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run6-train_epoch21 epoch="22" run_uuid="5eebdaf5" random_seed="821704" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch22 epoch="23" run_uuid="5eebdaf5" random_seed="821704" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run6-train_epoch23 epoch="24" run_uuid="5eebdaf5" random_seed="821704" ResourceName="aws" continue_from_checkpoint="true"
+VARS run6-train_epoch24 epoch="25" run_uuid="5eebdaf5" random_seed="821704" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch25 epoch="26" run_uuid="5eebdaf5" random_seed="821704" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch26 epoch="27" run_uuid="5eebdaf5" random_seed="821704" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run6-train_epoch27 epoch="28" run_uuid="5eebdaf5" random_seed="821704" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch28 epoch="29" run_uuid="5eebdaf5" random_seed="821704" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run6-train_epoch29 epoch="30" run_uuid="5eebdaf5" random_seed="821704" ResourceName="CHTC" continue_from_checkpoint="true"
+
+
+PARENT run6-train_epoch0 CHILD run6-train_epoch1
+PARENT run6-train_epoch1 CHILD run6-train_epoch2
+PARENT run6-train_epoch2 CHILD run6-train_epoch3
+PARENT run6-train_epoch3 CHILD run6-train_epoch4
+PARENT run6-train_epoch4 CHILD run6-train_epoch5
+PARENT run6-train_epoch5 CHILD run6-train_epoch6
+PARENT run6-train_epoch6 CHILD run6-train_epoch7
+PARENT run6-train_epoch7 CHILD run6-train_epoch8
+PARENT run6-train_epoch8 CHILD run6-train_epoch9
+PARENT run6-train_epoch9 CHILD run6-train_epoch10
+PARENT run6-train_epoch10 CHILD run6-train_epoch11
+PARENT run6-train_epoch11 CHILD run6-train_epoch12
+PARENT run6-train_epoch12 CHILD run6-train_epoch13
+PARENT run6-train_epoch13 CHILD run6-train_epoch14
+PARENT run6-train_epoch14 CHILD run6-train_epoch15
+PARENT run6-train_epoch15 CHILD run6-train_epoch16
+PARENT run6-train_epoch16 CHILD run6-train_epoch17
+PARENT run6-train_epoch17 CHILD run6-train_epoch18
+PARENT run6-train_epoch18 CHILD run6-train_epoch19
+PARENT run6-train_epoch19 CHILD run6-train_epoch20
+PARENT run6-train_epoch20 CHILD run6-train_epoch21
+PARENT run6-train_epoch21 CHILD run6-train_epoch22
+PARENT run6-train_epoch22 CHILD run6-train_epoch23
+PARENT run6-train_epoch23 CHILD run6-train_epoch24
+PARENT run6-train_epoch24 CHILD run6-train_epoch25
+PARENT run6-train_epoch25 CHILD run6-train_epoch26
+PARENT run6-train_epoch26 CHILD run6-train_epoch27
+PARENT run6-train_epoch27 CHILD run6-train_epoch28
+PARENT run6-train_epoch28 CHILD run6-train_epoch29
+SCRIPT PRE run6-train_epoch0 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run6-train_epoch4 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run6-train_epoch12 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run6-train_epoch14 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run6-train_epoch16 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run6-train_epoch22 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run6-train_epoch23 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run6-train_epoch26 pre_request_annex.sh expanse expanse_annex
+
+JOB run7-train_epoch0 expanse_pretrain.sub
+JOB run7-train_epoch1 ospool_pretrain.sub
+JOB run7-train_epoch2 ospool_pretrain.sub
+JOB run7-train_epoch3 ospool_pretrain.sub
+JOB run7-train_epoch4 expanse_pretrain.sub
+JOB run7-train_epoch5 ospool_pretrain.sub
+JOB run7-train_epoch6 ospool_pretrain.sub
+JOB run7-train_epoch7 ospool_pretrain.sub
+JOB run7-train_epoch8 ospool_pretrain.sub
+JOB run7-train_epoch9 bridges2_pretrain.sub
+JOB run7-train_epoch10 ospool_pretrain.sub
+JOB run7-train_epoch11 delta_pretrain.sub
+JOB run7-train_epoch12 delta_pretrain.sub
+JOB run7-train_epoch13 delta_pretrain.sub
+JOB run7-train_epoch14 delta_pretrain.sub
+JOB run7-train_epoch15 ospool_pretrain.sub
+JOB run7-train_epoch16 ospool_pretrain.sub
+JOB run7-train_epoch17 ospool_pretrain.sub
+JOB run7-train_epoch18 aws_pretrain.sub
+JOB run7-train_epoch19 ospool_pretrain.sub
+JOB run7-train_epoch20 ospool_pretrain.sub
+JOB run7-train_epoch21 ospool_pretrain.sub
+JOB run7-train_epoch22 ospool_pretrain.sub
+JOB run7-train_epoch23 ospool_pretrain.sub
+JOB run7-train_epoch24 ospool_pretrain.sub
+JOB run7-train_epoch25 ospool_pretrain.sub
+JOB run7-train_epoch26 ospool_pretrain.sub
+JOB run7-train_epoch27 ospool_pretrain.sub
+JOB run7-train_epoch28 ospool_pretrain.sub
+JOB run7-train_epoch29 bridges2_pretrain.sub
+
+VARS run7-train_epoch0 epoch="1" run_uuid="22307df7" random_seed="812456" ResourceName="expanse" 
+VARS run7-train_epoch1 epoch="2" run_uuid="22307df7" random_seed="812456" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run7-train_epoch2 epoch="3" run_uuid="22307df7" random_seed="812456" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch3 epoch="4" run_uuid="22307df7" random_seed="812456" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run7-train_epoch4 epoch="5" run_uuid="22307df7" random_seed="812456" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run7-train_epoch5 epoch="6" run_uuid="22307df7" random_seed="812456" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run7-train_epoch6 epoch="7" run_uuid="22307df7" random_seed="812456" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch7 epoch="8" run_uuid="22307df7" random_seed="812456" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run7-train_epoch8 epoch="9" run_uuid="22307df7" random_seed="812456" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch9 epoch="10" run_uuid="22307df7" random_seed="812456" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run7-train_epoch10 epoch="11" run_uuid="22307df7" random_seed="812456" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch11 epoch="12" run_uuid="22307df7" random_seed="812456" ResourceName="delta" continue_from_checkpoint="true"
+VARS run7-train_epoch12 epoch="13" run_uuid="22307df7" random_seed="812456" ResourceName="delta" continue_from_checkpoint="true"
+VARS run7-train_epoch13 epoch="14" run_uuid="22307df7" random_seed="812456" ResourceName="delta" continue_from_checkpoint="true"
+VARS run7-train_epoch14 epoch="15" run_uuid="22307df7" random_seed="812456" ResourceName="delta" continue_from_checkpoint="true"
+VARS run7-train_epoch15 epoch="16" run_uuid="22307df7" random_seed="812456" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch16 epoch="17" run_uuid="22307df7" random_seed="812456" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run7-train_epoch17 epoch="18" run_uuid="22307df7" random_seed="812456" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run7-train_epoch18 epoch="19" run_uuid="22307df7" random_seed="812456" ResourceName="aws" continue_from_checkpoint="true"
+VARS run7-train_epoch19 epoch="20" run_uuid="22307df7" random_seed="812456" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run7-train_epoch20 epoch="21" run_uuid="22307df7" random_seed="812456" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run7-train_epoch21 epoch="22" run_uuid="22307df7" random_seed="812456" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run7-train_epoch22 epoch="23" run_uuid="22307df7" random_seed="812456" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch23 epoch="24" run_uuid="22307df7" random_seed="812456" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run7-train_epoch24 epoch="25" run_uuid="22307df7" random_seed="812456" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run7-train_epoch25 epoch="26" run_uuid="22307df7" random_seed="812456" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch26 epoch="27" run_uuid="22307df7" random_seed="812456" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch27 epoch="28" run_uuid="22307df7" random_seed="812456" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch28 epoch="29" run_uuid="22307df7" random_seed="812456" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run7-train_epoch29 epoch="30" run_uuid="22307df7" random_seed="812456" ResourceName="bridges2" continue_from_checkpoint="true"
+
+
+PARENT run7-train_epoch0 CHILD run7-train_epoch1
+PARENT run7-train_epoch1 CHILD run7-train_epoch2
+PARENT run7-train_epoch2 CHILD run7-train_epoch3
+PARENT run7-train_epoch3 CHILD run7-train_epoch4
+PARENT run7-train_epoch4 CHILD run7-train_epoch5
+PARENT run7-train_epoch5 CHILD run7-train_epoch6
+PARENT run7-train_epoch6 CHILD run7-train_epoch7
+PARENT run7-train_epoch7 CHILD run7-train_epoch8
+PARENT run7-train_epoch8 CHILD run7-train_epoch9
+PARENT run7-train_epoch9 CHILD run7-train_epoch10
+PARENT run7-train_epoch10 CHILD run7-train_epoch11
+PARENT run7-train_epoch11 CHILD run7-train_epoch12
+PARENT run7-train_epoch12 CHILD run7-train_epoch13
+PARENT run7-train_epoch13 CHILD run7-train_epoch14
+PARENT run7-train_epoch14 CHILD run7-train_epoch15
+PARENT run7-train_epoch15 CHILD run7-train_epoch16
+PARENT run7-train_epoch16 CHILD run7-train_epoch17
+PARENT run7-train_epoch17 CHILD run7-train_epoch18
+PARENT run7-train_epoch18 CHILD run7-train_epoch19
+PARENT run7-train_epoch19 CHILD run7-train_epoch20
+PARENT run7-train_epoch20 CHILD run7-train_epoch21
+PARENT run7-train_epoch21 CHILD run7-train_epoch22
+PARENT run7-train_epoch22 CHILD run7-train_epoch23
+PARENT run7-train_epoch23 CHILD run7-train_epoch24
+PARENT run7-train_epoch24 CHILD run7-train_epoch25
+PARENT run7-train_epoch25 CHILD run7-train_epoch26
+PARENT run7-train_epoch26 CHILD run7-train_epoch27
+PARENT run7-train_epoch27 CHILD run7-train_epoch28
+PARENT run7-train_epoch28 CHILD run7-train_epoch29
+SCRIPT PRE run7-train_epoch4 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run7-train_epoch9 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run7-train_epoch11 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run7-train_epoch14 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run7-train_epoch18 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run7-train_epoch29 pre_request_annex.sh bridges2 bridges2_annex
+
+JOB run8-train_epoch0 ospool_pretrain.sub
+JOB run8-train_epoch1 ospool_pretrain.sub
+JOB run8-train_epoch2 ospool_pretrain.sub
+JOB run8-train_epoch3 ospool_pretrain.sub
+JOB run8-train_epoch4 bridges2_pretrain.sub
+JOB run8-train_epoch5 ospool_pretrain.sub
+JOB run8-train_epoch6 anvil_pretrain.sub
+JOB run8-train_epoch7 ospool_pretrain.sub
+JOB run8-train_epoch8 ospool_pretrain.sub
+JOB run8-train_epoch9 ospool_pretrain.sub
+JOB run8-train_epoch10 delta_pretrain.sub
+JOB run8-train_epoch11 ospool_pretrain.sub
+JOB run8-train_epoch12 expanse_pretrain.sub
+JOB run8-train_epoch13 ospool_pretrain.sub
+JOB run8-train_epoch14 aws_pretrain.sub
+JOB run8-train_epoch15 ospool_pretrain.sub
+JOB run8-train_epoch16 ospool_pretrain.sub
+JOB run8-train_epoch17 ospool_pretrain.sub
+JOB run8-train_epoch18 ospool_pretrain.sub
+JOB run8-train_epoch19 ospool_pretrain.sub
+JOB run8-train_epoch20 ospool_pretrain.sub
+JOB run8-train_epoch21 ospool_pretrain.sub
+JOB run8-train_epoch22 ospool_pretrain.sub
+JOB run8-train_epoch23 ospool_pretrain.sub
+JOB run8-train_epoch24 anvil_pretrain.sub
+JOB run8-train_epoch25 anvil_pretrain.sub
+JOB run8-train_epoch26 ospool_pretrain.sub
+JOB run8-train_epoch27 aws_pretrain.sub
+JOB run8-train_epoch28 ospool_pretrain.sub
+JOB run8-train_epoch29 ospool_pretrain.sub
+
+VARS run8-train_epoch0 epoch="1" run_uuid="60358187" random_seed="389688" ResourceName="UA-LR-ITS-EP" 
+VARS run8-train_epoch1 epoch="2" run_uuid="60358187" random_seed="389688" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run8-train_epoch2 epoch="3" run_uuid="60358187" random_seed="389688" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run8-train_epoch3 epoch="4" run_uuid="60358187" random_seed="389688" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run8-train_epoch4 epoch="5" run_uuid="60358187" random_seed="389688" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run8-train_epoch5 epoch="6" run_uuid="60358187" random_seed="389688" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run8-train_epoch6 epoch="7" run_uuid="60358187" random_seed="389688" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run8-train_epoch7 epoch="8" run_uuid="60358187" random_seed="389688" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run8-train_epoch8 epoch="9" run_uuid="60358187" random_seed="389688" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run8-train_epoch9 epoch="10" run_uuid="60358187" random_seed="389688" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run8-train_epoch10 epoch="11" run_uuid="60358187" random_seed="389688" ResourceName="delta" continue_from_checkpoint="true"
+VARS run8-train_epoch11 epoch="12" run_uuid="60358187" random_seed="389688" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run8-train_epoch12 epoch="13" run_uuid="60358187" random_seed="389688" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run8-train_epoch13 epoch="14" run_uuid="60358187" random_seed="389688" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run8-train_epoch14 epoch="15" run_uuid="60358187" random_seed="389688" ResourceName="aws" continue_from_checkpoint="true"
+VARS run8-train_epoch15 epoch="16" run_uuid="60358187" random_seed="389688" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run8-train_epoch16 epoch="17" run_uuid="60358187" random_seed="389688" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run8-train_epoch17 epoch="18" run_uuid="60358187" random_seed="389688" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run8-train_epoch18 epoch="19" run_uuid="60358187" random_seed="389688" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run8-train_epoch19 epoch="20" run_uuid="60358187" random_seed="389688" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run8-train_epoch20 epoch="21" run_uuid="60358187" random_seed="389688" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run8-train_epoch21 epoch="22" run_uuid="60358187" random_seed="389688" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run8-train_epoch22 epoch="23" run_uuid="60358187" random_seed="389688" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run8-train_epoch23 epoch="24" run_uuid="60358187" random_seed="389688" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run8-train_epoch24 epoch="25" run_uuid="60358187" random_seed="389688" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run8-train_epoch25 epoch="26" run_uuid="60358187" random_seed="389688" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run8-train_epoch26 epoch="27" run_uuid="60358187" random_seed="389688" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run8-train_epoch27 epoch="28" run_uuid="60358187" random_seed="389688" ResourceName="aws" continue_from_checkpoint="true"
+VARS run8-train_epoch28 epoch="29" run_uuid="60358187" random_seed="389688" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run8-train_epoch29 epoch="30" run_uuid="60358187" random_seed="389688" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+
+
+PARENT run8-train_epoch0 CHILD run8-train_epoch1
+PARENT run8-train_epoch1 CHILD run8-train_epoch2
+PARENT run8-train_epoch2 CHILD run8-train_epoch3
+PARENT run8-train_epoch3 CHILD run8-train_epoch4
+PARENT run8-train_epoch4 CHILD run8-train_epoch5
+PARENT run8-train_epoch5 CHILD run8-train_epoch6
+PARENT run8-train_epoch6 CHILD run8-train_epoch7
+PARENT run8-train_epoch7 CHILD run8-train_epoch8
+PARENT run8-train_epoch8 CHILD run8-train_epoch9
+PARENT run8-train_epoch9 CHILD run8-train_epoch10
+PARENT run8-train_epoch10 CHILD run8-train_epoch11
+PARENT run8-train_epoch11 CHILD run8-train_epoch12
+PARENT run8-train_epoch12 CHILD run8-train_epoch13
+PARENT run8-train_epoch13 CHILD run8-train_epoch14
+PARENT run8-train_epoch14 CHILD run8-train_epoch15
+PARENT run8-train_epoch15 CHILD run8-train_epoch16
+PARENT run8-train_epoch16 CHILD run8-train_epoch17
+PARENT run8-train_epoch17 CHILD run8-train_epoch18
+PARENT run8-train_epoch18 CHILD run8-train_epoch19
+PARENT run8-train_epoch19 CHILD run8-train_epoch20
+PARENT run8-train_epoch20 CHILD run8-train_epoch21
+PARENT run8-train_epoch21 CHILD run8-train_epoch22
+PARENT run8-train_epoch22 CHILD run8-train_epoch23
+PARENT run8-train_epoch23 CHILD run8-train_epoch24
+PARENT run8-train_epoch24 CHILD run8-train_epoch25
+PARENT run8-train_epoch25 CHILD run8-train_epoch26
+PARENT run8-train_epoch26 CHILD run8-train_epoch27
+PARENT run8-train_epoch27 CHILD run8-train_epoch28
+PARENT run8-train_epoch28 CHILD run8-train_epoch29
+SCRIPT PRE run8-train_epoch4 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run8-train_epoch6 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run8-train_epoch10 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run8-train_epoch12 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run8-train_epoch14 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run8-train_epoch24 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run8-train_epoch25 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run8-train_epoch27 pre_request_annex.sh aws aws_annex
+
+JOB run9-train_epoch0 ospool_pretrain.sub
+JOB run9-train_epoch1 ospool_pretrain.sub
+JOB run9-train_epoch2 ospool_pretrain.sub
+JOB run9-train_epoch3 ospool_pretrain.sub
+JOB run9-train_epoch4 bridges2_pretrain.sub
+JOB run9-train_epoch5 ospool_pretrain.sub
+JOB run9-train_epoch6 ospool_pretrain.sub
+JOB run9-train_epoch7 ospool_pretrain.sub
+JOB run9-train_epoch8 ospool_pretrain.sub
+JOB run9-train_epoch9 ospool_pretrain.sub
+JOB run9-train_epoch10 ospool_pretrain.sub
+JOB run9-train_epoch11 ospool_pretrain.sub
+JOB run9-train_epoch12 ospool_pretrain.sub
+JOB run9-train_epoch13 expanse_pretrain.sub
+JOB run9-train_epoch14 ospool_pretrain.sub
+JOB run9-train_epoch15 ospool_pretrain.sub
+JOB run9-train_epoch16 ospool_pretrain.sub
+JOB run9-train_epoch17 anvil_pretrain.sub
+JOB run9-train_epoch18 ospool_pretrain.sub
+JOB run9-train_epoch19 ospool_pretrain.sub
+JOB run9-train_epoch20 ospool_pretrain.sub
+JOB run9-train_epoch21 ospool_pretrain.sub
+JOB run9-train_epoch22 ospool_pretrain.sub
+JOB run9-train_epoch23 ospool_pretrain.sub
+JOB run9-train_epoch24 ospool_pretrain.sub
+JOB run9-train_epoch25 ospool_pretrain.sub
+JOB run9-train_epoch26 ospool_pretrain.sub
+JOB run9-train_epoch27 ospool_pretrain.sub
+JOB run9-train_epoch28 ospool_pretrain.sub
+JOB run9-train_epoch29 ospool_pretrain.sub
+
+VARS run9-train_epoch0 epoch="1" run_uuid="d9615728" random_seed="475016" ResourceName="ospool" 
+VARS run9-train_epoch1 epoch="2" run_uuid="d9615728" random_seed="475016" ResourceName="delospool" continue_from_checkpoint="true"
+VARS run9-train_epoch2 epoch="3" run_uuid="d9615728" random_seed="475016" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run9-train_epoch3 epoch="4" run_uuid="d9615728" random_seed="475016" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run9-train_epoch4 epoch="5" run_uuid="d9615728" random_seed="475016" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run9-train_epoch5 epoch="6" run_uuid="d9615728" random_seed="475016" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run9-train_epoch6 epoch="7" run_uuid="d9615728" random_seed="475016" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run9-train_epoch7 epoch="8" run_uuid="d9615728" random_seed="475016" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch8 epoch="9" run_uuid="d9615728" random_seed="475016" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run9-train_epoch9 epoch="10" run_uuid="d9615728" random_seed="475016" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch10 epoch="11" run_uuid="d9615728" random_seed="475016" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run9-train_epoch11 epoch="12" run_uuid="d9615728" random_seed="475016" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run9-train_epoch12 epoch="13" run_uuid="d9615728" random_seed="475016" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch13 epoch="14" run_uuid="d9615728" random_seed="475016" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run9-train_epoch14 epoch="15" run_uuid="d9615728" random_seed="475016" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run9-train_epoch15 epoch="16" run_uuid="d9615728" random_seed="475016" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch16 epoch="17" run_uuid="d9615728" random_seed="475016" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run9-train_epoch17 epoch="18" run_uuid="d9615728" random_seed="475016" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run9-train_epoch18 epoch="19" run_uuid="d9615728" random_seed="475016" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch19 epoch="20" run_uuid="d9615728" random_seed="475016" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch20 epoch="21" run_uuid="d9615728" random_seed="475016" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run9-train_epoch21 epoch="22" run_uuid="d9615728" random_seed="475016" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch22 epoch="23" run_uuid="d9615728" random_seed="475016" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch23 epoch="24" run_uuid="d9615728" random_seed="475016" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch24 epoch="25" run_uuid="d9615728" random_seed="475016" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch25 epoch="26" run_uuid="d9615728" random_seed="475016" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run9-train_epoch26 epoch="27" run_uuid="d9615728" random_seed="475016" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run9-train_epoch27 epoch="28" run_uuid="d9615728" random_seed="475016" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run9-train_epoch28 epoch="29" run_uuid="d9615728" random_seed="475016" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run9-train_epoch29 epoch="30" run_uuid="d9615728" random_seed="475016" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+
+
+PARENT run9-train_epoch0 CHILD run9-train_epoch1
+PARENT run9-train_epoch1 CHILD run9-train_epoch2
+PARENT run9-train_epoch2 CHILD run9-train_epoch3
+PARENT run9-train_epoch3 CHILD run9-train_epoch4
+PARENT run9-train_epoch4 CHILD run9-train_epoch5
+PARENT run9-train_epoch5 CHILD run9-train_epoch6
+PARENT run9-train_epoch6 CHILD run9-train_epoch7
+PARENT run9-train_epoch7 CHILD run9-train_epoch8
+PARENT run9-train_epoch8 CHILD run9-train_epoch9
+PARENT run9-train_epoch9 CHILD run9-train_epoch10
+PARENT run9-train_epoch10 CHILD run9-train_epoch11
+PARENT run9-train_epoch11 CHILD run9-train_epoch12
+PARENT run9-train_epoch12 CHILD run9-train_epoch13
+PARENT run9-train_epoch13 CHILD run9-train_epoch14
+PARENT run9-train_epoch14 CHILD run9-train_epoch15
+PARENT run9-train_epoch15 CHILD run9-train_epoch16
+PARENT run9-train_epoch16 CHILD run9-train_epoch17
+PARENT run9-train_epoch17 CHILD run9-train_epoch18
+PARENT run9-train_epoch18 CHILD run9-train_epoch19
+PARENT run9-train_epoch19 CHILD run9-train_epoch20
+PARENT run9-train_epoch20 CHILD run9-train_epoch21
+PARENT run9-train_epoch21 CHILD run9-train_epoch22
+PARENT run9-train_epoch22 CHILD run9-train_epoch23
+PARENT run9-train_epoch23 CHILD run9-train_epoch24
+PARENT run9-train_epoch24 CHILD run9-train_epoch25
+PARENT run9-train_epoch25 CHILD run9-train_epoch26
+PARENT run9-train_epoch26 CHILD run9-train_epoch27
+PARENT run9-train_epoch27 CHILD run9-train_epoch28
+PARENT run9-train_epoch28 CHILD run9-train_epoch29
+SCRIPT PRE run9-train_epoch0 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run9-train_epoch1 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run9-train_epoch4 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run9-train_epoch13 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run9-train_epoch17 pre_request_annex.sh anvil anvil_annex
+
+JOB run10-train_epoch0 ospool_pretrain.sub
+JOB run10-train_epoch1 ospool_pretrain.sub
+JOB run10-train_epoch2 ospool_pretrain.sub
+JOB run10-train_epoch3 ospool_pretrain.sub
+JOB run10-train_epoch4 expanse_pretrain.sub
+JOB run10-train_epoch5 ospool_pretrain.sub
+JOB run10-train_epoch6 bridges2_pretrain.sub
+JOB run10-train_epoch7 bridges2_pretrain.sub
+JOB run10-train_epoch8 delta_pretrain.sub
+JOB run10-train_epoch9 bridges2_pretrain.sub
+JOB run10-train_epoch10 bridges2_pretrain.sub
+JOB run10-train_epoch11 ospool_pretrain.sub
+JOB run10-train_epoch12 ospool_pretrain.sub
+JOB run10-train_epoch13 aws_pretrain.sub
+JOB run10-train_epoch14 ospool_pretrain.sub
+JOB run10-train_epoch15 ospool_pretrain.sub
+JOB run10-train_epoch16 ospool_pretrain.sub
+JOB run10-train_epoch17 ospool_pretrain.sub
+JOB run10-train_epoch18 ospool_pretrain.sub
+JOB run10-train_epoch19 ospool_pretrain.sub
+JOB run10-train_epoch20 ospool_pretrain.sub
+JOB run10-train_epoch21 ospool_pretrain.sub
+JOB run10-train_epoch22 ospool_pretrain.sub
+JOB run10-train_epoch23 ospool_pretrain.sub
+JOB run10-train_epoch24 ospool_pretrain.sub
+JOB run10-train_epoch25 ospool_pretrain.sub
+JOB run10-train_epoch26 expanse_pretrain.sub
+JOB run10-train_epoch27 bridges2_pretrain.sub
+JOB run10-train_epoch28 ospool_pretrain.sub
+JOB run10-train_epoch29 ospool_pretrain.sub
+
+VARS run10-train_epoch0 epoch="1" run_uuid="52d357d8" random_seed="591910" ResourceName="AMNH-Mendel-CE1" 
+VARS run10-train_epoch1 epoch="2" run_uuid="52d357d8" random_seed="591910" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run10-train_epoch2 epoch="3" run_uuid="52d357d8" random_seed="591910" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run10-train_epoch3 epoch="4" run_uuid="52d357d8" random_seed="591910" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run10-train_epoch4 epoch="5" run_uuid="52d357d8" random_seed="591910" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run10-train_epoch5 epoch="6" run_uuid="52d357d8" random_seed="591910" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run10-train_epoch6 epoch="7" run_uuid="52d357d8" random_seed="591910" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run10-train_epoch7 epoch="8" run_uuid="52d357d8" random_seed="591910" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run10-train_epoch8 epoch="9" run_uuid="52d357d8" random_seed="591910" ResourceName="delta" continue_from_checkpoint="true"
+VARS run10-train_epoch9 epoch="10" run_uuid="52d357d8" random_seed="591910" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run10-train_epoch10 epoch="11" run_uuid="52d357d8" random_seed="591910" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run10-train_epoch11 epoch="12" run_uuid="52d357d8" random_seed="591910" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run10-train_epoch12 epoch="13" run_uuid="52d357d8" random_seed="591910" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run10-train_epoch13 epoch="14" run_uuid="52d357d8" random_seed="591910" ResourceName="aws" continue_from_checkpoint="true"
+VARS run10-train_epoch14 epoch="15" run_uuid="52d357d8" random_seed="591910" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run10-train_epoch15 epoch="16" run_uuid="52d357d8" random_seed="591910" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run10-train_epoch16 epoch="17" run_uuid="52d357d8" random_seed="591910" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run10-train_epoch17 epoch="18" run_uuid="52d357d8" random_seed="591910" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run10-train_epoch18 epoch="19" run_uuid="52d357d8" random_seed="591910" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run10-train_epoch19 epoch="20" run_uuid="52d357d8" random_seed="591910" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run10-train_epoch20 epoch="21" run_uuid="52d357d8" random_seed="591910" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run10-train_epoch21 epoch="22" run_uuid="52d357d8" random_seed="591910" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run10-train_epoch22 epoch="23" run_uuid="52d357d8" random_seed="591910" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run10-train_epoch23 epoch="24" run_uuid="52d357d8" random_seed="591910" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run10-train_epoch24 epoch="25" run_uuid="52d357d8" random_seed="591910" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run10-train_epoch25 epoch="26" run_uuid="52d357d8" random_seed="591910" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run10-train_epoch26 epoch="27" run_uuid="52d357d8" random_seed="591910" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run10-train_epoch27 epoch="28" run_uuid="52d357d8" random_seed="591910" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run10-train_epoch28 epoch="29" run_uuid="52d357d8" random_seed="591910" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run10-train_epoch29 epoch="30" run_uuid="52d357d8" random_seed="591910" ResourceName="CHTC" continue_from_checkpoint="true"
+
+
+PARENT run10-train_epoch0 CHILD run10-train_epoch1
+PARENT run10-train_epoch1 CHILD run10-train_epoch2
+PARENT run10-train_epoch2 CHILD run10-train_epoch3
+PARENT run10-train_epoch3 CHILD run10-train_epoch4
+PARENT run10-train_epoch4 CHILD run10-train_epoch5
+PARENT run10-train_epoch5 CHILD run10-train_epoch6
+PARENT run10-train_epoch6 CHILD run10-train_epoch7
+PARENT run10-train_epoch7 CHILD run10-train_epoch8
+PARENT run10-train_epoch8 CHILD run10-train_epoch9
+PARENT run10-train_epoch9 CHILD run10-train_epoch10
+PARENT run10-train_epoch10 CHILD run10-train_epoch11
+PARENT run10-train_epoch11 CHILD run10-train_epoch12
+PARENT run10-train_epoch12 CHILD run10-train_epoch13
+PARENT run10-train_epoch13 CHILD run10-train_epoch14
+PARENT run10-train_epoch14 CHILD run10-train_epoch15
+PARENT run10-train_epoch15 CHILD run10-train_epoch16
+PARENT run10-train_epoch16 CHILD run10-train_epoch17
+PARENT run10-train_epoch17 CHILD run10-train_epoch18
+PARENT run10-train_epoch18 CHILD run10-train_epoch19
+PARENT run10-train_epoch19 CHILD run10-train_epoch20
+PARENT run10-train_epoch20 CHILD run10-train_epoch21
+PARENT run10-train_epoch21 CHILD run10-train_epoch22
+PARENT run10-train_epoch22 CHILD run10-train_epoch23
+PARENT run10-train_epoch23 CHILD run10-train_epoch24
+PARENT run10-train_epoch24 CHILD run10-train_epoch25
+PARENT run10-train_epoch25 CHILD run10-train_epoch26
+PARENT run10-train_epoch26 CHILD run10-train_epoch27
+PARENT run10-train_epoch27 CHILD run10-train_epoch28
+PARENT run10-train_epoch28 CHILD run10-train_epoch29
+SCRIPT PRE run10-train_epoch4 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run10-train_epoch6 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run10-train_epoch8 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run10-train_epoch10 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run10-train_epoch13 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run10-train_epoch26 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run10-train_epoch27 pre_request_annex.sh bridges2 bridges2_annex
+
+JOB run11-train_epoch0 ospool_pretrain.sub
+JOB run11-train_epoch1 ospool_pretrain.sub
+JOB run11-train_epoch2 ospool_pretrain.sub
+JOB run11-train_epoch3 ospool_pretrain.sub
+JOB run11-train_epoch4 ospool_pretrain.sub
+JOB run11-train_epoch5 ospool_pretrain.sub
+JOB run11-train_epoch6 delta_pretrain.sub
+JOB run11-train_epoch7 ospool_pretrain.sub
+JOB run11-train_epoch8 ospool_pretrain.sub
+JOB run11-train_epoch9 ospool_pretrain.sub
+JOB run11-train_epoch10 bridges2_pretrain.sub
+JOB run11-train_epoch11 ospool_pretrain.sub
+JOB run11-train_epoch12 ospool_pretrain.sub
+JOB run11-train_epoch13 expanse_pretrain.sub
+JOB run11-train_epoch14 ospool_pretrain.sub
+JOB run11-train_epoch15 expanse_pretrain.sub
+JOB run11-train_epoch16 expanse_pretrain.sub
+JOB run11-train_epoch17 ospool_pretrain.sub
+JOB run11-train_epoch18 ospool_pretrain.sub
+JOB run11-train_epoch19 ospool_pretrain.sub
+JOB run11-train_epoch20 ospool_pretrain.sub
+JOB run11-train_epoch21 expanse_pretrain.sub
+JOB run11-train_epoch22 expanse_pretrain.sub
+JOB run11-train_epoch23 expanse_pretrain.sub
+JOB run11-train_epoch24 expanse_pretrain.sub
+JOB run11-train_epoch25 expanse_pretrain.sub
+JOB run11-train_epoch26 ospool_pretrain.sub
+JOB run11-train_epoch27 ospool_pretrain.sub
+JOB run11-train_epoch28 expanse_pretrain.sub
+JOB run11-train_epoch29 expanse_pretrain.sub
+
+VARS run11-train_epoch0 epoch="1" run_uuid="81de9128" random_seed="878304" ResourceName="SDSC-PRP-OSPool-Provisioner" 
+VARS run11-train_epoch1 epoch="2" run_uuid="81de9128" random_seed="878304" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch2 epoch="3" run_uuid="81de9128" random_seed="878304" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch3 epoch="4" run_uuid="81de9128" random_seed="878304" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run11-train_epoch4 epoch="5" run_uuid="81de9128" random_seed="878304" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch5 epoch="6" run_uuid="81de9128" random_seed="878304" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run11-train_epoch6 epoch="7" run_uuid="81de9128" random_seed="878304" ResourceName="delta" continue_from_checkpoint="true"
+VARS run11-train_epoch7 epoch="8" run_uuid="81de9128" random_seed="878304" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run11-train_epoch8 epoch="9" run_uuid="81de9128" random_seed="878304" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run11-train_epoch9 epoch="10" run_uuid="81de9128" random_seed="878304" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch10 epoch="11" run_uuid="81de9128" random_seed="878304" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run11-train_epoch11 epoch="12" run_uuid="81de9128" random_seed="878304" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run11-train_epoch12 epoch="13" run_uuid="81de9128" random_seed="878304" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run11-train_epoch13 epoch="14" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch14 epoch="15" run_uuid="81de9128" random_seed="878304" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch15 epoch="16" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch16 epoch="17" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch17 epoch="18" run_uuid="81de9128" random_seed="878304" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run11-train_epoch18 epoch="19" run_uuid="81de9128" random_seed="878304" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run11-train_epoch19 epoch="20" run_uuid="81de9128" random_seed="878304" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch20 epoch="21" run_uuid="81de9128" random_seed="878304" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch21 epoch="22" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch22 epoch="23" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch23 epoch="24" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch24 epoch="25" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch25 epoch="26" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch26 epoch="27" run_uuid="81de9128" random_seed="878304" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run11-train_epoch27 epoch="28" run_uuid="81de9128" random_seed="878304" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run11-train_epoch28 epoch="29" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run11-train_epoch29 epoch="30" run_uuid="81de9128" random_seed="878304" ResourceName="expanse" continue_from_checkpoint="true"
+
+
+PARENT run11-train_epoch0 CHILD run11-train_epoch1
+PARENT run11-train_epoch1 CHILD run11-train_epoch2
+PARENT run11-train_epoch2 CHILD run11-train_epoch3
+PARENT run11-train_epoch3 CHILD run11-train_epoch4
+PARENT run11-train_epoch4 CHILD run11-train_epoch5
+PARENT run11-train_epoch5 CHILD run11-train_epoch6
+PARENT run11-train_epoch6 CHILD run11-train_epoch7
+PARENT run11-train_epoch7 CHILD run11-train_epoch8
+PARENT run11-train_epoch8 CHILD run11-train_epoch9
+PARENT run11-train_epoch9 CHILD run11-train_epoch10
+PARENT run11-train_epoch10 CHILD run11-train_epoch11
+PARENT run11-train_epoch11 CHILD run11-train_epoch12
+PARENT run11-train_epoch12 CHILD run11-train_epoch13
+PARENT run11-train_epoch13 CHILD run11-train_epoch14
+PARENT run11-train_epoch14 CHILD run11-train_epoch15
+PARENT run11-train_epoch15 CHILD run11-train_epoch16
+PARENT run11-train_epoch16 CHILD run11-train_epoch17
+PARENT run11-train_epoch17 CHILD run11-train_epoch18
+PARENT run11-train_epoch18 CHILD run11-train_epoch19
+PARENT run11-train_epoch19 CHILD run11-train_epoch20
+PARENT run11-train_epoch20 CHILD run11-train_epoch21
+PARENT run11-train_epoch21 CHILD run11-train_epoch22
+PARENT run11-train_epoch22 CHILD run11-train_epoch23
+PARENT run11-train_epoch23 CHILD run11-train_epoch24
+PARENT run11-train_epoch24 CHILD run11-train_epoch25
+PARENT run11-train_epoch25 CHILD run11-train_epoch26
+PARENT run11-train_epoch26 CHILD run11-train_epoch27
+PARENT run11-train_epoch27 CHILD run11-train_epoch28
+PARENT run11-train_epoch28 CHILD run11-train_epoch29
+SCRIPT PRE run11-train_epoch6 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run11-train_epoch10 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run11-train_epoch13 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run11-train_epoch15 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run11-train_epoch16 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run11-train_epoch29 pre_request_annex.sh anvil anvil_annex
+
+JOB run12-train_epoch0 ospool_pretrain.sub
+JOB run12-train_epoch1 ospool_pretrain.sub
+JOB run12-train_epoch2 ospool_pretrain.sub
+JOB run12-train_epoch3 ospool_pretrain.sub
+JOB run12-train_epoch4 ospool_pretrain.sub
+JOB run12-train_epoch5 delta_pretrain.sub
+JOB run12-train_epoch6 ospool_pretrain.sub
+JOB run12-train_epoch7 ospool_pretrain.sub
+JOB run12-train_epoch8 bridges2_pretrain.sub
+JOB run12-train_epoch9 expanse_pretrain.sub
+JOB run12-train_epoch10 ospool_pretrain.sub
+JOB run12-train_epoch11 ospool_pretrain.sub
+JOB run12-train_epoch12 ospool_pretrain.sub
+JOB run12-train_epoch13 ospool_pretrain.sub
+JOB run12-train_epoch14 ospool_pretrain.sub
+JOB run12-train_epoch15 ospool_pretrain.sub
+JOB run12-train_epoch16 aws_pretrain.sub
+JOB run12-train_epoch17 ospool_pretrain.sub
+JOB run12-train_epoch18 ospool_pretrain.sub
+JOB run12-train_epoch19 ospool_pretrain.sub
+JOB run12-train_epoch20 delta_pretrain.sub
+JOB run12-train_epoch21 ospool_pretrain.sub
+JOB run12-train_epoch22 ospool_pretrain.sub
+JOB run12-train_epoch23 delta_pretrain.sub
+JOB run12-train_epoch24 ospool_pretrain.sub
+JOB run12-train_epoch25 ospool_pretrain.sub
+JOB run12-train_epoch26 aws_pretrain.sub
+JOB run12-train_epoch27 aws_pretrain.sub
+JOB run12-train_epoch28 aws_pretrain.sub
+JOB run12-train_epoch29 ospool_pretrain.sub
+
+VARS run12-train_epoch0 epoch="1" run_uuid="3e18435c" random_seed="53175" ResourceName="ospool" 
+VARS run12-train_epoch1 epoch="2" run_uuid="3e18435c" random_seed="53175" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run12-train_epoch2 epoch="3" run_uuid="3e18435c" random_seed="53175" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch3 epoch="4" run_uuid="3e18435c" random_seed="53175" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run12-train_epoch4 epoch="5" run_uuid="3e18435c" random_seed="53175" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch5 epoch="6" run_uuid="3e18435c" random_seed="53175" ResourceName="delta" continue_from_checkpoint="true"
+VARS run12-train_epoch6 epoch="7" run_uuid="3e18435c" random_seed="53175" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch7 epoch="8" run_uuid="3e18435c" random_seed="53175" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch8 epoch="9" run_uuid="3e18435c" random_seed="53175" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run12-train_epoch9 epoch="10" run_uuid="3e18435c" random_seed="53175" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run12-train_epoch10 epoch="11" run_uuid="3e18435c" random_seed="53175" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch11 epoch="12" run_uuid="3e18435c" random_seed="53175" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run12-train_epoch12 epoch="13" run_uuid="3e18435c" random_seed="53175" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run12-train_epoch13 epoch="14" run_uuid="3e18435c" random_seed="53175" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch14 epoch="15" run_uuid="3e18435c" random_seed="53175" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run12-train_epoch15 epoch="16" run_uuid="3e18435c" random_seed="53175" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run12-train_epoch16 epoch="17" run_uuid="3e18435c" random_seed="53175" ResourceName="aws" continue_from_checkpoint="true"
+VARS run12-train_epoch17 epoch="18" run_uuid="3e18435c" random_seed="53175" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run12-train_epoch18 epoch="19" run_uuid="3e18435c" random_seed="53175" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run12-train_epoch19 epoch="20" run_uuid="3e18435c" random_seed="53175" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run12-train_epoch20 epoch="21" run_uuid="3e18435c" random_seed="53175" ResourceName="delta" continue_from_checkpoint="true"
+VARS run12-train_epoch21 epoch="22" run_uuid="3e18435c" random_seed="53175" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run12-train_epoch22 epoch="23" run_uuid="3e18435c" random_seed="53175" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch23 epoch="24" run_uuid="3e18435c" random_seed="53175" ResourceName="delta" continue_from_checkpoint="true"
+VARS run12-train_epoch24 epoch="25" run_uuid="3e18435c" random_seed="53175" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run12-train_epoch25 epoch="26" run_uuid="3e18435c" random_seed="53175" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run12-train_epoch26 epoch="27" run_uuid="3e18435c" random_seed="53175" ResourceName="aws" continue_from_checkpoint="true"
+VARS run12-train_epoch27 epoch="28" run_uuid="3e18435c" random_seed="53175" ResourceName="aws" continue_from_checkpoint="true"
+VARS run12-train_epoch28 epoch="29" run_uuid="3e18435c" random_seed="53175" ResourceName="aws" continue_from_checkpoint="true"
+VARS run12-train_epoch29 epoch="30" run_uuid="3e18435c" random_seed="53175" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+
+
+PARENT run12-train_epoch0 CHILD run12-train_epoch1
+PARENT run12-train_epoch1 CHILD run12-train_epoch2
+PARENT run12-train_epoch2 CHILD run12-train_epoch3
+PARENT run12-train_epoch3 CHILD run12-train_epoch4
+PARENT run12-train_epoch4 CHILD run12-train_epoch5
+PARENT run12-train_epoch5 CHILD run12-train_epoch6
+PARENT run12-train_epoch6 CHILD run12-train_epoch7
+PARENT run12-train_epoch7 CHILD run12-train_epoch8
+PARENT run12-train_epoch8 CHILD run12-train_epoch9
+PARENT run12-train_epoch9 CHILD run12-train_epoch10
+PARENT run12-train_epoch10 CHILD run12-train_epoch11
+PARENT run12-train_epoch11 CHILD run12-train_epoch12
+PARENT run12-train_epoch12 CHILD run12-train_epoch13
+PARENT run12-train_epoch13 CHILD run12-train_epoch14
+PARENT run12-train_epoch14 CHILD run12-train_epoch15
+PARENT run12-train_epoch15 CHILD run12-train_epoch16
+PARENT run12-train_epoch16 CHILD run12-train_epoch17
+PARENT run12-train_epoch17 CHILD run12-train_epoch18
+PARENT run12-train_epoch18 CHILD run12-train_epoch19
+PARENT run12-train_epoch19 CHILD run12-train_epoch20
+PARENT run12-train_epoch20 CHILD run12-train_epoch21
+PARENT run12-train_epoch21 CHILD run12-train_epoch22
+PARENT run12-train_epoch22 CHILD run12-train_epoch23
+PARENT run12-train_epoch23 CHILD run12-train_epoch24
+PARENT run12-train_epoch24 CHILD run12-train_epoch25
+PARENT run12-train_epoch25 CHILD run12-train_epoch26
+PARENT run12-train_epoch26 CHILD run12-train_epoch27
+PARENT run12-train_epoch27 CHILD run12-train_epoch28
+PARENT run12-train_epoch28 CHILD run12-train_epoch29
+SCRIPT PRE run12-train_epoch0 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run12-train_epoch5 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run12-train_epoch8 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run12-train_epoch9 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run12-train_epoch16 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run12-train_epoch20 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run12-train_epoch23 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run12-train_epoch26 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run12-train_epoch27 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run12-train_epoch28 pre_request_annex.sh aws aws_annex
+
+JOB run13-train_epoch0 ospool_pretrain.sub
+JOB run13-train_epoch1 ospool_pretrain.sub
+JOB run13-train_epoch2 ospool_pretrain.sub
+JOB run13-train_epoch3 ospool_pretrain.sub
+JOB run13-train_epoch4 ospool_pretrain.sub
+JOB run13-train_epoch5 delta_pretrain.sub
+JOB run13-train_epoch6 ospool_pretrain.sub
+JOB run13-train_epoch7 expanse_pretrain.sub
+JOB run13-train_epoch8 ospool_pretrain.sub
+JOB run13-train_epoch9 ospool_pretrain.sub
+JOB run13-train_epoch10 ospool_pretrain.sub
+JOB run13-train_epoch11 ospool_pretrain.sub
+JOB run13-train_epoch12 ospool_pretrain.sub
+JOB run13-train_epoch13 ospool_pretrain.sub
+JOB run13-train_epoch14 ospool_pretrain.sub
+JOB run13-train_epoch15 ospool_pretrain.sub
+JOB run13-train_epoch16 anvil_pretrain.sub
+JOB run13-train_epoch17 ospool_pretrain.sub
+JOB run13-train_epoch18 ospool_pretrain.sub
+JOB run13-train_epoch19 ospool_pretrain.sub
+JOB run13-train_epoch20 ospool_pretrain.sub
+JOB run13-train_epoch21 aws_pretrain.sub
+JOB run13-train_epoch22 bridges2_pretrain.sub
+JOB run13-train_epoch23 ospool_pretrain.sub
+JOB run13-train_epoch24 ospool_pretrain.sub
+JOB run13-train_epoch25 bridges2_pretrain.sub
+JOB run13-train_epoch26 ospool_pretrain.sub
+JOB run13-train_epoch27 delta_pretrain.sub
+JOB run13-train_epoch28 expanse_pretrain.sub
+JOB run13-train_epoch29 ospool_pretrain.sub
+
+VARS run13-train_epoch0 epoch="1" run_uuid="dfae34a0" random_seed="974265" ResourceName="ospool" 
+VARS run13-train_epoch1 epoch="2" run_uuid="dfae34a0" random_seed="974265" ResourceName="ospool" continue_from_checkpoint="true"
+VARS run13-train_epoch2 epoch="3" run_uuid="dfae34a0" random_seed="974265" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch3 epoch="4" run_uuid="dfae34a0" random_seed="974265" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run13-train_epoch4 epoch="5" run_uuid="dfae34a0" random_seed="974265" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch5 epoch="6" run_uuid="dfae34a0" random_seed="974265" ResourceName="delta" continue_from_checkpoint="true"
+VARS run13-train_epoch6 epoch="7" run_uuid="dfae34a0" random_seed="974265" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run13-train_epoch7 epoch="8" run_uuid="dfae34a0" random_seed="974265" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run13-train_epoch8 epoch="9" run_uuid="dfae34a0" random_seed="974265" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run13-train_epoch9 epoch="10" run_uuid="dfae34a0" random_seed="974265" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch10 epoch="11" run_uuid="dfae34a0" random_seed="974265" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch11 epoch="12" run_uuid="dfae34a0" random_seed="974265" ResourceName="CHTC" continue_from_checkpoint="true"
+VARS run13-train_epoch12 epoch="13" run_uuid="dfae34a0" random_seed="974265" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run13-train_epoch13 epoch="14" run_uuid="dfae34a0" random_seed="974265" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run13-train_epoch14 epoch="15" run_uuid="dfae34a0" random_seed="974265" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch15 epoch="16" run_uuid="dfae34a0" random_seed="974265" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch16 epoch="17" run_uuid="dfae34a0" random_seed="974265" ResourceName="anvil" continue_from_checkpoint="true"
+VARS run13-train_epoch17 epoch="18" run_uuid="dfae34a0" random_seed="974265" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run13-train_epoch18 epoch="19" run_uuid="dfae34a0" random_seed="974265" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run13-train_epoch19 epoch="20" run_uuid="dfae34a0" random_seed="974265" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run13-train_epoch20 epoch="21" run_uuid="dfae34a0" random_seed="974265" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch21 epoch="22" run_uuid="dfae34a0" random_seed="974265" ResourceName="aws" continue_from_checkpoint="true"
+VARS run13-train_epoch22 epoch="23" run_uuid="dfae34a0" random_seed="974265" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run13-train_epoch23 epoch="24" run_uuid="dfae34a0" random_seed="974265" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch24 epoch="25" run_uuid="dfae34a0" random_seed="974265" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch25 epoch="26" run_uuid="dfae34a0" random_seed="974265" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run13-train_epoch26 epoch="27" run_uuid="dfae34a0" random_seed="974265" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run13-train_epoch27 epoch="28" run_uuid="dfae34a0" random_seed="974265" ResourceName="delta" continue_from_checkpoint="true"
+VARS run13-train_epoch28 epoch="29" run_uuid="dfae34a0" random_seed="974265" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run13-train_epoch29 epoch="30" run_uuid="dfae34a0" random_seed="974265" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+
+
+PARENT run13-train_epoch0 CHILD run13-train_epoch1
+PARENT run13-train_epoch1 CHILD run13-train_epoch2
+PARENT run13-train_epoch2 CHILD run13-train_epoch3
+PARENT run13-train_epoch3 CHILD run13-train_epoch4
+PARENT run13-train_epoch4 CHILD run13-train_epoch5
+PARENT run13-train_epoch5 CHILD run13-train_epoch6
+PARENT run13-train_epoch6 CHILD run13-train_epoch7
+PARENT run13-train_epoch7 CHILD run13-train_epoch8
+PARENT run13-train_epoch8 CHILD run13-train_epoch9
+PARENT run13-train_epoch9 CHILD run13-train_epoch10
+PARENT run13-train_epoch10 CHILD run13-train_epoch11
+PARENT run13-train_epoch11 CHILD run13-train_epoch12
+PARENT run13-train_epoch12 CHILD run13-train_epoch13
+PARENT run13-train_epoch13 CHILD run13-train_epoch14
+PARENT run13-train_epoch14 CHILD run13-train_epoch15
+PARENT run13-train_epoch15 CHILD run13-train_epoch16
+PARENT run13-train_epoch16 CHILD run13-train_epoch17
+PARENT run13-train_epoch17 CHILD run13-train_epoch18
+PARENT run13-train_epoch18 CHILD run13-train_epoch19
+PARENT run13-train_epoch19 CHILD run13-train_epoch20
+PARENT run13-train_epoch20 CHILD run13-train_epoch21
+PARENT run13-train_epoch21 CHILD run13-train_epoch22
+PARENT run13-train_epoch22 CHILD run13-train_epoch23
+PARENT run13-train_epoch23 CHILD run13-train_epoch24
+PARENT run13-train_epoch24 CHILD run13-train_epoch25
+PARENT run13-train_epoch25 CHILD run13-train_epoch26
+PARENT run13-train_epoch26 CHILD run13-train_epoch27
+PARENT run13-train_epoch27 CHILD run13-train_epoch28
+PARENT run13-train_epoch28 CHILD run13-train_epoch29
+SCRIPT PRE run13-train_epoch0 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run13-train_epoch1 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run13-train_epoch5 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run13-train_epoch7 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run13-train_epoch16 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run13-train_epoch21 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run13-train_epoch22 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run13-train_epoch25 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run13-train_epoch27 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run13-train_epoch28 pre_request_annex.sh expanse expanse_annex
+
+JOB run14-train_epoch0 ospool_pretrain.sub
+JOB run14-train_epoch1 expanse_pretrain.sub
+JOB run14-train_epoch2 expanse_pretrain.sub
+JOB run14-train_epoch3 expanse_pretrain.sub
+JOB run14-train_epoch4 ospool_pretrain.sub
+JOB run14-train_epoch5 bridges2_pretrain.sub
+JOB run14-train_epoch6 ospool_pretrain.sub
+JOB run14-train_epoch7 ospool_pretrain.sub
+JOB run14-train_epoch8 ospool_pretrain.sub
+JOB run14-train_epoch9 ospool_pretrain.sub
+JOB run14-train_epoch10 ospool_pretrain.sub
+JOB run14-train_epoch11 aws_pretrain.sub
+JOB run14-train_epoch12 ospool_pretrain.sub
+JOB run14-train_epoch13 ospool_pretrain.sub
+JOB run14-train_epoch14 ospool_pretrain.sub
+JOB run14-train_epoch15 delta_pretrain.sub
+JOB run14-train_epoch16 ospool_pretrain.sub
+JOB run14-train_epoch17 expanse_pretrain.sub
+JOB run14-train_epoch18 ospool_pretrain.sub
+JOB run14-train_epoch19 ospool_pretrain.sub
+JOB run14-train_epoch20 ospool_pretrain.sub
+JOB run14-train_epoch21 bridges2_pretrain.sub
+JOB run14-train_epoch22 aws_pretrain.sub
+JOB run14-train_epoch23 ospool_pretrain.sub
+JOB run14-train_epoch24 bridges2_pretrain.sub
+JOB run14-train_epoch25 ospool_pretrain.sub
+JOB run14-train_epoch26 ospool_pretrain.sub
+JOB run14-train_epoch27 ospool_pretrain.sub
+JOB run14-train_epoch28 ospool_pretrain.sub
+JOB run14-train_epoch29 ospool_pretrain.sub
+
+VARS run14-train_epoch0 epoch="1" run_uuid="64bf430f" random_seed="169656" ResourceName="SIUE-CC-production" 
+VARS run14-train_epoch1 epoch="2" run_uuid="64bf430f" random_seed="169656" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run14-train_epoch2 epoch="3" run_uuid="64bf430f" random_seed="169656" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run14-train_epoch3 epoch="4" run_uuid="64bf430f" random_seed="169656" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run14-train_epoch4 epoch="5" run_uuid="64bf430f" random_seed="169656" ResourceName="UTC-Epyc" continue_from_checkpoint="true"
+VARS run14-train_epoch5 epoch="6" run_uuid="64bf430f" random_seed="169656" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run14-train_epoch6 epoch="7" run_uuid="64bf430f" random_seed="169656" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run14-train_epoch7 epoch="8" run_uuid="64bf430f" random_seed="169656" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch8 epoch="9" run_uuid="64bf430f" random_seed="169656" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
+VARS run14-train_epoch9 epoch="10" run_uuid="64bf430f" random_seed="169656" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+VARS run14-train_epoch10 epoch="11" run_uuid="64bf430f" random_seed="169656" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch11 epoch="12" run_uuid="64bf430f" random_seed="169656" ResourceName="aws" continue_from_checkpoint="true"
+VARS run14-train_epoch12 epoch="13" run_uuid="64bf430f" random_seed="169656" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
+VARS run14-train_epoch13 epoch="14" run_uuid="64bf430f" random_seed="169656" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
+VARS run14-train_epoch14 epoch="15" run_uuid="64bf430f" random_seed="169656" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch15 epoch="16" run_uuid="64bf430f" random_seed="169656" ResourceName="delta" continue_from_checkpoint="true"
+VARS run14-train_epoch16 epoch="17" run_uuid="64bf430f" random_seed="169656" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch17 epoch="18" run_uuid="64bf430f" random_seed="169656" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run14-train_epoch18 epoch="19" run_uuid="64bf430f" random_seed="169656" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch19 epoch="20" run_uuid="64bf430f" random_seed="169656" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
+VARS run14-train_epoch20 epoch="21" run_uuid="64bf430f" random_seed="169656" ResourceName="DESY-ZN" continue_from_checkpoint="true"
+VARS run14-train_epoch21 epoch="22" run_uuid="64bf430f" random_seed="169656" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run14-train_epoch22 epoch="23" run_uuid="64bf430f" random_seed="169656" ResourceName="aws" continue_from_checkpoint="true"
+VARS run14-train_epoch23 epoch="24" run_uuid="64bf430f" random_seed="169656" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch24 epoch="25" run_uuid="64bf430f" random_seed="169656" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run14-train_epoch25 epoch="26" run_uuid="64bf430f" random_seed="169656" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch26 epoch="27" run_uuid="64bf430f" random_seed="169656" ResourceName="MTState-Tempest-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch27 epoch="28" run_uuid="64bf430f" random_seed="169656" ResourceName="SIUE-CC-production" continue_from_checkpoint="true"
+VARS run14-train_epoch28 epoch="29" run_uuid="64bf430f" random_seed="169656" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
+VARS run14-train_epoch29 epoch="30" run_uuid="64bf430f" random_seed="169656" ResourceName="Colgate-CCARE-EP" continue_from_checkpoint="true"
+
+
+PARENT run14-train_epoch0 CHILD run14-train_epoch1
+PARENT run14-train_epoch1 CHILD run14-train_epoch2
+PARENT run14-train_epoch2 CHILD run14-train_epoch3
+PARENT run14-train_epoch3 CHILD run14-train_epoch4
+PARENT run14-train_epoch4 CHILD run14-train_epoch5
+PARENT run14-train_epoch5 CHILD run14-train_epoch6
+PARENT run14-train_epoch6 CHILD run14-train_epoch7
+PARENT run14-train_epoch7 CHILD run14-train_epoch8
+PARENT run14-train_epoch8 CHILD run14-train_epoch9
+PARENT run14-train_epoch9 CHILD run14-train_epoch10
+PARENT run14-train_epoch10 CHILD run14-train_epoch11
+PARENT run14-train_epoch11 CHILD run14-train_epoch12
+PARENT run14-train_epoch12 CHILD run14-train_epoch13
+PARENT run14-train_epoch13 CHILD run14-train_epoch14
+PARENT run14-train_epoch14 CHILD run14-train_epoch15
+PARENT run14-train_epoch15 CHILD run14-train_epoch16
+PARENT run14-train_epoch16 CHILD run14-train_epoch17
+PARENT run14-train_epoch17 CHILD run14-train_epoch18
+PARENT run14-train_epoch18 CHILD run14-train_epoch19
+PARENT run14-train_epoch19 CHILD run14-train_epoch20
+PARENT run14-train_epoch20 CHILD run14-train_epoch21
+PARENT run14-train_epoch21 CHILD run14-train_epoch22
+PARENT run14-train_epoch22 CHILD run14-train_epoch23
+PARENT run14-train_epoch23 CHILD run14-train_epoch24
+PARENT run14-train_epoch24 CHILD run14-train_epoch25
+PARENT run14-train_epoch25 CHILD run14-train_epoch26
+PARENT run14-train_epoch26 CHILD run14-train_epoch27
+PARENT run14-train_epoch27 CHILD run14-train_epoch28
+PARENT run14-train_epoch28 CHILD run14-train_epoch29
+SCRIPT PRE run14-train_epoch1 pre_request_annex.sh anvil anvil_annex
+SCRIPT PRE run14-train_epoch5 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run14-train_epoch11 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run14-train_epoch15 pre_request_annex.sh delta delta_annex
+SCRIPT PRE run14-train_epoch17 pre_request_annex.sh expanse expanse_annex
+SCRIPT PRE run14-train_epoch21 pre_request_annex.sh bridges2 bridges2_annex
+SCRIPT PRE run14-train_epoch22 pre_request_annex.sh aws aws_annex
+SCRIPT PRE run14-train_epoch24 pre_request_annex.sh bridges2 bridges2_annex
+
+
+RETRY ALL_NODES 3
+NODE_STATUS_FILE nodes.dag.status 30

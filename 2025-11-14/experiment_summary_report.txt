@@ -1,0 +1,76 @@
+EXPERIMENT ANALYSIS SUMMARY REPORT
+==================================================
+
+Analysis Period: 2025-08-20 to 2025-11-14
+Total Job Attempts: 888
+Unique Jobs: 259
+
+RESOURCE UTILIZATION:
+--------------------
+EXPANSE:
+  • Successful Jobs: 77 (100.0%)
+  • Computation Time: 474.1 hours
+  • Time Efficiency: 21.8%
+
+OSPOOL:
+  • Successful Jobs: 210 (100.0%)
+  • Computation Time: 2,193.5 hours
+  • Time Efficiency: 20.8%
+
+BRIDGES2:
+  • Successful Jobs: 15 (100.0%)
+  • Computation Time: 99.7 hours
+  • Time Efficiency: 7.6%
+
+DELTA:
+  • Successful Jobs: 12 (100.0%)
+  • Computation Time: 148.6 hours
+  • Time Efficiency: 15.6%
+
+AWS:
+  • Successful Jobs: 67 (100.0%)
+  • Computation Time: 391.7 hours
+  • Time Efficiency: 27.2%
+
+OVERALL METRICS:
+---------------
+Total Success Rate: 100.0%
+Total Computation Time: 3,307.7 hours
+Overall Time Efficiency: 100.0%
+
+GPU UTILIZATION:
+----------------
+Total GPU Hours: 5,742.4
+GPU Types Used: 7
+
+NVIDIA A100-SXM4-40GB: 9.0 jobs, 100.0% success rate
+NVIDIA A100-SXM4-80GB: 94.0 jobs, 100.0% success rate
+NVIDIA A40: 20.0 jobs, 100.0% success rate
+NVIDIA H100 80GB HBM3: 16.0 jobs, 100.0% success rate
+NVIDIA H200: 109.0 jobs, 100.0% success rate
+NVIDIA L40S: 66.0 jobs, 100.0% success rate
+Tesla V100-SXM2-32GB: 88.0 jobs, 100.0% success rate
+
+DATA TRANSFER:
+-------------
+Total Data Transferred: 14,547.7 GB
+
+aws: 2,595.2 GB (86.0 jobs)
+bridges2: 129.7 GB (24.0 jobs)
+delta: 80.7 GB (18.0 jobs)
+expanse: 664.6 GB (103.0 jobs)
+ospool: 11,077.5 GB (358.0 jobs)
+
+INPUT FILE TRANSFER TIMING:
+---------------------------
+Jobs with Transfer Timing: 888
+Mean Transfer Duration: 4.7 minutes
+Median Transfer Duration: 2.1 minutes
+Total Transfer Time: 69.8 hours
+
+anvil: median 4.0 min, mean 4.0 min (4 jobs)
+aws: median 4.5 min, mean 5.1 min (128 jobs)
+bridges2: median 7.8 min, mean 14.6 min (30 jobs)
+delta: median 1.4 min, mean 6.3 min (23 jobs)
+expanse: median 2.2 min, mean 4.3 min (134 jobs)
+ospool: median 1.7 min, mean 4.1 min (569 jobs)
