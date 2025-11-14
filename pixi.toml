@@ -1,0 +1,36 @@
+[project]
+name = "mldag-fixed-global"
+version = "0.1.0"
+description = "ML DAG experiment analysis and reporting"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[dependencies]
+python = ">=3.9"
+uv = ">=0.1.0"
+
+[tasks]
+# Install Python dependencies using uv
+install = "uv sync"
+
+# Generate full CSV report from DAG files
+generate-csv = "uv run post_experiment_csv.py --dag-files bigger_global_pretraining.dag global_pretraining.dag --output full.csv"
+
+# Generate experiment report from CSV (default output)
+generate-report = "uv run experiment_report.py full.csv"
+
+# Generate experiment report with dated output directory
+generate-report-dated = { cmd = "uv run experiment_report.py full.csv --output-dir $(date +\"%Y-%m-%d\")", depends-on = ["generate-report"] }
+
+# Complete workflow: generate CSV and both reports
+full-report = { depends-on = ["generate-csv", "generate-report-dated"] }
+
+# Monthly report with specific month filter (set MONTH env var, e.g., MONTH=10)
+monthly-report = { cmd = "bash -c 'uv run post_experiment_csv.py --dag-files bigger_global_pretraining.dag global_pretraining.dag --output full.csv && uv run experiment_report.py full.csv --month ${MONTH:-10} --output-dir month_${MONTH:-10}_reports'" }
+
+[feature.dev.dependencies]
+# Add any development dependencies here if needed
+
+[environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
