@@ -65,11 +65,12 @@ class JobAttempt:
 class SimpleCSVGenerator:
     """Generate CSV reports using DAG files, DAGMan output files, and metl.log."""
 
-    def __init__(self, dag_files: Optional[List[str]] = None, include_standalone: bool = False):
+    def __init__(self, dag_files: Optional[List[str]] = None, metl_logs: Optional[List[str]] = None, include_standalone: bool = False):
         """Initialize the generator.
 
         Args:
             dag_files: List of DAG files. If None, auto-detect *.dag files.
+            metl_logs: List of metl.log files. If None, use ["metl.log"].
             include_standalone: Whether to include standalone training runs from standalone/ directory and UUID 861e7e66 runs.
         """
         if dag_files is None:
@@ -78,6 +79,13 @@ class SimpleCSVGenerator:
         self.dag_files = [f for f in dag_files if Path(f).exists()]
         if not self.dag_files:
             raise FileNotFoundError("No DAG files found")
+
+        if metl_logs is None:
+            metl_logs = ["metl.log"]
+
+        self.metl_logs = [f for f in metl_logs if Path(f).exists()]
+        if not self.metl_logs:
+            raise FileNotFoundError("No metl.log files found")
 
         self.include_standalone = include_standalone
 
@@ -98,6 +106,7 @@ class SimpleCSVGenerator:
         print(f"Found DAG files: {self.dag_files}")
         print(f"Found DAGMan output files: {self.dagman_out_files}")
         print(f"Found DAG nodes log files: {self.nodes_log_files}")
+        print(f"Found metl.log files: {self.metl_logs}")
 
     def parse_dag_files(self) -> Tuple[Dict[str, str], Dict[Tuple[str, str], str]]:
         """Parse DAG files to extract job name to DAG source mapping and resource names.
@@ -377,7 +386,7 @@ class SimpleCSVGenerator:
         return None, None
 
     def parse_metl_log(self) -> Dict[int, List[Dict[str, Any]]]:
-        """Parse metl.log to extract all execution attempts by cluster ID.
+        """Parse metl.log files to extract all execution attempts by cluster ID.
         Also parses standalone/*.log files for additional training runs.
 
         Returns:
@@ -385,16 +394,16 @@ class SimpleCSVGenerator:
         """
         cluster_attempts = {}
 
-        # Parse main metl.log file
-        metl_log_path = Path("metl.log")
-        if metl_log_path.exists():
-            with open(metl_log_path, 'r') as f:
-                lines = f.readlines()
-            print(f"Parsing main metl.log ({len(lines)} lines)")
-            self._parse_log_lines(lines, cluster_attempts)
-        else:
-            print("Main metl.log not found")
-            lines = []
+        # Parse all metl.log files
+        for metl_log_path in self.metl_logs:
+            metl_log_path = Path(metl_log_path)
+            if metl_log_path.exists():
+                with open(metl_log_path, 'r') as f:
+                    lines = f.readlines()
+                print(f"Parsing {metl_log_path} ({len(lines)} lines)")
+                self._parse_log_lines(lines, cluster_attempts)
+            else:
+                print(f"Warning: {metl_log_path} not found")
 
         # Parse standalone metl_*.log files for UUID 861e7e66 training runs (only if enabled)
         if self.include_standalone:
@@ -925,16 +934,18 @@ class SimpleCSVGenerator:
 
     def extract_job_name_from_metl(self, cluster_id: int) -> Optional[str]:
         """Try to extract job name from DAG Node info in metl.log submission events."""
-        metl_log_path = Path("metl.log")
-        if not metl_log_path.exists():
-            return None
+        # Search through all metl.log files
+        for metl_log_path in self.metl_logs:
+            metl_log_path = Path(metl_log_path)
+            if not metl_log_path.exists():
+                continue
 
-        with open(metl_log_path, 'r') as f:
-            for line in f:
-                if f'000 ({cluster_id}.' in line and 'DAG Node:' in line:
-                    dag_match = re.search(r'DAG Node: (\S+)', line)
-                    if dag_match:
-                        return dag_match.group(1)
+            with open(metl_log_path, 'r') as f:
+                for line in f:
+                    if f'000 ({cluster_id}.' in line and 'DAG Node:' in line:
+                        dag_match = re.search(r'DAG Node: (\S+)', line)
+                        if dag_match:
+                            return dag_match.group(1)
 
         return None
 
@@ -1241,6 +1252,7 @@ Examples:
 
     parser.add_argument("--output", "-o", default="job_summary.csv", help="Output CSV file path (default: job_summary.csv)")
     parser.add_argument("--dag-files", nargs="+", help="Specific DAG files to use")
+    parser.add_argument("--metl-logs", nargs="+", help="Specific metl.log files to use (default: metl.log)")
     parser.add_argument("--include-standalone", action="store_true", help="Include standalone training runs from standalone/ directory and UUID 861e7e66 runs")
     parser.add_argument("output_file", nargs="?", help="Output CSV file path (legacy positional argument - use --output instead)")
 
@@ -1249,7 +1261,7 @@ Examples:
     # Determine output file - prioritize positional argument for backwards compatibility
     output_file = args.output_file if args.output_file else args.output
 
-    generator = SimpleCSVGenerator(args.dag_files, include_standalone=args.include_standalone)
+    generator = SimpleCSVGenerator(args.dag_files, metl_logs=args.metl_logs, include_standalone=args.include_standalone)
     generator.export_csv(output_file)
     print(f"CSV exported to: {output_file}")
 

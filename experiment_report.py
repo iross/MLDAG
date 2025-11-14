@@ -175,6 +175,73 @@ class ExperimentAnalyzer:
 
         return pd.DataFrame(summary_stats)
 
+    def extract_epoch_stats_with_glidein(self) -> pd.DataFrame:
+        """Extract epoch completion statistics with GLIDEIN resource breakdown for OSPool.
+
+        For OSPool jobs, uses GLIDEIN Resource Name instead of 'ospool'.
+        For other resources (expanse, delta, etc.), uses Targeted Resource as normal.
+        """
+        # Filter for jobs with successful status and execution time
+        epoch_data = self.df[
+            (self.df['Is Successful']) &
+            (self.df['Execution Duration (seconds)'] > 0)
+        ].copy()
+
+        # Separate epoch-based jobs from standalone jobs
+        epoch_jobs = epoch_data[epoch_data['Epoch'].notna()].copy()
+        standalone_jobs = epoch_data[epoch_data['Epoch'].isna()].copy()
+
+        print(f"Found {len(epoch_jobs)} successful epoch-based attempts and {len(standalone_jobs)} standalone attempts")
+
+        # Combine epoch jobs and standalone jobs for processing
+        all_jobs = pd.concat([epoch_jobs, standalone_jobs], ignore_index=True)
+
+        # Create a new column that uses GLIDEIN Resource Name for OSPool, Targeted Resource for others
+        def get_resource_with_glidein(row):
+            targeted = row['Targeted Resource']
+            if targeted == 'ospool' and pd.notna(row['GLIDEIN Resource Name']) and row['GLIDEIN Resource Name']:
+                return row['GLIDEIN Resource Name']
+            return targeted
+
+        all_jobs['Resource (with GLIDEIN)'] = all_jobs.apply(get_resource_with_glidein, axis=1)
+
+        # For each unique job (DAG + Job Name), select the attempt with longest execution time
+        longest_executions = all_jobs.loc[
+            all_jobs.groupby(['DAG Source', 'Job Name'])['Execution Duration (seconds)'].idxmax()
+        ].copy()
+
+        print(f"Selected {len(longest_executions)} longest executions for GLIDEIN breakdown")
+
+        # Calculate summary statistics using the new resource column
+        summary_stats = []
+        for resource in longest_executions['Resource (with GLIDEIN)'].unique():
+            resource_data = longest_executions[longest_executions['Resource (with GLIDEIN)'] == resource]
+
+            total_jobs = len(resource_data)
+            completed_jobs = len(resource_data[resource_data['Final Status'] == 'completed'])
+            checkpointed_jobs = len(resource_data[resource_data['Final Status'] == 'checkpointed'])
+            successful_jobs = total_jobs
+
+            total_time = resource_data['Execution Duration (seconds)'].sum()
+
+            # Calculate all-time efficiency
+            all_resource_data = self.df[self.df.apply(get_resource_with_glidein, axis=1) == resource]
+            total_wall_time = all_resource_data['Total Duration (seconds)'].sum()
+
+            summary_stats.append({
+                'Resource': resource,
+                'Total Jobs': total_jobs,
+                'Completed Jobs': completed_jobs,
+                'Checkpointed Jobs': checkpointed_jobs,
+                'Successful Jobs': successful_jobs,
+                'Success Rate': successful_jobs / total_jobs if total_jobs > 0 else 0,
+                'Total Time (hours)': total_time / 3600,
+                'Successful Time (hours)': total_time / 3600,
+                'Time Efficiency': total_time / total_wall_time if total_wall_time > 0 else 0
+            })
+
+        return pd.DataFrame(summary_stats)
+
     def analyze_gpu_utilization(self) -> Dict:
         """Analyze GPU utilization patterns using longest execution per job."""
         gpu_data = self.df[
@@ -297,6 +364,34 @@ class ExperimentAnalyzer:
             return 'OSPool'
         else:
             return resource_name.title()
+
+    def format_resource_name_with_glidein(self, resource_name):
+        """Format resource names with GLIDEIN breakdown and NAIRR/OSPool labels.
+
+        GLIDEIN resources get (OSPool) suffix and cleaned names.
+        Major NAIRR resources get (NAIRR) suffix.
+        """
+        # GLIDEIN resource name mappings
+        glidein_mappings = {
+            'CHTC-Spark-CE1': 'CHTC-Spark (OSPool)',
+            'Duke-NCShare-CE1': 'Duke (OSPool)',
+            'UIUC-TGI-RAILS-CE1': 'UIUC (OSPool)',
+            'PDX-Coeus-CE1': 'PDX-Coeus (OSPool)',
+        }
+
+        # Check if it's a GLIDEIN resource
+        if resource_name in glidein_mappings:
+            return glidein_mappings[resource_name]
+
+        # NAIRR resources
+        nairr_resources = ['expanse', 'delta', 'bridges2', 'anvil', 'aws']
+        if resource_name.lower() in nairr_resources:
+            if resource_name.lower() == 'aws':
+                return 'AWS (NAIRR)'
+            return f"{resource_name.title()} (NAIRR)"
+
+        # Fallback to regular formatting
+        return self.format_resource_name(resource_name)
 
     def get_resource_colors(self, resources):
         """Get consistent colors for resources regardless of which ones are present."""
@@ -456,6 +551,160 @@ class ExperimentAnalyzer:
         # Adjust layout to prevent label cutoff
         plt.tight_layout(pad=4.0)  # Extra padding to accommodate larger text
         self.save_figure(fig, 'resource_epochs_breakdown')
+
+    def plot_resource_breakdown_with_glidein(self):
+        """Generate resource utilization breakdown plots with GLIDEIN resources shown separately."""
+        epoch_stats = self.extract_epoch_stats_with_glidein()
+
+        # Sort by Total Time for better visualization
+        epoch_stats = epoch_stats.sort_values('Total Time (hours)', ascending=False)
+
+        # Format resource names for display with GLIDEIN and NAIRR labels
+        formatted_resources = [self.format_resource_name_with_glidein(resource) for resource in epoch_stats['Resource']]
+
+        # Get colors with consistent theming: warm colors for OSPool, cool colors for NAIRR
+        def get_color_for_resource(resource_name):
+            # OSPool resources - warm colors (reds/oranges/yellows)
+            ospool_colors = {
+                'CHTC-Spark-CE1': '#DC143C',      # Crimson (darkest red)
+                'Duke-NCShare-CE1': '#FF6347',    # Tomato (red-orange)
+                'UIUC-TGI-RAILS-CE1': '#FF8C00',  # Dark Orange
+                'PDX-Coeus-CE1': '#FFD700',       # Gold (yellow)
+            }
+
+            # NAIRR resources - cool colors (blues/greens/purples)
+            nairr_colors = {
+                'expanse': '#4169E1',    # Royal Blue
+                'delta': '#6495ED',      # Cornflower Blue
+                'bridges2': '#9370DB',   # Medium Purple
+                'anvil': '#2E8B57',      # Sea Green
+                'aws': '#5F9EA0',        # Cadet Blue
+            }
+
+            # Other resources (fallback)
+            other_colors = {}
+
+            # Check which category this resource belongs to
+            if resource_name in ospool_colors:
+                return ospool_colors[resource_name]
+            elif resource_name in nairr_colors:
+                return nairr_colors[resource_name]
+            elif resource_name in other_colors:
+                return other_colors[resource_name]
+            else:
+                return '#808080'  # Gray for unknown
+
+        colors = [get_color_for_resource(resource) for resource in epoch_stats['Resource']]
+
+        # Plot 1: Total computation time by resource (pie chart with GLIDEIN breakdown)
+        fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+
+        # Total computation time by resource (pie chart)
+        def make_time_autopct(values):
+            def my_autopct(pct):
+                absolute = pct/100.*sum(values)
+                # Only show label if slice is large enough (>3%)
+                if pct > 3:
+                    return f'{round(absolute)}h\n({pct:.1f}%)'
+                else:
+                    return ''
+            return my_autopct
+
+        wedges, texts, autotexts = ax.pie(
+            epoch_stats['Total Time (hours)'],
+            labels=formatted_resources,
+            autopct=make_time_autopct(epoch_stats['Total Time (hours)']),
+            startangle=0,  # Rotated 90 degrees clockwise (was 90)
+            colors=colors,
+            textprops={'fontsize': 16},
+            labeldistance=1.1,
+            pctdistance=0.75,
+        )
+        ax.set_title('Total Computation Time by Resource', fontsize=40, pad=30)
+
+        # Improve text readability for pie chart percentages
+        for i, (autotext, pct) in enumerate(zip(autotexts,
+                                                 100 * epoch_stats['Total Time (hours)'] / epoch_stats['Total Time (hours)'].sum())):
+            if pct > 3:  # Only style visible text
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+                autotext.set_fontsize(11)
+
+        # Adjust layout to prevent label cutoff
+        plt.tight_layout(pad=4.0)
+        self.save_figure(fig, 'resource_computation_time_breakdown_glidein')
+
+        # Plot 2: Successful epochs by resource (pie chart with GLIDEIN breakdown)
+        fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+
+        # Successful jobs by resource (pie chart)
+        def make_autopct_jobs(values):
+            def my_autopct(pct):
+                absolute = int(round(pct/100.*sum(values)))
+                # Only show label if slice is large enough (>3%)
+                if pct > 3:
+                    return f'{absolute}\n({pct:.1f}%)'
+                else:
+                    return ''
+            return my_autopct
+
+        wedges, texts, autotexts = ax.pie(
+            epoch_stats['Successful Jobs'],
+            labels=formatted_resources,
+            autopct=make_autopct_jobs(epoch_stats['Successful Jobs']),
+            startangle=0,  # Rotated 90 degrees clockwise (was 90)
+            colors=colors,
+            textprops={'fontsize': 16},
+            labeldistance=1.1,
+            pctdistance=0.75,
+        )
+        ax.set_title('Successful Epochs by Resource', fontsize=40, pad=30)
+
+        # Improve text readability for pie chart percentages
+        for i, (autotext, pct) in enumerate(zip(autotexts,
+                                                 100 * epoch_stats['Successful Jobs'] / epoch_stats['Successful Jobs'].sum())):
+            if pct > 3:  # Only style visible text
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+                autotext.set_fontsize(11)
+
+        # Adjust layout to prevent label cutoff
+        plt.tight_layout(pad=4.0)
+        self.save_figure(fig, 'resource_epochs_breakdown_glidein')
+
+        # Plot 3: Bar chart showing both metrics side by side
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+
+        # Successful epochs bar chart
+        bars1 = ax1.bar(range(len(formatted_resources)), epoch_stats['Successful Jobs'], color=colors)
+        ax1.set_title('Successful Epochs by Resource\n(with GLIDEIN)', fontsize=14, pad=20)
+        ax1.set_xlabel('Resource', fontsize=12)
+        ax1.set_ylabel('Number of Successful Epochs', fontsize=12)
+        ax1.set_xticks(range(len(formatted_resources)))
+        ax1.set_xticklabels(formatted_resources, rotation=45, ha='right')
+
+        # Add value labels on bars
+        for bar in bars1:
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                    f'{int(height)}', ha='center', va='bottom', fontsize=9)
+
+        # Computation time bar chart
+        bars2 = ax2.bar(range(len(formatted_resources)), epoch_stats['Total Time (hours)'], color=colors)
+        ax2.set_title('Total Computation Time by Resource\n(with GLIDEIN)', fontsize=14, pad=20)
+        ax2.set_xlabel('Resource', fontsize=12)
+        ax2.set_ylabel('Total Time (hours)', fontsize=12)
+        ax2.set_xticks(range(len(formatted_resources)))
+        ax2.set_xticklabels(formatted_resources, rotation=45, ha='right')
+
+        # Add value labels on bars
+        for bar in bars2:
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                    f'{int(height)}h', ha='center', va='bottom', fontsize=9)
+
+        plt.tight_layout()
+        self.save_figure(fig, 'resource_breakdown_bars_glidein')
 
     def plot_gpu_analysis(self):
         """Generate GPU utilization analysis plots."""
@@ -1706,6 +1955,9 @@ class ExperimentAnalyzer:
         try:
             print("\n1. Generating resource breakdown plots...")
             self.plot_resource_breakdown()
+
+            print("\n1b. Generating resource breakdown plots with GLIDEIN...")
+            self.plot_resource_breakdown_with_glidein()
 
             print("\n2. Generating GPU analysis plots...")
             self.plot_gpu_analysis()

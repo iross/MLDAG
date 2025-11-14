@@ -16,14 +16,17 @@ install = "uv sync"
 # Generate full CSV report from DAG files
 generate-csv = "uv run post_experiment_csv.py --dag-files bigger_global_pretraining.dag global_pretraining.dag --output full.csv"
 
+# Generate full CSV report from DAG files
+generate-csv-with-aws = "uv run post_experiment_csv.py --dag-files bigger_global_pretraining.dag global_pretraining.dag global_pretraining_in_aws.dag --metl-logs metl.log metl_aws.log --output full.csv"
+
 # Generate experiment report from CSV (default output)
 generate-report = "uv run experiment_report.py full.csv"
 
 # Generate experiment report with dated output directory
-generate-report-dated = { cmd = "uv run experiment_report.py full.csv --output-dir $(date +\"%Y-%m-%d\")", depends-on = ["generate-report"] }
+generate-report-dated = { cmd = "uv run experiment_report.py full.csv --output-dir $(date +\"%Y-%m-%d\")"}
 
 # Complete workflow: generate CSV and both reports
-full-report = { depends-on = ["generate-csv", "generate-report-dated"] }
+full-report = { depends-on = ["generate-csv-with-aws", "generate-report-dated"] }
 
 # Monthly report with specific month filter (set MONTH env var, e.g., MONTH=10)
 monthly-report = { cmd = "bash -c 'uv run post_experiment_csv.py --dag-files bigger_global_pretraining.dag global_pretraining.dag --output full.csv && uv run experiment_report.py full.csv --month ${MONTH:-10} --output-dir month_${MONTH:-10}_reports'" }
