@@ -1852,6 +1852,9 @@ class ExperimentAnalyzer:
         gpu_analysis = self.analyze_gpu_utilization()
         transfer_analysis = self.analyze_data_transfer()
 
+        # Calculate total completed epochs for header
+        total_completed_epochs = epoch_stats['Successful Jobs'].sum()
+
         report_lines = [
             "EXPERIMENT ANALYSIS SUMMARY REPORT",
             "=" * 50,
@@ -1859,6 +1862,7 @@ class ExperimentAnalyzer:
             f"Analysis Period: {self.df['Submit Time'].min().strftime('%Y-%m-%d')} to {self.df['Submit Time'].max().strftime('%Y-%m-%d')}",
             f"Total Job Attempts: {len(self.df):,}",
             f"Unique Jobs: {self.df['Job Name'].nunique():,}",
+            f"Total Completed Epochs: {total_completed_epochs:,}",
             "",
             "RESOURCE UTILIZATION:",
             "-" * 20,
@@ -1875,14 +1879,13 @@ class ExperimentAnalyzer:
 
         # Overall statistics
         total_jobs = epoch_stats['Total Jobs'].sum()
-        total_successful = epoch_stats['Successful Jobs'].sum()
         total_time = epoch_stats['Total Time (hours)'].sum()
         total_successful_time = epoch_stats['Successful Time (hours)'].sum()
 
         report_lines.extend([
             "OVERALL METRICS:",
             "-" * 15,
-            f"Total Success Rate: {total_successful/total_jobs:.1%}",
+            f"Total Success Rate: {total_completed_epochs/total_jobs:.1%}",
             f"Total Computation Time: {total_time:,.1f} hours",
             f"Overall Time Efficiency: {total_successful_time/total_time:.1%}",
             "",

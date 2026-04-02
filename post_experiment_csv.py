@@ -43,6 +43,18 @@ class JobAttempt:
     gpu_capability: str = ""
     gpu_driver_version: str = ""
     gpu_ecc_enabled: Optional[bool] = None
+    gpu_uuid: str = ""  # DeviceUuid - unique identifier for the physical GPU
+    gpu_id: str = ""  # Short GPU ID like "GPU-74a71a79"
+    gpu_pci_bus_id: str = ""  # PCI Bus ID like "0000:41:00.0"
+
+    # GPU and CPU usage from termination event (actual utilization)
+    gpu_usage: Optional[float] = None  # GPU utilization (0.0-1.0)
+    gpu_memory_usage_mb: Optional[int] = None  # Actual GPU memory used in MB
+    cpu_usage: Optional[float] = None  # CPU utilization (number of cores used)
+
+    # Memory and Disk usage
+    peak_memory_usage_mb: Optional[int] = None  # Peak memory usage in MB
+    disk_usage_kb: Optional[int] = None  # Disk usage in KB
 
     # Additional event times
     held_time: Optional[datetime] = None
@@ -57,6 +69,9 @@ class JobAttempt:
     # Resource information
     targeted_resource: str = ""
     glidein_resource_name: str = ""  # OSPool specific: actual resource name from GLIDEIN_ResourceName
+
+    # Run identification
+    run_uuid: str = ""  # UUID from DAG VARS definition identifying the training run
 
     # Training information
     epochs_completed: int = 1  # Default to 1 for regular epoch-based jobs
@@ -108,14 +123,15 @@ class SimpleCSVGenerator:
         print(f"Found DAG nodes log files: {self.nodes_log_files}")
         print(f"Found metl.log files: {self.metl_logs}")
 
-    def parse_dag_files(self) -> Tuple[Dict[str, str], Dict[Tuple[str, str], str]]:
-        """Parse DAG files to extract job name to DAG source mapping and resource names.
+    def parse_dag_files(self) -> Tuple[Dict[str, str], Dict[Tuple[str, str], str], Dict[Tuple[str, str], str]]:
+        """Parse DAG files to extract job name to DAG source mapping, resource names, and run UUIDs.
 
         Returns:
-            Tuple of (job_to_dag_mapping, (job_name, dag_source)_to_resource_mapping)
+            Tuple of (job_to_dag_mapping, (job_name, dag_source)_to_resource_mapping, (job_name, dag_source)_to_run_uuid_mapping)
         """
         job_to_dag = {}
         job_dag_to_resource = {}
+        job_dag_to_run_uuid = {}
 
         for dag_file in self.dag_files:
             dag_source = Path(dag_file).stem
@@ -132,7 +148,7 @@ class SimpleCSVGenerator:
                             job_name = parts[1]
                             job_to_dag[job_name] = dag_source
 
-                # Parse VARS lines to extract ResourceName for this specific DAG
+                # Parse VARS lines to extract ResourceName and run_uuid for this specific DAG
                 vars_pattern = r'VARS\s+(\S+)\s+(.+)'
                 for match in re.finditer(vars_pattern, content, re.MULTILINE):
                     job_name = match.group(1)
@@ -144,9 +160,15 @@ class SimpleCSVGenerator:
                         # Store with both job_name and dag_source as key
                         job_dag_to_resource[(job_name, dag_source)] = resource_match.group(1)
 
+                    # Look for run_uuid="value" in the VARS line
+                    uuid_match = re.search(r'run_uuid="([^"]*)"', vars_content)
+                    if uuid_match:
+                        job_dag_to_run_uuid[(job_name, dag_source)] = uuid_match.group(1)
+
         print(f"Found {len(job_to_dag)} jobs across {len(self.dag_files)} DAG files")
         print(f"Found {len(job_dag_to_resource)} job-DAG resource mappings")
-        return job_to_dag, job_dag_to_resource
+        print(f"Found {len(job_dag_to_run_uuid)} job-DAG run UUID mappings")
+        return job_to_dag, job_dag_to_resource, job_dag_to_run_uuid
 
     def parse_dagman_out_files(self) -> Dict[str, Dict[int, str]]:
         """Parse DAGMan output files to create node-to-jobid mapping for each DAG.
@@ -593,6 +615,8 @@ class SimpleCSVGenerator:
 
                     # Look for transfer data
                     self._parse_transfer_data(lines, event['line_index'], attempt)
+                    # Look for resource usage data
+                    self._parse_resource_usage(lines, event['line_index'], attempt)
                     break
                 elif event['event_code'] == '004':  # Evicted
                     attempt['evicted_time'] = event['timestamp']
@@ -812,6 +836,61 @@ class SimpleCSVGenerator:
             if legacy_received_match:
                 attempt['total_bytes_received'] = int(legacy_received_match.group(1))
 
+    def _parse_resource_usage(self, lines: List[str], line_index: int, attempt: Dict[str, Any]):
+        """Parse resource usage data from termination event (005).
+
+        Extracts actual CPU, GPU, memory, and disk usage from the Partitionable Resources section.
+        Example format:
+            Partitionable Resources :       Usage   Request Allocated Assigned
+               Cpus                 :        4.04         8         8
+               Disk (KB)            : 56826223    104857600 104860266
+               GPUs                 :        0.93         1         1 "GPU-74a71a79"
+               GpusMemory (MB)      :    77723
+               Memory (MB)          :    46955        65536     65536
+        """
+        for i in range(line_index + 1, min(line_index + 30, len(lines))):
+            line = lines[i].strip()
+
+            # CPU usage - format: "Cpus                 :        4.04         8         8"
+            cpu_match = re.search(r'Cpus\s+:\s+([\d.]+)', line)
+            if cpu_match:
+                try:
+                    attempt['cpu_usage'] = float(cpu_match.group(1))
+                except ValueError:
+                    pass
+
+            # GPU usage - format: "GPUs                 :        0.93         1         1"
+            gpu_usage_match = re.search(r'GPUs\s+:\s+([\d.]+)', line)
+            if gpu_usage_match:
+                try:
+                    attempt['gpu_usage'] = float(gpu_usage_match.group(1))
+                except ValueError:
+                    pass
+
+            # GPU memory usage - format: "GpusMemory (MB)      :    77723"
+            gpu_mem_match = re.search(r'GpusMemory \(MB\)\s+:\s+(\d+)', line)
+            if gpu_mem_match:
+                try:
+                    attempt['gpu_memory_usage_mb'] = int(gpu_mem_match.group(1))
+                except ValueError:
+                    pass
+
+            # Peak memory usage - format: "Memory (MB)          :    46955        65536     65536"
+            memory_match = re.search(r'Memory \(MB\)\s+:\s+(\d+)', line)
+            if memory_match:
+                try:
+                    attempt['peak_memory_usage_mb'] = int(memory_match.group(1))
+                except ValueError:
+                    pass
+
+            # Disk usage - format: "Disk (KB)            : 56826223    104857600 104860266"
+            disk_match = re.search(r'Disk \(KB\)\s+:\s+(\d+)', line)
+            if disk_match:
+                try:
+                    attempt['disk_usage_kb'] = int(disk_match.group(1))
+                except ValueError:
+                    pass
+
     def _parse_transfer_timing(self, lines: List[str], line_index: int, attempt: Dict[str, Any]):
         """Parse file transfer timing information from event 040 lines.
 
@@ -923,6 +1002,9 @@ class SimpleCSVGenerator:
                 attempt['gpu_capability'] = details.get('Capability', '')
                 attempt['gpu_driver_version'] = details.get('DriverVersion', '')
                 attempt['gpu_ecc_enabled'] = details.get('ECCEnabled')
+                attempt['gpu_uuid'] = details.get('DeviceUuid', '')
+                attempt['gpu_id'] = details.get('Id', '')
+                attempt['gpu_pci_bus_id'] = details.get('DevicePciBusId', '')
             else:
                 # Multiple GPUs - just use the device name without count prefix
                 first_gpu = gpu_details[0]
@@ -931,6 +1013,9 @@ class SimpleCSVGenerator:
                 attempt['gpu_capability'] = first_gpu.get('Capability', '')
                 attempt['gpu_driver_version'] = first_gpu.get('DriverVersion', '')
                 attempt['gpu_ecc_enabled'] = first_gpu.get('ECCEnabled')
+                attempt['gpu_uuid'] = first_gpu.get('DeviceUuid', '')
+                attempt['gpu_id'] = first_gpu.get('Id', '')
+                attempt['gpu_pci_bus_id'] = first_gpu.get('DevicePciBusId', '')
 
     def extract_job_name_from_metl(self, cluster_id: int) -> Optional[str]:
         """Try to extract job name from DAG Node info in metl.log submission events."""
@@ -951,7 +1036,7 @@ class SimpleCSVGenerator:
 
     def generate_attempts(self) -> List[JobAttempt]:
         """Generate all JobAttempt objects."""
-        job_to_dag, job_dag_to_resource = self.parse_dag_files()
+        job_to_dag, job_dag_to_resource, job_dag_to_run_uuid = self.parse_dag_files()
         dag_mappings = self.parse_dagman_out_files()
         rescued_clusters = self.parse_rescue_events()
         gpu_details = self.parse_nodes_log_files()
@@ -1022,6 +1107,16 @@ class SimpleCSVGenerator:
                 attempt.gpu_capability = attempt_data.get('gpu_capability', '')
                 attempt.gpu_driver_version = attempt_data.get('gpu_driver_version', '')
                 attempt.gpu_ecc_enabled = attempt_data.get('gpu_ecc_enabled')
+                attempt.gpu_uuid = attempt_data.get('gpu_uuid', '')
+                attempt.gpu_id = attempt_data.get('gpu_id', '')
+                attempt.gpu_pci_bus_id = attempt_data.get('gpu_pci_bus_id', '')
+
+                # Fill in resource usage data (from termination event)
+                attempt.gpu_usage = attempt_data.get('gpu_usage')
+                attempt.gpu_memory_usage_mb = attempt_data.get('gpu_memory_usage_mb')
+                attempt.cpu_usage = attempt_data.get('cpu_usage')
+                attempt.peak_memory_usage_mb = attempt_data.get('peak_memory_usage_mb')
+                attempt.disk_usage_kb = attempt_data.get('disk_usage_kb')
 
                 # Override with detailed GPU info from nodes log if available
                 if cluster_id in gpu_details:
@@ -1071,6 +1166,9 @@ class SimpleCSVGenerator:
                         detected_resource = attempt_data.get('actual_resource', '')
                         if detected_resource:
                             attempt.targeted_resource = self._map_resource_name(detected_resource)
+
+                # Fill in run UUID from DAG VARS
+                attempt.run_uuid = job_dag_to_run_uuid.get((job_name, dag_source), '')
 
                 # Filter out jobs that went directly from released to aborted without execution
                 # These likely sat idle until they were aborted
@@ -1158,12 +1256,14 @@ class SimpleCSVGenerator:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         fieldnames = [
-            'Job Name', 'DAG Source', 'HTCondor Cluster ID', 'Attempt Sequence',
+            'Job Name', 'DAG Source', 'Run UUID', 'HTCondor Cluster ID', 'Attempt Sequence',
             'Final Status', 'Targeted Resource', 'GLIDEIN Resource Name', 'Submit Time', 'Start Time', 'End Time',
             'Execution Duration (seconds)', 'Execution Duration (human)',
             'Total Duration (seconds)', 'Total Duration (human)',
             'Total Bytes Sent', 'Total Bytes Received',
             'Number of GPUs', 'GPU Device Name', 'GPU Memory MB', 'GPU Capability', 'GPU Driver Version', 'GPU ECC Enabled',
+            'GPU UUID', 'GPU ID', 'GPU PCI Bus ID',
+            'GPU Usage', 'GPU Memory Usage MB', 'CPU Usage', 'Peak Memory Usage MB', 'Disk Usage KB',
             'Held Time', 'Released Time', 'Evicted Time', 'Aborted Time',
             'Transfer Input Start Time', 'Transfer Input End Time',
             'Transfer Input Duration (seconds)', 'Transfer Input Duration (human)',
@@ -1197,6 +1297,7 @@ class SimpleCSVGenerator:
                     writer.writerow({
                         'Job Name': attempt.job_name,
                         'DAG Source': attempt.dag_source,
+                        'Run UUID': attempt.run_uuid,
                         'HTCondor Cluster ID': attempt.cluster_id,
                         'Attempt Sequence': attempt.attempt_sequence,
                         'Final Status': attempt.final_status or "",
@@ -1217,6 +1318,14 @@ class SimpleCSVGenerator:
                         'GPU Capability': attempt.gpu_capability,
                         'GPU Driver Version': attempt.gpu_driver_version,
                         'GPU ECC Enabled': attempt.gpu_ecc_enabled,
+                        'GPU UUID': attempt.gpu_uuid,
+                        'GPU ID': attempt.gpu_id,
+                        'GPU PCI Bus ID': attempt.gpu_pci_bus_id,
+                        'GPU Usage': attempt.gpu_usage,
+                        'GPU Memory Usage MB': attempt.gpu_memory_usage_mb,
+                        'CPU Usage': attempt.cpu_usage,
+                        'Peak Memory Usage MB': attempt.peak_memory_usage_mb,
+                        'Disk Usage KB': attempt.disk_usage_kb,
                         'Held Time': self.format_datetime(attempt.held_time),
                         'Released Time': self.format_datetime(attempt.released_time),
                         'Evicted Time': self.format_datetime(attempt.evicted_time),
