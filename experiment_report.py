@@ -30,7 +30,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 class ExperimentAnalyzer:
     """Main class for analyzing experiment data and generating reports."""
 
-    def __init__(self, csv_file: str, output_dir: str = "reports"):
+    def __init__(self, csv_file: str, output_dir: str = "reports", hours: Optional[int] = None):
         """Initialize the analyzer with data file and output directory."""
         self.csv_file = Path(csv_file)
         self.output_dir = Path(output_dir)
@@ -41,6 +41,11 @@ class ExperimentAnalyzer:
 
         # Load and validate data
         self.df = self.load_data()
+
+        if hours is not None:
+            self.df = self._filter_recent(self.df, hours)
+            print(f"Filtered to jobs active in the last {hours} hours: {len(self.df)} attempts")
+
         self.validate_data()
 
         print(f"Loaded {len(self.df)} job attempts from {csv_file}")
@@ -93,6 +98,17 @@ class ExperimentAnalyzer:
         df['Is Successful'] = df['Final Status'].isin(successful_statuses)
 
         return df
+
+    def _filter_recent(self, df: pd.DataFrame, hours: int) -> pd.DataFrame:
+        """Return rows where any timing column falls within the last `hours` hours."""
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+        activity_cols = ['Submit Time', 'Start Time', 'End Time']
+        present_cols = [c for c in activity_cols if c in df.columns]
+        mask = pd.Series(False, index=df.index)
+        for col in present_cols:
+            mask |= df[col].notna() & (df[col] >= cutoff)
+        return df[mask].copy()
 
     def validate_data(self):
         """Validate the loaded data and print summary."""
@@ -460,6 +476,10 @@ class ExperimentAnalyzer:
         """Generate resource utilization breakdown plots."""
         epoch_stats = self.extract_epoch_stats()
 
+        if epoch_stats.empty:
+            print("  No successful jobs found — skipping resource breakdown plot.")
+            return
+
         # Format resource names for display
         formatted_resources = [self.format_resource_name(resource) for resource in epoch_stats['Resource']]
 
@@ -555,6 +575,10 @@ class ExperimentAnalyzer:
     def plot_resource_breakdown_with_glidein(self):
         """Generate resource utilization breakdown plots with GLIDEIN resources shown separately."""
         epoch_stats = self.extract_epoch_stats_with_glidein()
+
+        if epoch_stats.empty:
+            print("  No successful jobs found — skipping GLIDEIN resource breakdown plot.")
+            return
 
         # Sort by Total Time for better visualization
         epoch_stats = epoch_stats.sort_values('Total Time (hours)', ascending=False)
@@ -1852,14 +1876,21 @@ class ExperimentAnalyzer:
         gpu_analysis = self.analyze_gpu_utilization()
         transfer_analysis = self.analyze_data_transfer()
 
-        # Calculate total completed epochs for header
-        total_completed_epochs = epoch_stats['Successful Jobs'].sum()
+        has_completions = not epoch_stats.empty
+        total_completed_epochs = epoch_stats['Successful Jobs'].sum() if has_completions else 0
+
+        submit_min = self.df['Submit Time'].dropna().min()
+        submit_max = self.df['Submit Time'].dropna().max()
+        period_str = (
+            f"{submit_min.strftime('%Y-%m-%d %H:%M')} to {submit_max.strftime('%Y-%m-%d %H:%M')}"
+            if pd.notna(submit_min) else "unknown"
+        )
 
         report_lines = [
             "EXPERIMENT ANALYSIS SUMMARY REPORT",
             "=" * 50,
             "",
-            f"Analysis Period: {self.df['Submit Time'].min().strftime('%Y-%m-%d')} to {self.df['Submit Time'].max().strftime('%Y-%m-%d')}",
+            f"Analysis Period: {period_str}",
             f"Total Job Attempts: {len(self.df):,}",
             f"Unique Jobs: {self.df['Job Name'].nunique():,}",
             f"Total Completed Epochs: {total_completed_epochs:,}",
@@ -1868,28 +1899,32 @@ class ExperimentAnalyzer:
             "-" * 20,
         ]
 
-        for _, row in epoch_stats.iterrows():
-            report_lines.extend([
-                f"{row['Resource'].upper()}:",
-                f"  • Successful Jobs: {row['Successful Jobs']:,} ({row['Success Rate']:.1%})",
-                f"  • Computation Time: {row['Total Time (hours)']:,.1f} hours",
-                f"  • Time Efficiency: {row['Time Efficiency']:.1%}",
-                ""
-            ])
+        if not has_completions:
+            report_lines.append("  (no successful jobs in this period)")
+            report_lines.append("")
+        else:
+            for _, row in epoch_stats.iterrows():
+                report_lines.extend([
+                    f"{row['Resource'].upper()}:",
+                    f"  • Successful Jobs: {row['Successful Jobs']:,} ({row['Success Rate']:.1%})",
+                    f"  • Computation Time: {row['Total Time (hours)']:,.1f} hours",
+                    f"  • Time Efficiency: {row['Time Efficiency']:.1%}",
+                    ""
+                ])
 
         # Overall statistics
-        total_jobs = epoch_stats['Total Jobs'].sum()
-        total_time = epoch_stats['Total Time (hours)'].sum()
-        total_successful_time = epoch_stats['Successful Time (hours)'].sum()
-
-        report_lines.extend([
-            "OVERALL METRICS:",
-            "-" * 15,
-            f"Total Success Rate: {total_completed_epochs/total_jobs:.1%}",
-            f"Total Computation Time: {total_time:,.1f} hours",
-            f"Overall Time Efficiency: {total_successful_time/total_time:.1%}",
-            "",
-        ])
+        if has_completions:
+            total_jobs = epoch_stats['Total Jobs'].sum()
+            total_time = epoch_stats['Total Time (hours)'].sum()
+            total_successful_time = epoch_stats['Successful Time (hours)'].sum()
+            report_lines.extend([
+                "OVERALL METRICS:",
+                "-" * 15,
+                f"Total Success Rate: {total_completed_epochs/total_jobs:.1%}",
+                f"Total Computation Time: {total_time:,.1f} hours",
+                f"Overall Time Efficiency: {total_successful_time/total_time:.1%}",
+                "",
+            ])
 
         # GPU analysis
         if not gpu_analysis['efficiency'].empty:
@@ -2042,6 +2077,8 @@ Examples:
                        help="Output directory for reports (default: reports)")
     parser.add_argument("--month", type=int, choices=range(1, 13), metavar="1-12",
                        help="Generate monthly reports for specific month (1-12, e.g., 10 for October)")
+    parser.add_argument("--hours", type=int, metavar="N",
+                       help="Restrict analysis to jobs active in the last N hours (e.g., 24)")
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Enable verbose output")
 
@@ -2049,7 +2086,7 @@ Examples:
 
     try:
         # Create analyzer and generate reports
-        analyzer = ExperimentAnalyzer(args.input_file, args.output_dir)
+        analyzer = ExperimentAnalyzer(args.input_file, args.output_dir, hours=args.hours)
         analyzer.generate_all_reports(monthly_report_month=args.month)
 
     except FileNotFoundError as e:

@@ -37,6 +37,14 @@ generate-report-dated:
 # Complete workflow: generate CSV from all sources and dated report
 full-report: generate-csv-with-aws generate-report-dated
 
+# Summarize the last 24 hours of job activity across all DAG sources
+daily-summary: generate-csv-with-aws
+    uv run experiment_report.py full.csv --hours 24 --output-dir daily_summary
+
+# Summarize the last N hours of job activity (e.g. just recent-summary 48)
+recent-summary hours: generate-csv-with-aws
+    uv run experiment_report.py full.csv --hours {{ hours }} --output-dir recent_{{ hours }}h_summary
+
 # Monthly report (set MONTH env var, e.g., MONTH=10 just monthly-report)
 monthly-report month="${MONTH:-11}":
     uv run post_experiment_csv.py \
