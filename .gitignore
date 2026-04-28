@@ -1,16 +1,14 @@
+# Generated / user-local config
 resources.yaml
+config.yaml
+
+# HTCondor job files
 *.request
-__pycache__/
-data/EventLog*
-data/gel_timestamp.txt
-data/logs/
-output/
 *.err
 *.out
-reports/
+EventLog*
 
-# DAGs, logs, etc
-*.dag
+# DAG runtime files
 *.dag.status
 *.dag.log
 *.dag.err
@@ -19,29 +17,49 @@ reports/
 *.dag.lock
 *.dag.metrics
 *.dag.condor.sub
-
-pproc/logs
-*.log
-
-EventLog*
-*.h5
-*.csvcp
 pipeline.dag*
 nodes.dag.status
-resources.yaml
-config.yaml
 *baseline.dag
 
-# Logs
+# Logs and data artifacts
+*.log
 logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-dev-debug.log
+*.h5
+*.csvcp
+*.csv
+pproc/logs
+data/EventLog*
+data/gel_timestamp.txt
+data/logs/
+
+# Report and experiment output
+archive/
+output/
+reports/
+*reports/
+*path_monthly
+20??-*/
+recent_*/
+big_run/
+combined/
+little_run/
+evals/
+
+# Generated lookup files
+slow_transfers
+global_checkpoint_files
+csv_resources.txt
+
+# HTCondor cluster output directories (8-digit cluster IDs)
+[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]/
+
 # Dependency directories
 node_modules/
+__pycache__/
+
 # Environment variables
 .env
+
 # Editor directories and files
 .idea
 .vscode
@@ -50,16 +68,12 @@ node_modules/
 *.njsproj
 *.sln
 *.sw?
+
 # OS specific
 .DS_Store
 
-# Task files
+# Task / local tooling
 .cursor
 .cursorrules
 CLAUDE.md
-# tasks.json
-# tasks/
 progress/
-2025-*
-*path_monthly
-*reports/
