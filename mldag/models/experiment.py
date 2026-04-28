@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from typing import Optional
 import random
 import yaml
-from TrainingRun import TrainingRun
-from Resource import Resource
+from mldag.models.training_run import TrainingRun
+from mldag.models.resource import Resource
 
 def read_from_config(config: str = "Experiment.yaml") -> None:
     """

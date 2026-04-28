@@ -3,7 +3,7 @@ import time
 import htcondor2 as htcondor
 import typer
 from typing_extensions import Annotated
-from Resource import get_resource_names, get_resource_from_yaml
+from mldag.models.resource import get_resource_names, get_resource_from_yaml
 from htcondor_cli.annex import Create, Add
 from htcondor_cli.annex_create import annex_name_exists
 from htcondor_cli.cli import get_logger

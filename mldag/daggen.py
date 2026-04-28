@@ -8,9 +8,9 @@ import htcondor
 import random
 from pydantic import BaseModel
 import yaml
-from Resource import Resource, ResourceType, get_resources_from_yaml
-from TrainingRun import TrainingRun
-from Experiment import Experiment, read_from_config
+from mldag.models.resource import Resource, ResourceType, get_resources_from_yaml
+from mldag.models.training_run import TrainingRun
+from mldag.models.experiment import Experiment, read_from_config
 
 EVAL=False
 

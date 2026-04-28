@@ -6,7 +6,7 @@ Uses the existing DAGStatusMonitor to generate a status report.
 
 import sys
 from pathlib import Path
-from dagman_monitor import DAGStatusMonitor
+from mldag.monitor.dagman import DAGStatusMonitor
 
 def generate_status_report(dag_file: str, verbose: bool = False):
     """Generate a one-time status report for a DAG"""
@@ -42,7 +42,7 @@ def generate_status_report(dag_file: str, verbose: bool = False):
     # Fix the regex patterns for the actual log format
     import re
     from datetime import datetime
-    from dagman_monitor import JobStatus
+    from mldag.monitor.dagman import JobStatus
     
     # Updated patterns for this log format
     patterns = {
@@ -129,7 +129,7 @@ def generate_status_report(dag_file: str, verbose: bool = False):
                         job_name = cluster_to_dagnode.get(cluster_id, f'cluster_{cluster_id}')
                         
                         if job_name not in jobs:
-                            from dagman_monitor import JobInfo
+                            from mldag.monitor.dagman import JobInfo
                             
                             # Parse job variables to get metadata if we have a DAG node name
                             if job_name != f'cluster_{cluster_id}':

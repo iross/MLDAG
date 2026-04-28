@@ -33,7 +33,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
-from query import ES_HOST, ES_USER, ES_PASS, ES_INDEX, get_query
+from mldag.query import ES_HOST, ES_USER, ES_PASS, ES_INDEX, get_query
 
 
 def parse_timestamp(ts_str):

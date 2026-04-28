@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 import random
 import uuid
-from Resource import Resource
+from mldag.models.resource import Resource
 
 class TrainingRun(BaseModel):
     resources: Optional[list[Resource]] = []
