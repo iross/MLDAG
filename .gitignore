@@ -71,6 +71,7 @@ __pycache__/
 
 # OS specific
 .DS_Store
+*.docx
 
 # Task / local tooling
 .cursor
