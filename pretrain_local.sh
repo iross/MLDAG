@@ -16,24 +16,18 @@ export PROVENANCE_RUN_ID="$run_uuid"
 
 _provenance_capture_and_emit() {
     python3 - <<'PYEOF'
-import json, os, re, subprocess, sys
+import json, os, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
+import torch
 
 def run(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True)
     return r.stdout.strip() if r.returncode == 0 else ""
 
-smi = run(["nvidia-smi"])
-if not smi:
-    print("ERROR: nvidia-smi not available or failed", file=sys.stderr)
-    sys.exit(1)
-
-gpu_name_raw = run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"])
-gpu_model = gpu_name_raw.split("\n")[0].strip() if gpu_name_raw else "unknown"
-gpu_count = len([l for l in gpu_name_raw.split("\n") if l.strip()])
-cuda_m = re.search(r"CUDA Version:\s+([\d.]+)", smi)
-cuda = cuda_m.group(1) if cuda_m else "unknown"
+gpu_count = torch.cuda.device_count()
+gpu_model = torch.cuda.get_device_name(0) if gpu_count > 0 else "none"
+cuda = torch.version.cuda or "unknown"
 hostname = run(["hostname", "-f"]) or run(["hostname"]) or "unknown"
 python_ver = run([sys.executable, "--version"]).replace("Python ", "")
 commit = run(["git", "rev-parse", "--short", "HEAD"]) or "unknown"
@@ -62,7 +56,7 @@ event = {
     "run_id": run_id,
     "ts": datetime.now(timezone.utc).isoformat(),
     "source": "execute_node",
-    "site_info_source": "nvidia_smi",
+    "site_info_source": "torch_cuda",
     **site_info,
     **env_info,
 }
