@@ -41,6 +41,88 @@ Structured events (NDJSON, one per lifecycle boundary) and checkpoint sidecars (
 - What were the actual GPU hours consumed by a run, accounting for evictions? (sum `wall_time_s` from `job.completed` events, not job durations)
 
 The implementation is deliberately zero-infrastructure: NDJSON files live next to DAG output, sidecars live next to checkpoints. No collector service, no database, no credentials. The event log is greppable and DuckDB-queryable immediately. If query volume later warrants a database, the migration is trivial — the schema is stable and versioned from day one.
+
+---
+
+### Where metadata is created and where it goes
+
+Two concerns: what is written, and where. The answer to "are we slogging JSON files all over the place" is no — there are exactly two output locations per run.
+
+#### When each piece is emitted
+
+```
+Access Point                    Execute Node                    Access Point
+(DAG generation)                (inside pretrain.sh)            (SCRIPT POST)
+      |                                |                               |
+      |                                |                               |
+  job.submitted                   [job starts]                  [job exits]
+  ─────────────               site_info.json written          reads job ClassAd
+  written to:                  job.assigned emitted            job.completed or
+  run_id.ndjson                ─────────────────────           job.failed emitted
+                               written to:                     ─────────────────
+                               run_id.ndjson                   written to:
+                                                               run_id.ndjson
+                                    │
+                               [each epoch]
+                               epoch.started emitted
+                               ... training ...
+                               checkpoint saved
+                               epoch.completed emitted
+                               .provenance.json written
+                               ──────────────────────────
+                               events  → run_id.ndjson
+                               sidecar → alongside .ckpt
+```
+
+#### Where the files land
+
+```
+shared_filesystem/
+│
+├── provenance/
+│   └── a3f9cc12.ndjson        ← ONE file per run, all events append here
+│                                 ~2 KB per epoch; a 30-epoch run ≈ 60 KB total
+│
+└── training_logs/
+    └── a3f9cc12/
+        └── checkpoints/
+            ├── epoch=0-step=500-val_loss=0.52.ckpt
+            ├── epoch=0-step=500-val_loss=0.52.ckpt.provenance.json  ← sidecar
+            ├── epoch=1-step=1000-val_loss=0.48.ckpt
+            ├── epoch=1-step=1000-val_loss=0.48.ckpt.provenance.json ← sidecar
+            └── ...
+```
+
+**New files per run: 1 NDJSON + 1 sidecar per checkpoint.** The sidecars live exactly where the checkpoints already live. The NDJSON lives in one central `provenance/` directory. Nothing appears in unexpected places; nothing is written to the execute node's local disk after the job exits.
+
+#### What each file contains
+
+The NDJSON is a stream of lifecycle events — one line each, all for the same run:
+
+```jsonc
+{"schema_version":"1.0","type":"job.submitted","run_id":"a3f9cc12","ts":"...","hyperparams_hash":"cc39f1","code_commit":"f4a88bc"}
+{"schema_version":"1.0","type":"job.assigned","run_id":"a3f9cc12","ts":"...","site":"chtc-gpu04","hostname":"gpu04.chtc.wisc.edu","gpu":"NVIDIA H200","cuda":"12.2"}
+{"schema_version":"1.0","type":"epoch.started","run_id":"a3f9cc12","ts":"...","epoch":0,"checkpoint_in_hash":null}
+{"schema_version":"1.0","type":"epoch.completed","run_id":"a3f9cc12","ts":"...","epoch":0,"checkpoint_out_hash":"sha256:8bc1f3","loss":0.52,"duration_s":31240}
+{"schema_version":"1.0","type":"job.completed","run_id":"a3f9cc12","ts":"...","wall_time_s":31580,"cpu_usage":3.8,"gpu_usage":0.94,"peak_memory_mb":38400}
+```
+
+The sidecar is a self-contained record that makes the checkpoint file auditable in isolation:
+
+```jsonc
+{
+  "schema_version": "1.0",
+  "checkpoint_hash": "sha256:8bc1f3...",
+  "parent_hash": null,
+  "run_id": "a3f9cc12",
+  "epoch": 0,
+  "produced_at": {"site": "chtc-gpu04", "hostname": "gpu04.chtc.wisc.edu", "ts": "..."},
+  "environment": {"python": "3.11.4", "cuda": "12.2", "framework_version": "2.3.0", "code_commit": "f4a88bc"},
+  "training": {"loss": 0.52, "epoch_duration_s": 31240}
+}
+```
+
+The `parent_hash` field chains sidecars together across epochs and sites. Walking it backward from any checkpoint reconstructs the full training lineage without consulting the NDJSON log or any other system.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
