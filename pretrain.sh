@@ -68,6 +68,10 @@ event = {
 log_path = log_dir / f"{run_id}.ndjson"
 with open(log_path, "a") as f:
     f.write(json.dumps(event, separators=(",", ":")) + "\n")
+
+cluster_id = os.environ.get("CONDOR_CLUSTERID", "")
+if cluster_id:
+    (log_dir / f"{cluster_id}.run_id").write_text(run_id)
 PYEOF
 }
 

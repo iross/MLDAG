@@ -66,7 +66,15 @@ def _parse_event_line(line: str) -> tuple[str, int, datetime] | None:
 
 
 def _resolve_run_id(cluster_id: int, log_dir: Path) -> tuple[str, dict]:
-    """Return (run_id, resource_fields) from the cluster's ClassAd, if available."""
+    """Return (run_id, resource_fields) from the cluster's ClassAd, if available.
+
+    Checks for a lightweight .run_id marker written by the job at start (available
+    during hold/release before the ClassAd is written on job exit), then falls back
+    to the ClassAd, then to "unknown:<cluster_id>".
+    """
+    run_id_path = log_dir / f"{cluster_id}.run_id"
+    if run_id_path.exists():
+        return run_id_path.read_text().strip(), {}
     ad_path = log_dir / f"{cluster_id}.ad"
     ad = parse_classad(ad_path)
     run_id = run_id_from_classad(ad) if ad else f"unknown:{cluster_id}"

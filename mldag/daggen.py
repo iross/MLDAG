@@ -81,7 +81,7 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
     # available in SCRIPT args, so run_uuid and epoch are embedded here.
     python = sys.executable
     pre_args = f'{job.run_uuid} {job.name} {job.epoch}'
-    if resource.resource_type == ResourceType.ANNEX:
+    if resource.resource_type == ResourceType.ANNEX and resource.annex:
         # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
         # DAGMan allows only one SCRIPT PRE per node.
         pre_args += f' --annex {resource.name}'
@@ -122,7 +122,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
         inner_txt = inner_txt.strip().rstrip("queue")
     if resource.resource_type == ResourceType.OSPOOL:
         inner_txt += f'TARGET.GLIDEIN_ResourceName == "{resource.name}"\n'
-    elif resource.resource_type == ResourceType.ANNEX:
+    elif resource.resource_type == ResourceType.ANNEX and resource.annex:
         inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex"\n'
     env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)"]
     if "wandb" in config:

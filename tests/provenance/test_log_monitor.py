@@ -134,6 +134,39 @@ def test_monitor_once_no_classad_uses_unknown_run_id(tmp_path):
     assert events[0]["type"] == "job.held"
 
 
+def test_monitor_once_run_id_marker_resolves_hold_without_classad(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    # Marker written by job at start — no ClassAd present (job not yet exited)
+    (ad_dir / "77.run_id").write_text("run-held")
+    log = tmp_path / "metl.log"
+    _write_log(log, "012 (77.000.000) 2026-04-01 11:00:00 Job was held.\n")
+
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    events = _read_events(prov_dir, "run-held")
+    assert len(events) == 1
+    assert events[0]["type"] == "job.held"
+    assert events[0]["run_id"] == "run-held"
+
+
+def test_monitor_once_run_id_marker_resolves_release_without_classad(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    (ad_dir / "77.run_id").write_text("run-held")
+    log = tmp_path / "metl.log"
+    _write_log(log, "013 (77.000.000) 2026-04-01 11:05:00 Job was released.\n")
+
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    events = _read_events(prov_dir, "run-held")
+    assert len(events) == 1
+    assert events[0]["type"] == "job.released"
+    assert events[0]["run_id"] == "run-held"
+
+
 def test_monitor_once_returns_new_byte_offset(tmp_path):
     ad_dir = tmp_path / "ads"
     ad_dir.mkdir()
