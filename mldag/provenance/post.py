@@ -54,6 +54,7 @@ def resource_fields_from_classad(ad: dict) -> dict:
         "CPUsUsage": "cpu_usage",
         "MemoryUsage": "peak_memory_mb",
         "GPUsUsage": "gpu_usage",
+        "GLIDEIN_ResourceName": "resource_name",
     }
     return {schema_key: ad[ad_key] for ad_key, schema_key in mapping.items() if ad_key in ad}
 

@@ -28,6 +28,7 @@ SAMPLE_AD = {
     "CPUsUsage": 0.98,
     "MemoryUsage": 4096,
     "GPUsUsage": 0.87,
+    "GLIDEIN_ResourceName": "CHTC-Spark-CE1",
     "Environment": "PROVENANCE_RUN_ID=run-abc123 OTHER=val",
 }
 
@@ -93,6 +94,7 @@ def test_resource_fields_all_present(tmp_path):
     assert abs(fields["cpu_usage"] - 0.98) < 1e-9
     assert fields["peak_memory_mb"] == 4096
     assert abs(fields["gpu_usage"] - 0.87) < 1e-9
+    assert fields["resource_name"] == "CHTC-Spark-CE1"
 
 
 def test_resource_fields_no_gpu(tmp_path):
@@ -101,6 +103,13 @@ def test_resource_fields_no_gpu(tmp_path):
     fields = resource_fields_from_classad(parse_classad(tmp_path / "12345.ad"))
     assert "gpu_usage" not in fields
     assert "wall_time_s" in fields
+
+
+def test_resource_fields_no_glidein(tmp_path):
+    ad = {k: v for k, v in SAMPLE_AD.items() if k != "GLIDEIN_ResourceName"}
+    _write_ad(tmp_path, ad)
+    fields = resource_fields_from_classad(parse_classad(tmp_path / "12345.ad"))
+    assert "resource_name" not in fields
 
 
 def test_resource_fields_empty_ad():

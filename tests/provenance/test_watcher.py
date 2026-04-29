@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mldag.provenance.watcher import _load_site_info, _sorted_by_mtime, watch_and_emit
+from mldag.provenance.watcher import _load_site_info, _parse_val_loss, _sorted_by_mtime, watch_and_emit
 
 
 def _make_ckpt(path: Path, content: bytes = b"weights") -> Path:
@@ -171,6 +171,45 @@ def test_watch_and_emit_no_checkpoints_exits_immediately(tmp_path):
     # Should exit immediately with idle_timeout=0 and no files
     watch_and_emit(tmp_path, "run-1", poll_interval=0, idle_timeout=0, log_dir=log_dir)
     assert not (log_dir / "run-1.ndjson").exists()
+
+
+# --- _parse_val_loss ---
+
+
+def test_parse_val_loss_lightning_filename(tmp_path):
+    p = tmp_path / "epoch=4-step=102968-val_loss=0.3421.ckpt"
+    p.write_bytes(b"")
+    assert abs(_parse_val_loss(p) - 0.3421) < 1e-9
+
+
+def test_parse_val_loss_scientific_notation(tmp_path):
+    p = tmp_path / "epoch=0-step=1000-val_loss=1.2e-3.ckpt"
+    p.write_bytes(b"")
+    assert abs(_parse_val_loss(p) - 0.0012) < 1e-9
+
+
+def test_parse_val_loss_no_match_returns_none(tmp_path):
+    p = tmp_path / "checkpoint_epoch_5.ckpt"
+    p.write_bytes(b"")
+    assert _parse_val_loss(p) is None
+
+
+def test_watch_and_emit_includes_val_loss_when_present(tmp_path):
+    log_dir = tmp_path / "provenance"
+    _make_ckpt(tmp_path / "epoch=0-step=1000-val_loss=0.42.ckpt")
+    watch_and_emit(tmp_path, "run-1", pattern="*.ckpt", poll_interval=0, idle_timeout=0, log_dir=log_dir)
+    events = _read_events(log_dir, "run-1")
+    completed = next(e for e in events if e["type"] == "epoch.completed")
+    assert abs(completed["val_loss"] - 0.42) < 1e-9
+
+
+def test_watch_and_emit_no_val_loss_when_filename_plain(tmp_path):
+    log_dir = tmp_path / "provenance"
+    _make_ckpt(tmp_path / "epoch0.ckpt")
+    watch_and_emit(tmp_path, "run-1", poll_interval=0, idle_timeout=0, log_dir=log_dir)
+    events = _read_events(log_dir, "run-1")
+    completed = next(e for e in events if e["type"] == "epoch.completed")
+    assert "val_loss" not in completed
 
 
 def test_watch_and_emit_two_checkpoints_two_completed_events(tmp_path):

@@ -14,13 +14,14 @@ Usage:
     python3 -m mldag.provenance.watcher <watch_dir> <run_id> \\
         [--pattern "*.ckpt"] [--poll-interval 10] [--idle-timeout 3600]
 
-Loss is not captured here because it requires access to training internals.
-To include loss, call emit_event("epoch.completed", ..., loss=...) directly
-from the training script instead.
+val_loss is parsed from the checkpoint filename when it follows the PyTorch
+Lightning convention: epoch=N-step=M-val_loss=V.ckpt.  Runs that use a
+different naming scheme will produce epoch.completed events without val_loss.
 """
 
 import json
 import os
+import re
 import signal
 import sys
 import time
@@ -53,6 +54,16 @@ def _load_site_info(watch_dir: Path) -> tuple[dict, dict]:
     site_info = {k: v for k, v in data.items() if k in site_keys}
     env_info = {k: v for k, v in data.items() if k not in site_keys}
     return site_info, env_info
+
+
+def _parse_val_loss(checkpoint_path: Path) -> float | None:
+    """Extract val_loss from a Lightning-style checkpoint filename.
+
+    Matches the pattern: epoch=N-step=M-val_loss=V[.anything].ckpt
+    Returns None if the filename does not contain a val_loss field.
+    """
+    m = re.search(r"val_loss=(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)", checkpoint_path.name)
+    return float(m.group(1)) if m else None
 
 
 def _sorted_by_mtime(paths: list[Path]) -> list[Path]:
@@ -115,14 +126,11 @@ def watch_and_emit(
             )
 
             duration_s = round(time.time() - epoch_start, 3)
-            emit_event(
-                "epoch.completed",
-                run_id,
-                log_dir=log_dir,
-                epoch=epoch_index,
-                checkpoint_out_hash=new_hash,
-                duration_s=duration_s,
-            )
+            completed_fields: dict = {"checkpoint_out_hash": new_hash, "duration_s": duration_s}
+            val_loss = _parse_val_loss(ckpt_path)
+            if val_loss is not None:
+                completed_fields["val_loss"] = val_loss
+            emit_event("epoch.completed", run_id, log_dir=log_dir, epoch=epoch_index, **completed_fields)
 
             parent_hash = new_hash
             epoch_index += 1

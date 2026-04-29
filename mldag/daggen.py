@@ -86,15 +86,23 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
     script_txt += f'SCRIPT POST {job.name} provenance_post.sh $JOB $RETURN $JOBID\n'
     return script_txt
 
-def get_service() -> str:
-    service_txt = textwrap.dedent("""\
-    SUBMIT-DESCRIPTION annex_helper.sub {
+def get_service(python_exe: str = "python3") -> str:
+    service_txt = textwrap.dedent(f"""\
+    SUBMIT-DESCRIPTION annex_helper.sub {{
         universe = local
         executable = /home/ian.ross/MLDAG/.venv/bin/python
         arguments = annex_helper.py watch --interval 60
         queue
-    }
+    }}
     SERVICE annex_helper annex_helper.sub
+
+    SUBMIT-DESCRIPTION provenance_monitor.sub {{
+        universe = local
+        executable = {python_exe}
+        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir output/provenance
+        queue
+    }}
+    SERVICE provenance_monitor provenance_monitor.sub
     """)
     return service_txt
 

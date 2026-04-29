@@ -22,6 +22,8 @@ VALID_EVENT_TYPES: frozenset[str] = frozenset({
     "epoch.started",
     "epoch.completed",
     "job.migrated",
+    "job.held",
+    "job.released",
     "job.failed",
     "job.completed",
 })
