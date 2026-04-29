@@ -3,10 +3,16 @@
 Tails the HTCondor event log (default: metl.log) and emits provenance events
 for job lifecycle transitions the SCRIPT PRE/POST pair cannot see:
 
-  001  Executing → job.executing  (job started on execute node)
-  004  Evicted   → job.migrated   (job left the execute node; will retry)
-  012  Held      → job.held       (job put on hold by HTCondor)
-  013  Released  → job.released   (job released from hold)
+  001  Executing                  → job.executing
+  004  Evicted                    → job.migrated
+  009  Aborted                    → job.aborted
+  012  Held                       → job.held
+  013  Released                   → job.released
+  023  Reconnected                → job.reconnected
+  027  Started transferring input → transfer.input.started
+  028  Done transferring input    → transfer.input.completed
+  040  Started transferring output→ transfer.output.started
+  041  Done transferring output   → transfer.output.completed
 
 Run this as a DAGMan SERVICE so it stays alive for the life of the DAG:
 
@@ -42,13 +48,19 @@ _ANY_HEADER_RE = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\)")
 _DAGNODE_RE = re.compile(r"DAG Node:\s+(\S+)")
 
 # Codes that emit provenance events
-_CODES = {"001", "004", "012", "013"}
+_CODES = {"001", "004", "009", "012", "013", "023", "027", "028", "040", "041"}
 
 _CODE_TO_EVENT = {
     "001": "job.executing",
     "004": "job.migrated",
+    "009": "job.aborted",
     "012": "job.held",
     "013": "job.released",
+    "023": "job.reconnected",
+    "027": "transfer.input.started",
+    "028": "transfer.input.completed",
+    "040": "transfer.output.started",
+    "041": "transfer.output.completed",
 }
 
 

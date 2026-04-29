@@ -81,6 +81,48 @@ def test_parse_event_line_hold_legacy_ts():
     assert result[1] == 42
 
 
+def test_parse_event_line_aborted_new_ts():
+    line = "009 (12345.000.000) 2026-04-01 10:00:00 Job was aborted."
+    result = _parse_event_line(line)
+    assert result is not None
+    assert result[0] == "009"
+
+
+def test_parse_event_line_reconnected_new_ts():
+    line = "023 (12345.000.000) 2026-04-01 10:00:00 Job reconnected to slot1_1@node."
+    result = _parse_event_line(line)
+    assert result is not None
+    assert result[0] == "023"
+
+
+def test_parse_event_line_transfer_input_started():
+    line = "027 (12345.000.000) 2026-04-01 10:00:00 Started transferring input files."
+    result = _parse_event_line(line)
+    assert result is not None
+    assert result[0] == "027"
+
+
+def test_parse_event_line_transfer_input_completed():
+    line = "028 (12345.000.000) 2026-04-01 10:01:00 Finished transferring input files."
+    result = _parse_event_line(line)
+    assert result is not None
+    assert result[0] == "028"
+
+
+def test_parse_event_line_transfer_output_started():
+    line = "040 (12345.000.000) 2026-04-01 11:00:00 Started transferring output files."
+    result = _parse_event_line(line)
+    assert result is not None
+    assert result[0] == "040"
+
+
+def test_parse_event_line_transfer_output_completed():
+    line = "041 (12345.000.000) 2026-04-01 11:05:00 Finished transferring output files."
+    result = _parse_event_line(line)
+    assert result is not None
+    assert result[0] == "041"
+
+
 def test_parse_event_line_submit_returns_none():
     line = "000 (12345.000.000) 2026-04-01 09:00:00 Job submitted from host."
     assert _parse_event_line(line) is None
@@ -176,6 +218,32 @@ def test_monitor_once_dag_node_across_poll_boundary(tmp_path):
 
 
 # --- monitor_once: event emission ---
+
+
+def test_monitor_once_transfer_events_emitted(tmp_path):
+    ad_dir = tmp_path / "ads"
+    prov_dir = tmp_path / "provenance"
+    _write_ad(ad_dir, 12345, "run-abc")
+    log = tmp_path / "metl.log"
+    _write_log(log,
+        "027 (12345.000.000) 2026-04-29 10:00:00 Started transferring input files.\n"
+        "028 (12345.000.000) 2026-04-29 10:01:00 Finished transferring input files.\n"
+        "040 (12345.000.000) 2026-04-29 11:00:00 Started transferring output files.\n"
+        "041 (12345.000.000) 2026-04-29 11:05:00 Finished transferring output files.\n"
+    )
+
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    events = _read_events(prov_dir, "run-abc")
+    types = [e["type"] for e in events]
+    assert types == [
+        "transfer.input.started",
+        "transfer.input.completed",
+        "transfer.output.started",
+        "transfer.output.completed",
+    ]
+    assert all(e["run_id"] == "run-abc" for e in events)
+    assert all(e["source"] == "htcondor_event_log" for e in events)
 
 
 def test_monitor_once_executing_emits_job_executing(tmp_path):
