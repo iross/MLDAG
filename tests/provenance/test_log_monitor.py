@@ -179,6 +179,68 @@ def test_monitor_once_event_000_then_executing_resolves_run_id(tmp_path):
     assert executing["cluster_id"] == 5055662
 
 
+def test_monitor_once_pending_lookup_resolved_on_next_poll(tmp_path):
+    """DAG Node seen but NDJSON not yet written → stored, resolved on next poll."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    log = tmp_path / "metl.log"
+
+    _write_log(log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        "    DAG Node: run0-train_epoch0\n"
+        "...\n"
+    )
+    cache: dict = {}
+    state: dict = {"cluster_id": None}
+    pending: dict = {}
+    offset = monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir,
+                          run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+
+    assert cache.get(5055662) is None
+    assert pending.get(5055662) == "run0-train_epoch0"
+
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+
+    monitor_once(log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir,
+                 run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+
+    assert cache.get(5055662) == "run-abc"
+    assert 5055662 not in pending
+
+
+def test_monitor_once_pending_resolved_before_executing_event(tmp_path):
+    """Executing event in second poll uses run_id resolved from pending_lookups."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    log = tmp_path / "metl.log"
+
+    _write_log(log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        "    DAG Node: run0-train_epoch0\n"
+        "...\n"
+    )
+    cache: dict = {}
+    state: dict = {"cluster_id": None}
+    pending: dict = {}
+    offset = monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir,
+                          run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    with open(log, "a") as f:
+        f.write("001 (5055662.000.000) 2026-04-29 10:05:00 Job executing on host: <10.0.0.1:1234>\n...\n")
+
+    monitor_once(log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir,
+                 run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+
+    events = _read_events(prov_dir, "run-abc")
+    executing = [e for e in events if e["type"] == "job.executing"]
+    assert len(executing) == 1
+    assert executing[0]["run_id"] == "run-abc"
+    assert executing[0]["cluster_id"] == 5055662
+
+
 def test_monitor_once_dag_node_across_poll_boundary(tmp_path):
     ad_dir = tmp_path / "ads"
     ad_dir.mkdir()

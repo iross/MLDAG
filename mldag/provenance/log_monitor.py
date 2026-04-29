@@ -160,17 +160,29 @@ def monitor_once(
     provenance_log_dir: Path,
     run_id_cache: dict[int, str] | None = None,
     multiline_state: dict | None = None,
+    pending_lookups: dict[int, str] | None = None,
 ) -> int:
     """Process any new lines in log_path, emit events, return new byte offset.
 
     multiline_state is a dict that persists across calls to track partial
     event 000 blocks (the "DAG Node:" body line may arrive in a later poll).
-    Pass the same dict on every call from watch_log.
+    pending_lookups maps cluster_id → job_name for DAG Node entries whose
+    NDJSON job.submitted record wasn't visible yet; retried on every call.
+    Pass the same dicts on every call from watch_log.
     """
     if run_id_cache is None:
         run_id_cache = {}
     if multiline_state is None:
         multiline_state = {"cluster_id": None}
+    if pending_lookups is None:
+        pending_lookups = {}
+
+    # Retry any cluster_id → job_name mappings that weren't resolved last poll.
+    for cluster_id, job_name in list(pending_lookups.items()):
+        run_id = _job_name_to_run_id(job_name, provenance_log_dir)
+        if run_id:
+            run_id_cache[cluster_id] = run_id
+            del pending_lookups[cluster_id]
 
     lines, new_offset = _scan_new_lines(log_path, byte_offset)
     for line in lines:
@@ -189,9 +201,12 @@ def monitor_once(
         if dn_m and multiline_state.get("cluster_id") is not None:
             cluster_id = multiline_state["cluster_id"]
             if cluster_id not in run_id_cache:
-                run_id = _job_name_to_run_id(dn_m.group(1), provenance_log_dir)
+                job_name = dn_m.group(1)
+                run_id = _job_name_to_run_id(job_name, provenance_log_dir)
                 if run_id:
                     run_id_cache[cluster_id] = run_id
+                else:
+                    pending_lookups[cluster_id] = job_name
             multiline_state["cluster_id"] = None
 
         # Emit provenance events for tracked codes
@@ -234,6 +249,7 @@ def watch_log(
     byte_offset = 0
     run_id_cache: dict[int, str] = {}
     multiline_state: dict = {"cluster_id": None}
+    pending_lookups: dict[int, str] = {}
 
     while True:
         byte_offset = monitor_once(
@@ -243,6 +259,7 @@ def watch_log(
             provenance_log_dir=provenance_log_dir,
             run_id_cache=run_id_cache,
             multiline_state=multiline_state,
+            pending_lookups=pending_lookups,
         )
         time.sleep(poll_interval)
 
