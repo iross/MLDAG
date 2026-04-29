@@ -89,20 +89,13 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
     script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post $JOB $RETURN $JOBID\n'
     return script_txt
 
-def get_service(python_exe: str = "python3") -> str:
+def get_service(python_exe: str = "python3", dag_name: str = "") -> str:
+    dagman_log_arg = f" --dagman-log {dag_name}.dagman.out" if dag_name else ""
     service_txt = textwrap.dedent(f"""\
-    SUBMIT-DESCRIPTION annex_helper.sub {{
-        universe = local
-        executable = /home/ian.ross/MLDAG/.venv/bin/python
-        arguments = annex_helper.py watch --interval 60
-        queue
-    }}
-    SERVICE annex_helper annex_helper.sub
-
     SUBMIT-DESCRIPTION provenance_monitor.sub {{
         universe = local
         executable = {python_exe}
-        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir output/provenance
+        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir output/provenance{dagman_log_arg}
         queue
     }}
     SERVICE provenance_monitor provenance_monitor.sub
@@ -168,6 +161,7 @@ app = typer.Typer()
 def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")] = 'config.yaml'):
     config = yaml.safe_load(open(config, 'r'))
     experiment = read_from_config("Experiment.yaml")
+    ename = experiment.name.replace(' ', '_').lower()
     dag_txt = ''
 
     num_epoch = experiment.vars['epochs']
@@ -182,7 +176,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    dag_txt += textwrap.dedent(get_service())
+    dag_txt += textwrap.dedent(get_service(dag_name=ename + '.dag'))
 
     # Grab the resources, if targeting is desired
     resources = []
@@ -265,7 +259,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     dag_txt += '\nRETRY ALL_NODES 3\n'
     dag_txt += 'NODE_STATUS_FILE nodes.dag.status 30\n'
 
-    ename = experiment.name.replace(' ', '_').lower()
     with open(f'{ename}.dag', 'w') as f:
         f.write(dag_txt)
     print(f'generated {ename}.dag')

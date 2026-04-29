@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from mldag.provenance.log_monitor import _parse_event_line, monitor_once
+from mldag.provenance.log_monitor import (
+    _parse_event_line,
+    _scan_dagman_log,
+    _job_name_to_run_id,
+    monitor_once,
+)
 
 
 # --- helpers ---
@@ -20,6 +25,12 @@ def _write_ad(ad_dir: Path, cluster_id: int, run_id: str) -> None:
         f'GLIDEIN_ResourceName = "Expanse"\n'
         f'RemoteWallClockTime = 3600\n'
     )
+
+
+def _write_ndjson(prov_dir: Path, run_id: str, job_name: str) -> None:
+    prov_dir.mkdir(parents=True, exist_ok=True)
+    event = {"type": "job.submitted", "run_id": run_id, "job_name": job_name}
+    (prov_dir / f"{run_id}.ndjson").write_text(json.dumps(event) + "\n")
 
 
 def _read_events(log_dir: Path, run_id: str) -> list[dict]:
@@ -72,6 +83,75 @@ def test_parse_event_line_irrelevant_code_returns_none():
 
 def test_parse_event_line_non_event_returns_none():
     assert _parse_event_line("    some indented log line") is None
+
+
+# --- _scan_dagman_log ---
+
+
+def test_scan_dagman_log_extracts_job_name_and_cluster_id(tmp_path):
+    dagman_log = tmp_path / "test.dag.dagman.out"
+    dagman_log.write_text(
+        "04/29 10:00:00 Submitting HTCondor Node run0-train_epoch0 job(s)...\n"
+        "04/29 10:00:00  Submitting job(s)....\n"
+        "04/29 10:00:00  1 job(s) submitted to cluster 5055662.\n"
+    )
+    pending: list = [None]
+    pairs, offset = _scan_dagman_log(dagman_log, 0, pending)
+    assert pairs == [("run0-train_epoch0", 5055662)]
+    assert offset == dagman_log.stat().st_size
+
+
+def test_scan_dagman_log_multiple_jobs(tmp_path):
+    dagman_log = tmp_path / "test.dag.dagman.out"
+    dagman_log.write_text(
+        "Submitting HTCondor Node run0-train_epoch0 job(s)...\n"
+        " 1 job(s) submitted to cluster 100.\n"
+        "Submitting HTCondor Node run0-train_epoch1 job(s)...\n"
+        " 1 job(s) submitted to cluster 101.\n"
+    )
+    pending: list = [None]
+    pairs, _ = _scan_dagman_log(dagman_log, 0, pending)
+    assert pairs == [("run0-train_epoch0", 100), ("run0-train_epoch1", 101)]
+
+
+def test_scan_dagman_log_missing_file_returns_empty(tmp_path):
+    pending: list = [None]
+    pairs, offset = _scan_dagman_log(tmp_path / "missing.dagman.out", 0, pending)
+    assert pairs == []
+    assert offset == 0
+
+
+def test_scan_dagman_log_incremental_read(tmp_path):
+    dagman_log = tmp_path / "test.dag.dagman.out"
+    first = "Submitting HTCondor Node run0-train_epoch0 job(s)...\n"
+    dagman_log.write_text(first)
+    pending: list = [None]
+    pairs1, offset1 = _scan_dagman_log(dagman_log, 0, pending)
+    assert pairs1 == []
+    assert pending[0] == "run0-train_epoch0"
+
+    # Append cluster line
+    with open(dagman_log, "a") as f:
+        f.write(" 1 job(s) submitted to cluster 999.\n")
+    pairs2, _ = _scan_dagman_log(dagman_log, offset1, pending)
+    assert pairs2 == [("run0-train_epoch0", 999)]
+
+
+# --- _job_name_to_run_id ---
+
+
+def test_job_name_to_run_id_finds_match(tmp_path):
+    _write_ndjson(tmp_path, "run-abc", "run0-train_epoch0")
+    assert _job_name_to_run_id("run0-train_epoch0", tmp_path) == "run-abc"
+
+
+def test_job_name_to_run_id_returns_none_for_unknown(tmp_path):
+    _write_ndjson(tmp_path, "run-abc", "run0-train_epoch0")
+    assert _job_name_to_run_id("run0-train_epoch99", tmp_path) is None
+
+
+def test_job_name_to_run_id_empty_dir(tmp_path):
+    assert _job_name_to_run_id("run0-train_epoch0", tmp_path) is None
 
 
 # --- monitor_once ---
@@ -134,11 +214,26 @@ def test_monitor_once_no_classad_uses_unknown_run_id(tmp_path):
     assert events[0]["type"] == "job.held"
 
 
+def test_monitor_once_cache_resolves_hold_without_classad(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    log = tmp_path / "metl.log"
+    _write_log(log, "012 (88.000.000) 2026-04-01 11:00:00 Job was held.\n")
+
+    cache = {88: "run-cached"}
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache)
+
+    events = _read_events(prov_dir, "run-cached")
+    assert len(events) == 1
+    assert events[0]["type"] == "job.held"
+    assert events[0]["run_id"] == "run-cached"
+
+
 def test_monitor_once_run_id_marker_resolves_hold_without_classad(tmp_path):
     ad_dir = tmp_path / "ads"
     ad_dir.mkdir()
     prov_dir = tmp_path / "provenance"
-    # Marker written by job at start — no ClassAd present (job not yet exited)
     (ad_dir / "77.run_id").write_text("run-held")
     log = tmp_path / "metl.log"
     _write_log(log, "012 (77.000.000) 2026-04-01 11:00:00 Job was held.\n")
@@ -188,9 +283,7 @@ def test_monitor_once_skips_already_read_bytes(tmp_path):
     second_line = "004 (12345.000.000) 2026-04-01 10:00:00 Job was evicted.\n"
     log.write_text(first_line + second_line)
 
-    # First call reads both lines but only first_line is in initial content
     offset1 = monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
-    # Second call from saved offset should see nothing new (file unchanged)
     offset2 = monitor_once(log, offset1, log_dir=ad_dir, provenance_log_dir=prov_dir)
     assert offset2 == offset1
 
