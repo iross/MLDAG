@@ -30,3 +30,8 @@ mldag-monitor = "mldag.monitor.htcondor:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mldag"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]

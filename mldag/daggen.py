@@ -107,8 +107,10 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
         inner_txt += f'TARGET.GLIDEIN_ResourceName == "{resource.name}"\n'
     elif resource.resource_type == ResourceType.ANNEX:
         inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex"\n'
+    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)"]
     if "wandb" in config:
-        inner_txt += f'environment = "WANDB_API_KEY={config["wandb"]["api_key"]}"\n'
+        env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
+    inner_txt += f'environment = "{" ".join(env_vars)}"\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -129,8 +131,10 @@ def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
     # OSPool resources will use TARGET.GLIDEIN_ResourceName variable instead of hardcoding
     inner_txt += 'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"\n'
 
+    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)"]
     if "wandb" in config:
-        inner_txt += f'environment = "WANDB_API_KEY={config["wandb"]["api_key"]}"\n'
+        env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
+    inner_txt += f'environment = "{" ".join(env_vars)}"\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
