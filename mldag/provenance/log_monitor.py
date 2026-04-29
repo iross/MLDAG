@@ -9,10 +9,10 @@ for job lifecycle transitions the SCRIPT PRE/POST pair cannot see:
   012  Held                       → job.held
   013  Released                   → job.released
   023  Reconnected                → job.reconnected
-  027  Started transferring input → transfer.input.started
-  028  Done transferring input    → transfer.input.completed
-  040  Started transferring output→ transfer.output.started
-  041  Done transferring output   → transfer.output.completed
+  040  Started/Finished transferring input/output files
+       → transfer.input.started / transfer.input.completed
+       → transfer.output.started / transfer.output.completed
+       (HTCondor uses code 040 for all four; direction is parsed from the description)
 
 Run this as a DAGMan SERVICE so it stays alive for the life of the DAG:
 
@@ -48,7 +48,7 @@ _ANY_HEADER_RE = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\)")
 _DAGNODE_RE = re.compile(r"DAG Node:\s+(\S+)")
 
 # Codes that emit provenance events
-_CODES = {"001", "004", "009", "012", "013", "023", "027", "028", "040", "041"}
+_CODES = {"001", "004", "009", "012", "013", "023", "040"}
 
 _CODE_TO_EVENT = {
     "001": "job.executing",
@@ -57,10 +57,16 @@ _CODE_TO_EVENT = {
     "012": "job.held",
     "013": "job.released",
     "023": "job.reconnected",
-    "027": "transfer.input.started",
-    "028": "transfer.input.completed",
-    "040": "transfer.output.started",
-    "041": "transfer.output.completed",
+    # 040 covers all file transfer events; event type is determined from description text
+}
+
+# HTCondor uses code 040 for all file transfer events; direction and phase are in the description
+_TRANSFER_RE = re.compile(r"\b(Started|Finished) transferring (input|output) files", re.IGNORECASE)
+_TRANSFER_EVENT_MAP = {
+    ("started",  "input"):  "transfer.input.started",
+    ("finished", "input"):  "transfer.input.completed",
+    ("started",  "output"): "transfer.output.started",
+    ("finished", "output"): "transfer.output.completed",
 }
 
 
@@ -193,7 +199,13 @@ def monitor_once(
         if parsed is None:
             continue
         code, cluster_id, ts = parsed
-        event_type = _CODE_TO_EVENT[code]
+        if code == "040":
+            tm = _TRANSFER_RE.search(stripped)
+            if tm is None:
+                continue
+            event_type = _TRANSFER_EVENT_MAP[(tm.group(1).lower(), tm.group(2).lower())]
+        else:
+            event_type = _CODE_TO_EVENT[code]
         run_id, resource = _resolve_run_id(cluster_id, log_dir, run_id_cache)
         emit_event(
             event_type,
