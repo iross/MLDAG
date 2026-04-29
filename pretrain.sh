@@ -1,5 +1,6 @@
 #!/bin/bash
-#!/bin/bash
+set -euo pipefail
+
 if [ $# -eq 0 ]
 then
     echo "No arguments supplied. Exiting."
@@ -12,6 +13,69 @@ fi
 
 #echo "Copying global dataset"
 # cp /staging/iaross/processed-global.tar.gz .
+_provenance_capture_and_emit() {
+    python3 - <<'PYEOF'
+import json, os, re, subprocess, sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+def run(cmd):
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+smi = run(["nvidia-smi"])
+if not smi:
+    print("ERROR: nvidia-smi not available or failed", file=sys.stderr)
+    sys.exit(1)
+
+gpu_name_raw = run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"])
+gpu_model = gpu_name_raw.split("\n")[0].strip() if gpu_name_raw else "unknown"
+gpu_count = len([l for l in gpu_name_raw.split("\n") if l.strip()])
+cuda_m = re.search(r"CUDA Version:\s+([\d.]+)", smi)
+cuda = cuda_m.group(1) if cuda_m else "unknown"
+hostname = run(["hostname", "-f"]) or run(["hostname"]) or "unknown"
+python_ver = run([sys.executable, "--version"]).replace("Python ", "")
+commit = run(["git", "rev-parse", "--short", "HEAD"]) or "unknown"
+slot = os.environ.get("_CONDOR_SLOT", "unknown")
+run_id = os.environ.get("PROVENANCE_RUN_ID", "unknown")
+log_dir = Path(os.environ.get("PROVENANCE_LOG_DIR", "output/provenance"))
+
+site_info = {
+    "hostname": hostname,
+    "slot": slot,
+    "gpu_model": gpu_model,
+    "gpu_count": gpu_count,
+}
+env_info = {
+    "python": python_ver,
+    "cuda": cuda,
+    "code_commit": commit,
+}
+
+Path("site_info.json").write_text(json.dumps({**site_info, **env_info}, indent=2))
+
+log_dir.mkdir(parents=True, exist_ok=True)
+event = {
+    "schema_version": "1.0",
+    "type": "job.assigned",
+    "run_id": run_id,
+    "ts": datetime.now(timezone.utc).isoformat(),
+    **site_info,
+    **env_info,
+}
+log_path = log_dir / f"{run_id}.ndjson"
+with open(log_path, "a") as f:
+    f.write(json.dumps(event, separators=(",", ":")) + "\n")
+PYEOF
+}
+
+_provenance_capture_and_emit || exit 1
+
+# Launch checkpoint watcher in background; trap ensures clean shutdown on exit
+python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" &
+WATCHER_PID=$!
+trap 'kill "$WATCHER_PID" 2>/dev/null; wait "$WATCHER_PID" 2>/dev/null || true' EXIT
+
 echo "Untarring global dataset"
 tar xzvf processed-global.tar.gz
 

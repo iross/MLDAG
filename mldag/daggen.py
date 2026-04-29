@@ -11,6 +11,7 @@ import yaml
 from mldag.models.resource import Resource, ResourceType, get_resources_from_yaml
 from mldag.models.training_run import TrainingRun
 from mldag.models.experiment import Experiment, read_from_config
+from mldag.provenance.events import emit_event, _DEFAULT_LOG_DIR
 
 EVAL=False
 
@@ -78,6 +79,7 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
     script_txt = ''
     if resource.resource_type == ResourceType.ANNEX:
         script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex\n'
+    script_txt += f'SCRIPT POST {job.name} provenance_post.sh $JOB $RETURN $JOBID\n'
     return script_txt
 
 def get_service() -> str:
@@ -111,6 +113,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
+    inner_txt += 'job_ad_file = output/provenance/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -135,6 +138,7 @@ def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
+    inner_txt += 'job_ad_file = output/provenance/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -249,6 +253,23 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     with open(f'{ename}.dag', 'w') as f:
         f.write(dag_txt)
     print(f'generated {ename}.dag')
+
+    provenance_log_dir = config.get("provenance", {}).get("log_dir", _DEFAULT_LOG_DIR)
+    submitted_count = 0
+    for tr in experiment.training_runs:
+        for j, epoch in enumerate(range(epochs_per_job, num_epoch + 1, epochs_per_job)):
+            resource = tr.resources[j] if tr.resources else Resource(name="default")
+            job_name = f'run{experiment.training_runs.index(tr)}-train_epoch{j}'
+            emit_event(
+                "job.submitted",
+                tr.run_uuid,
+                log_dir=provenance_log_dir,
+                job_name=job_name,
+                epoch=epoch,
+                resource=resource.name,
+            )
+            submitted_count += 1
+    print(f'emitted job.submitted for {submitted_count} jobs')
 
 if __name__ == "__main__":
     app()
