@@ -11,7 +11,6 @@ import yaml
 from mldag.models.resource import Resource, ResourceType, get_resources_from_yaml
 from mldag.models.training_run import TrainingRun
 from mldag.models.experiment import Experiment, read_from_config
-from mldag.provenance.events import emit_event, _DEFAULT_LOG_DIR
 
 EVAL=False
 
@@ -76,9 +75,14 @@ def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
     return vars_txt
 
 def get_script(job: Job, resource: Resource, config: dict) -> str:
-    script_txt = ''
+    # VARS macros (e.g. $(run_uuid)) are not available in SCRIPT PRE/POST args,
+    # so run_uuid and epoch are embedded directly at DAG generation time.
+    pre_args = f'{job.run_uuid} {job.name} {job.epoch}'
     if resource.resource_type == ResourceType.ANNEX:
-        script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex\n'
+        # Annex name appended so provenance_pre.sh can chain pre_request_annex.sh
+        # (DAGMan allows only one SCRIPT PRE per node).
+        pre_args += f' {resource.name}'
+    script_txt = f'SCRIPT PRE {job.name} provenance_pre.sh {pre_args}\n'
     script_txt += f'SCRIPT POST {job.name} provenance_post.sh $JOB $RETURN $JOBID\n'
     return script_txt
 
@@ -253,23 +257,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     with open(f'{ename}.dag', 'w') as f:
         f.write(dag_txt)
     print(f'generated {ename}.dag')
-
-    provenance_log_dir = config.get("provenance", {}).get("log_dir", _DEFAULT_LOG_DIR)
-    submitted_count = 0
-    for tr in experiment.training_runs:
-        for j, epoch in enumerate(range(epochs_per_job, num_epoch + 1, epochs_per_job)):
-            resource = tr.resources[j] if tr.resources else Resource(name="default")
-            job_name = f'run{experiment.training_runs.index(tr)}-train_epoch{j}'
-            emit_event(
-                "job.submitted",
-                tr.run_uuid,
-                log_dir=provenance_log_dir,
-                job_name=job_name,
-                epoch=epoch,
-                resource=resource.name,
-            )
-            submitted_count += 1
-    print(f'emitted job.submitted for {submitted_count} jobs')
 
 if __name__ == "__main__":
     app()

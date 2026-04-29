@@ -27,6 +27,7 @@ mldag-gen     = "mldag.daggen:app"
 mldag-csv     = "mldag.report.csv:main"
 mldag-report  = "mldag.report.experiment:main"
 mldag-monitor = "mldag.monitor.htcondor:main"
+mldag-pre     = "mldag.provenance.pre:main"
 mldag-post    = "mldag.provenance.post:main"
 mldag-query   = "mldag.provenance.query:main"
 
