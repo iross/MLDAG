@@ -234,6 +234,26 @@ def monitor_once(
     return new_offset
 
 
+def _load_offset(offset_path: Path, log_path: Path) -> int:
+    """Return the saved byte offset, or 0 if none or the log was recreated."""
+    try:
+        saved = int(offset_path.read_text().strip())
+        # If the log file is smaller than the saved offset it was recreated; reset.
+        if log_path.exists() and saved > log_path.stat().st_size:
+            return 0
+        return saved
+    except (OSError, ValueError):
+        return 0
+
+
+def _save_offset(offset_path: Path, byte_offset: int) -> None:
+    try:
+        offset_path.parent.mkdir(parents=True, exist_ok=True)
+        offset_path.write_text(str(byte_offset))
+    except OSError:
+        pass
+
+
 def watch_log(
     log_path: str | Path,
     *,
@@ -246,7 +266,8 @@ def watch_log(
     log_dir = Path(log_dir)
     provenance_log_dir = Path(provenance_log_dir)
 
-    byte_offset = 0
+    offset_path = provenance_log_dir / ".log_monitor.offset"
+    byte_offset = _load_offset(offset_path, log_path)
     run_id_cache: dict[int, str] = {}
     multiline_state: dict = {"cluster_id": None}
     pending_lookups: dict[int, str] = {}
@@ -261,6 +282,7 @@ def watch_log(
             multiline_state=multiline_state,
             pending_lookups=pending_lookups,
         )
+        _save_offset(offset_path, byte_offset)
         time.sleep(poll_interval)
 
 

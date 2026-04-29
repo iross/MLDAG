@@ -4,6 +4,8 @@ from pathlib import Path
 from mldag.provenance.log_monitor import (
     _parse_event_line,
     _job_name_to_run_id,
+    _load_offset,
+    _save_offset,
     monitor_once,
 )
 
@@ -464,3 +466,37 @@ def test_monitor_once_includes_resource_name_from_classad(tmp_path):
 
     events = _read_events(prov_dir, "run-abc")
     assert events[0].get("resource_name") == "Expanse"
+
+
+# --- _load_offset / _save_offset ---
+
+
+def test_save_and_load_offset_roundtrip(tmp_path):
+    log = tmp_path / "metl.log"
+    log.write_text("x" * 1000)
+    offset_path = tmp_path / ".log_monitor.offset"
+    _save_offset(offset_path, 1000)
+    assert _load_offset(offset_path, log) == 1000
+
+
+def test_load_offset_returns_zero_when_file_missing(tmp_path):
+    log = tmp_path / "metl.log"
+    log.write_text("x" * 100)
+    assert _load_offset(tmp_path / ".log_monitor.offset", log) == 0
+
+
+def test_load_offset_resets_when_log_recreated(tmp_path):
+    log = tmp_path / "metl.log"
+    log.write_text("x" * 100)
+    offset_path = tmp_path / ".log_monitor.offset"
+    # Save an offset larger than the current log (simulates log recreation)
+    _save_offset(offset_path, 50_000)
+    assert _load_offset(offset_path, log) == 0
+
+
+def test_load_offset_returns_zero_on_corrupt_file(tmp_path):
+    log = tmp_path / "metl.log"
+    log.write_text("x" * 100)
+    offset_path = tmp_path / ".log_monitor.offset"
+    offset_path.write_text("not-a-number")
+    assert _load_offset(offset_path, log) == 0
