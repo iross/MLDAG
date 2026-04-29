@@ -5,7 +5,7 @@ import sys
 import typer
 from typing_extensions import Annotated
 import textwrap
-import htcondor
+import htcondor2 as htcondor
 import random
 from pydantic import BaseModel
 import yaml
