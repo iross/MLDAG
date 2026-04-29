@@ -9,6 +9,8 @@ Event log location: <log_dir>/<run_id>.ndjson
 Default log_dir:    output/provenance
 """
 
+from __future__ import annotations
+
 import json
 import os
 from datetime import datetime, timezone

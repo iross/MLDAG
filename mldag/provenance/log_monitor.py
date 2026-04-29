@@ -17,6 +17,8 @@ For hold events the ClassAd is not yet written; run_id falls back to
 "unknown:<ClusterId>" so the event can still be correlated manually.
 """
 
+from __future__ import annotations
+
 import os
 import re
 import sys

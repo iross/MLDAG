@@ -12,6 +12,8 @@ Both commands accept --json for machine-readable output and --log-dir to
 override the default NDJSON location.
 """
 
+from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path

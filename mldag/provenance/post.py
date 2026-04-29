@@ -5,6 +5,8 @@ written by job_ad_file, extracts resource usage and the run ID, then appends
 a job.completed or job.failed event to the per-run NDJSON log.
 """
 
+from __future__ import annotations
+
 import os
 import re
 import sys

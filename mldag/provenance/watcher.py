@@ -19,6 +19,8 @@ Lightning convention: epoch=N-step=M-val_loss=V.ckpt.  Runs that use a
 different naming scheme will produce epoch.completed events without val_loss.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re

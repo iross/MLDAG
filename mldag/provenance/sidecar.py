@@ -6,6 +6,8 @@ parent_hash chain makes the full training lineage reconstructable from
 the files alone — no database required.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 from datetime import datetime, timezone
