@@ -176,7 +176,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    dag_txt += textwrap.dedent(get_service(dag_name=ename + '.dag'))
+    dag_txt += textwrap.dedent(get_service(python_exe=sys.executable, dag_name=ename + '.dag'))
 
     # Grab the resources, if targeting is desired
     resources = []
