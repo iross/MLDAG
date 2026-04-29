@@ -106,6 +106,7 @@ def monitor_once(
             log_dir=provenance_log_dir,
             cluster_id=cluster_id,
             condor_event_ts=ts.isoformat(),
+            source="htcondor_event_log",
             **resource,
         )
     return new_offset

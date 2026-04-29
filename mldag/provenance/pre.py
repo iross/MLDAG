@@ -25,6 +25,7 @@ def main() -> None:
         log_dir=log_dir,
         job_name=job_name,
         epoch=int(epoch_str),
+        source="dagman_pre_script",
     )
 
 

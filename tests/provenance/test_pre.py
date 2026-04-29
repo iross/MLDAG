@@ -23,6 +23,7 @@ def test_main_emits_job_submitted(tmp_path):
     assert e["run_id"] == "run-abc"
     assert e["job_name"] == "run0-train_epoch0"
     assert e["epoch"] == 5
+    assert e["source"] == "dagman_pre_script"
 
 
 def test_main_wrong_arg_count_exits_nonzero(tmp_path):

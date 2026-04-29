@@ -60,6 +60,8 @@ event = {
     "type": "job.assigned",
     "run_id": run_id,
     "ts": datetime.now(timezone.utc).isoformat(),
+    "source": "execute_node",
+    "site_info_source": "nvidia_smi",
     **site_info,
     **env_info,
 }

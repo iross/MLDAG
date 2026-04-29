@@ -113,6 +113,7 @@ def watch_and_emit(
                 log_dir=log_dir,
                 epoch=epoch_index,
                 checkpoint_in_hash=parent_hash,
+                source="checkpoint_file_watcher",
             )
 
             new_hash = write_sidecar(
@@ -126,10 +127,15 @@ def watch_and_emit(
             )
 
             duration_s = round(time.time() - epoch_start, 3)
-            completed_fields: dict = {"checkpoint_out_hash": new_hash, "duration_s": duration_s}
+            completed_fields: dict = {
+                "checkpoint_out_hash": new_hash,
+                "duration_s": duration_s,
+                "source": "checkpoint_file_watcher",
+            }
             val_loss = _parse_val_loss(ckpt_path)
             if val_loss is not None:
                 completed_fields["val_loss"] = val_loss
+                completed_fields["val_loss_source"] = "checkpoint_filename"
             emit_event("epoch.completed", run_id, log_dir=log_dir, epoch=epoch_index, **completed_fields)
 
             parent_hash = new_hash

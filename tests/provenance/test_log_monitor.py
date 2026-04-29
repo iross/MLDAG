@@ -92,6 +92,7 @@ def test_monitor_once_eviction_emits_job_migrated(tmp_path):
     assert events[0]["run_id"] == "run-abc"
     assert events[0]["cluster_id"] == 12345
     assert events[0]["condor_event_ts"].startswith("2026")
+    assert events[0]["source"] == "htcondor_event_log"
 
 
 def test_monitor_once_hold_emits_job_held(tmp_path):

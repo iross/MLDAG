@@ -135,6 +135,7 @@ def test_emit_post_event_completed(tmp_path):
     assert e["job_name"] == "run0-train_epoch0"
     assert e["wall_time_s"] == 3600
     assert e["peak_memory_mb"] == 4096
+    assert e["source"] == "dagman_post_script_classad"
     assert "exit_code" not in e
 
 
@@ -146,6 +147,7 @@ def test_emit_post_event_failed(tmp_path):
     assert e["type"] == "job.failed"
     assert e["exit_code"] == 1
     assert e["wall_time_s"] == 3600
+    assert e["source"] == "dagman_post_script_classad"
 
 
 def test_emit_post_event_failed_with_hold_reason(tmp_path):

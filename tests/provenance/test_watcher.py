@@ -108,6 +108,7 @@ def test_watch_and_emit_completed_has_out_hash(tmp_path):
     events = _read_events(log_dir, "run-1")
     completed = next(e for e in events if e["type"] == "epoch.completed")
     assert completed["checkpoint_out_hash"].startswith("sha256:")
+    assert completed["source"] == "checkpoint_file_watcher"
 
 
 def test_watch_and_emit_completed_has_duration_s(tmp_path):
@@ -201,6 +202,7 @@ def test_watch_and_emit_includes_val_loss_when_present(tmp_path):
     events = _read_events(log_dir, "run-1")
     completed = next(e for e in events if e["type"] == "epoch.completed")
     assert abs(completed["val_loss"] - 0.42) < 1e-9
+    assert completed["val_loss_source"] == "checkpoint_filename"
 
 
 def test_watch_and_emit_no_val_loss_when_filename_plain(tmp_path):

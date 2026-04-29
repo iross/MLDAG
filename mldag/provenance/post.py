@@ -73,13 +73,19 @@ def emit_post_event(
     resource = resource_fields_from_classad(ad)
 
     if exit_code == 0:
-        emit_event("job.completed", run_id, log_dir=log_dir, job_name=job_name, **resource)
+        emit_event(
+            "job.completed", run_id, log_dir=log_dir, job_name=job_name,
+            source="dagman_post_script_classad", **resource,
+        )
     else:
         extra: dict = {"exit_code": exit_code, **resource}
         hold_reason = ad.get("HoldReason", "")
         if hold_reason:
             extra["hold_reason"] = hold_reason
-        emit_event("job.failed", run_id, log_dir=log_dir, job_name=job_name, **extra)
+        emit_event(
+            "job.failed", run_id, log_dir=log_dir, job_name=job_name,
+            source="dagman_post_script_classad", **extra,
+        )
 
 
 def main() -> None:
