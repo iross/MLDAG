@@ -182,7 +182,8 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     dag_txt += textwrap.dedent(get_service())
 
     # Grab the resources, if targeting is desired
-    resources = get_ospool_resources()
+    resources = []
+#    resources = get_ospool_resources()
     resources += get_resources_from_yaml()
 
     # Create experiment permutations and expansion
