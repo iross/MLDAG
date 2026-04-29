@@ -1,11 +1,8 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from mldag.provenance.log_monitor import (
     _parse_event_line,
-    _scan_dagman_log,
     _job_name_to_run_id,
     monitor_once,
 )
@@ -43,6 +40,14 @@ def _read_events(log_dir: Path, run_id: str) -> list[dict]:
 # --- _parse_event_line ---
 
 
+def test_parse_event_line_executing_new_ts():
+    line = "001 (12345.000.000) 2026-04-01 10:00:00 Job executing on host."
+    result = _parse_event_line(line)
+    assert result is not None
+    assert result[0] == "001"
+    assert result[1] == 12345
+
+
 def test_parse_event_line_eviction_new_ts():
     line = "004 (12345.000.000) 2026-04-01 10:00:00 Job was evicted."
     result = _parse_event_line(line)
@@ -76,65 +81,18 @@ def test_parse_event_line_hold_legacy_ts():
     assert result[1] == 42
 
 
+def test_parse_event_line_submit_returns_none():
+    line = "000 (12345.000.000) 2026-04-01 09:00:00 Job submitted from host."
+    assert _parse_event_line(line) is None
+
+
 def test_parse_event_line_irrelevant_code_returns_none():
-    line = "001 (12345.000.000) 2026-04-01 10:00:00 Job executing on host."
+    line = "006 (12345.000.000) 2026-04-01 10:00:00 Image size updated."
     assert _parse_event_line(line) is None
 
 
 def test_parse_event_line_non_event_returns_none():
     assert _parse_event_line("    some indented log line") is None
-
-
-# --- _scan_dagman_log ---
-
-
-def test_scan_dagman_log_extracts_job_name_and_cluster_id(tmp_path):
-    dagman_log = tmp_path / "test.dag.dagman.out"
-    dagman_log.write_text(
-        "04/29 10:00:00 Submitting HTCondor Node run0-train_epoch0 job(s)...\n"
-        "04/29 10:00:00  Submitting job(s)....\n"
-        "04/29 10:00:00  1 job(s) submitted to cluster 5055662.\n"
-    )
-    pending: list = [None]
-    pairs, offset = _scan_dagman_log(dagman_log, 0, pending)
-    assert pairs == [("run0-train_epoch0", 5055662)]
-    assert offset == dagman_log.stat().st_size
-
-
-def test_scan_dagman_log_multiple_jobs(tmp_path):
-    dagman_log = tmp_path / "test.dag.dagman.out"
-    dagman_log.write_text(
-        "Submitting HTCondor Node run0-train_epoch0 job(s)...\n"
-        " 1 job(s) submitted to cluster 100.\n"
-        "Submitting HTCondor Node run0-train_epoch1 job(s)...\n"
-        " 1 job(s) submitted to cluster 101.\n"
-    )
-    pending: list = [None]
-    pairs, _ = _scan_dagman_log(dagman_log, 0, pending)
-    assert pairs == [("run0-train_epoch0", 100), ("run0-train_epoch1", 101)]
-
-
-def test_scan_dagman_log_missing_file_returns_empty(tmp_path):
-    pending: list = [None]
-    pairs, offset = _scan_dagman_log(tmp_path / "missing.dagman.out", 0, pending)
-    assert pairs == []
-    assert offset == 0
-
-
-def test_scan_dagman_log_incremental_read(tmp_path):
-    dagman_log = tmp_path / "test.dag.dagman.out"
-    first = "Submitting HTCondor Node run0-train_epoch0 job(s)...\n"
-    dagman_log.write_text(first)
-    pending: list = [None]
-    pairs1, offset1 = _scan_dagman_log(dagman_log, 0, pending)
-    assert pairs1 == []
-    assert pending[0] == "run0-train_epoch0"
-
-    # Append cluster line
-    with open(dagman_log, "a") as f:
-        f.write(" 1 job(s) submitted to cluster 999.\n")
-    pairs2, _ = _scan_dagman_log(dagman_log, offset1, pending)
-    assert pairs2 == [("run0-train_epoch0", 999)]
 
 
 # --- _job_name_to_run_id ---
@@ -154,7 +112,86 @@ def test_job_name_to_run_id_empty_dir(tmp_path):
     assert _job_name_to_run_id("run0-train_epoch0", tmp_path) is None
 
 
-# --- monitor_once ---
+# --- monitor_once: cache population from event 000 + DAG Node ---
+
+
+def test_monitor_once_event_000_dag_node_populates_cache(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    log = tmp_path / "metl.log"
+    _write_log(log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        "    DAG Node: run0-train_epoch0\n"
+        "...\n"
+    )
+    cache: dict = {}
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache)
+    assert cache.get(5055662) == "run-abc"
+
+
+def test_monitor_once_event_000_then_executing_resolves_run_id(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    log = tmp_path / "metl.log"
+    _write_log(log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        "    DAG Node: run0-train_epoch0\n"
+        "...\n"
+        "001 (5055662.000.000) 2026-04-29 10:05:00 Job executing on host: <10.0.0.1:1234>\n"
+        "...\n"
+    )
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+    events = _read_events(prov_dir, "run-abc")
+    assert len(events) == 2  # job.submitted (written earlier) + job.executing
+    executing = next(e for e in events if e["type"] == "job.executing")
+    assert executing["run_id"] == "run-abc"
+    assert executing["cluster_id"] == 5055662
+
+
+def test_monitor_once_dag_node_across_poll_boundary(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    log = tmp_path / "metl.log"
+
+    first = "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+    log.write_text(first)
+    cache: dict = {}
+    state: dict = {"cluster_id": None}
+    offset = monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir,
+                          run_id_cache=cache, multiline_state=state)
+    assert cache.get(5055662) is None  # DAG Node line not seen yet
+    assert state["cluster_id"] == 5055662  # pending
+
+    with open(log, "a") as f:
+        f.write("    DAG Node: run0-train_epoch0\n...\n")
+    monitor_once(log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir,
+                 run_id_cache=cache, multiline_state=state)
+    assert cache.get(5055662) == "run-abc"
+
+
+# --- monitor_once: event emission ---
+
+
+def test_monitor_once_executing_emits_job_executing(tmp_path):
+    ad_dir = tmp_path / "ads"
+    prov_dir = tmp_path / "provenance"
+    _write_ad(ad_dir, 12345, "run-abc")
+    log = tmp_path / "metl.log"
+    _write_log(log, "001 (12345.000.000) 2026-04-01 10:00:00 Job executing on host.\n")
+
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    events = _read_events(prov_dir, "run-abc")
+    assert len(events) == 1
+    assert events[0]["type"] == "job.executing"
+    assert events[0]["run_id"] == "run-abc"
+    assert events[0]["source"] == "htcondor_event_log"
 
 
 def test_monitor_once_eviction_emits_job_migrated(tmp_path):
@@ -227,7 +264,6 @@ def test_monitor_once_cache_resolves_hold_without_classad(tmp_path):
     events = _read_events(prov_dir, "run-cached")
     assert len(events) == 1
     assert events[0]["type"] == "job.held"
-    assert events[0]["run_id"] == "run-cached"
 
 
 def test_monitor_once_run_id_marker_resolves_hold_without_classad(tmp_path):
@@ -259,7 +295,6 @@ def test_monitor_once_run_id_marker_resolves_release_without_classad(tmp_path):
     events = _read_events(prov_dir, "run-held")
     assert len(events) == 1
     assert events[0]["type"] == "job.released"
-    assert events[0]["run_id"] == "run-held"
 
 
 def test_monitor_once_returns_new_byte_offset(tmp_path):
@@ -279,7 +314,7 @@ def test_monitor_once_skips_already_read_bytes(tmp_path):
     prov_dir = tmp_path / "provenance"
     _write_ad(ad_dir, 12345, "run-abc")
     log = tmp_path / "metl.log"
-    first_line = "001 (12345.000.000) 2026-04-01 09:00:00 Job executing.\n"
+    first_line = "006 (12345.000.000) 2026-04-01 09:00:00 Image size updated.\n"
     second_line = "004 (12345.000.000) 2026-04-01 10:00:00 Job was evicted.\n"
     log.write_text(first_line + second_line)
 

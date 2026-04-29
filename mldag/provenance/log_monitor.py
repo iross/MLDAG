@@ -1,22 +1,23 @@
-"""HTCondor event log monitor for eviction, hold, and release provenance events.
+"""HTCondor event log monitor for job lifecycle provenance events.
 
 Tails the HTCondor event log (default: metl.log) and emits provenance events
-for the three job lifecycle transitions the SCRIPT PRE/POST pair cannot see:
+for job lifecycle transitions the SCRIPT PRE/POST pair cannot see:
 
-  004  Evicted  → job.migrated   (job left the execute node; will retry)
-  012  Held     → job.held       (job put on hold by HTCondor)
-  013  Released → job.released   (job released from hold)
+  001  Executing → job.executing  (job started on execute node)
+  004  Evicted   → job.migrated   (job left the execute node; will retry)
+  012  Held      → job.held       (job put on hold by HTCondor)
+  013  Released  → job.released   (job released from hold)
 
 Run this as a DAGMan SERVICE so it stays alive for the life of the DAG:
 
   SERVICE provenance_monitor provenance_monitor.sub
 
 The ClusterId → run_id mapping is resolved in order:
-  1. In-memory cache — populated by tailing the .dagman.out file, which logs
-     "Submitting HTCondor Node <name> job(s)..." and
-     "N job(s) submitted to cluster <id>." for every submission.
-     The job name is cross-referenced against NDJSON files where the PRE
-     script wrote a job.submitted event containing both job_name and run_id.
+  1. In-memory cache — populated by reading event 000 (job submitted) blocks
+     from metl.log itself, which contains "DAG Node: <name>" body lines when
+     submitted via DAGMan.  The node name is cross-referenced against NDJSON
+     files where the PRE script wrote a job.submitted event with both
+     job_name and run_id.
   2. <cluster_id>.run_id marker written by the job at start (requires shared FS)
   3. <cluster_id>.ad ClassAd written by HTCondor on job exit
   4. "unknown:<cluster_id>" fallback
@@ -34,21 +35,21 @@ from pathlib import Path
 from mldag.provenance.events import _DEFAULT_LOG_DIR, emit_event
 from mldag.provenance.post import parse_classad, run_id_from_classad, resource_fields_from_classad
 
-# HTCondor event log timestamp formats (new-style YYYY-MM-DD, legacy MM/DD)
+# Matches any HTCondor event log header line; groups: (code, cluster_id, ...)
 _TS_NEW = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
 _TS_OLD = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}) (\d{2}:\d{2}:\d{2})")
+_ANY_HEADER_RE = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\)")
+_DAGNODE_RE = re.compile(r"DAG Node:\s+(\S+)")
 
-_CODES = {"004", "012", "013"}
+# Codes that emit provenance events
+_CODES = {"001", "004", "012", "013"}
 
 _CODE_TO_EVENT = {
+    "001": "job.executing",
     "004": "job.migrated",
     "012": "job.held",
     "013": "job.released",
 }
-
-# DAGMan output log patterns
-_DAGMAN_SUBMIT_RE = re.compile(r"Submitting HTCondor Node (\S+) job\(s\)\.\.\.")
-_DAGMAN_CLUSTER_RE = re.compile(r"\d+ job\(s\) submitted to cluster (\d+)\.")
 
 
 def _parse_event_line(line: str) -> tuple[str, int, datetime] | None:
@@ -72,37 +73,6 @@ def _parse_event_line(line: str) -> tuple[str, int, datetime] | None:
         return code, cluster_id, ts
 
     return None
-
-
-def _scan_dagman_log(
-    dagman_path: Path,
-    byte_offset: int,
-    pending_node: list[str | None],
-) -> tuple[list[tuple[str, int]], int]:
-    """Scan dagman.out for (job_name, cluster_id) pairs since byte_offset.
-
-    pending_node is a single-element list used to carry the last-seen node
-    name across calls so a pair split across two polls is still matched.
-    """
-    try:
-        with open(dagman_path, "rb") as f:
-            f.seek(byte_offset)
-            new_bytes = f.read()
-        new_offset = byte_offset + len(new_bytes)
-    except FileNotFoundError:
-        return [], byte_offset
-
-    pairs: list[tuple[str, int]] = []
-    for line in new_bytes.decode("utf-8", errors="replace").splitlines():
-        m = _DAGMAN_SUBMIT_RE.search(line)
-        if m:
-            pending_node[0] = m.group(1)
-            continue
-        m = _DAGMAN_CLUSTER_RE.search(line)
-        if m and pending_node[0] is not None:
-            pairs.append((pending_node[0], int(m.group(1))))
-            pending_node[0] = None
-    return pairs, new_offset
 
 
 def _job_name_to_run_id(job_name: str, provenance_log_dir: Path) -> str | None:
@@ -171,13 +141,43 @@ def monitor_once(
     log_dir: Path,
     provenance_log_dir: Path,
     run_id_cache: dict[int, str] | None = None,
+    multiline_state: dict | None = None,
 ) -> int:
-    """Process any new lines in log_path, emit events, return new byte offset."""
+    """Process any new lines in log_path, emit events, return new byte offset.
+
+    multiline_state is a dict that persists across calls to track partial
+    event 000 blocks (the "DAG Node:" body line may arrive in a later poll).
+    Pass the same dict on every call from watch_log.
+    """
     if run_id_cache is None:
         run_id_cache = {}
+    if multiline_state is None:
+        multiline_state = {"cluster_id": None}
+
     lines, new_offset = _scan_new_lines(log_path, byte_offset)
     for line in lines:
-        parsed = _parse_event_line(line.strip())
+        stripped = line.strip()
+
+        # Track event 000 blocks to build cluster_id → run_id cache.
+        # Event 000 body contains "DAG Node: <name>" when submitted by DAGMan.
+        hm = _ANY_HEADER_RE.match(stripped)
+        if hm:
+            if hm.group(1) == "000":
+                multiline_state["cluster_id"] = int(hm.group(2))
+            else:
+                multiline_state["cluster_id"] = None
+
+        dn_m = _DAGNODE_RE.search(stripped)
+        if dn_m and multiline_state.get("cluster_id") is not None:
+            cluster_id = multiline_state["cluster_id"]
+            if cluster_id not in run_id_cache:
+                run_id = _job_name_to_run_id(dn_m.group(1), provenance_log_dir)
+                if run_id:
+                    run_id_cache[cluster_id] = run_id
+            multiline_state["cluster_id"] = None
+
+        # Emit provenance events for tracked codes
+        parsed = _parse_event_line(stripped)
         if parsed is None:
             continue
         code, cluster_id, ts = parsed
@@ -200,41 +200,25 @@ def watch_log(
     *,
     log_dir: str | Path,
     provenance_log_dir: str | Path = _DEFAULT_LOG_DIR,
-    dagman_log: str | Path | None = None,
     poll_interval: float = 5.0,
 ) -> None:
-    """Tail log_path indefinitely, emitting provenance events for 004/012/013.
-
-    If dagman_log is provided, it is tailed alongside log_path to build a
-    cluster_id → run_id cache from DAGMan's submission records and the
-    existing NDJSON provenance files.
-    """
+    """Tail log_path indefinitely, emitting provenance events."""
     log_path = Path(log_path)
     log_dir = Path(log_dir)
     provenance_log_dir = Path(provenance_log_dir)
-    dagman_log_path = Path(dagman_log) if dagman_log else None
 
     byte_offset = 0
-    dagman_offset = 0
-    pending_node: list[str | None] = [None]
     run_id_cache: dict[int, str] = {}
+    multiline_state: dict = {"cluster_id": None}
 
     while True:
-        if dagman_log_path:
-            pairs, dagman_offset = _scan_dagman_log(
-                dagman_log_path, dagman_offset, pending_node
-            )
-            for job_name, cluster_id in pairs:
-                run_id = _job_name_to_run_id(job_name, provenance_log_dir)
-                if run_id:
-                    run_id_cache[cluster_id] = run_id
-
         byte_offset = monitor_once(
             log_path,
             byte_offset,
             log_dir=log_dir,
             provenance_log_dir=provenance_log_dir,
             run_id_cache=run_id_cache,
+            multiline_state=multiline_state,
         )
         time.sleep(poll_interval)
 
@@ -249,12 +233,6 @@ def main() -> None:
         default="output/provenance",
         help="Directory containing per-cluster .ad files (job_ad_file output)",
     )
-    parser.add_argument(
-        "--dagman-log",
-        default=None,
-        metavar="FILE",
-        help="DAGMan output log (*.dagman.out) for cluster_id → run_id mapping",
-    )
     parser.add_argument("--poll-interval", type=float, default=5.0, metavar="S")
     args = parser.parse_args()
 
@@ -263,7 +241,6 @@ def main() -> None:
         args.log_file,
         log_dir=args.classad_dir,
         provenance_log_dir=provenance_log_dir,
-        dagman_log=args.dagman_log,
         poll_interval=args.poll_interval,
     )
 

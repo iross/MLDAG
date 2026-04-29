@@ -21,6 +21,7 @@ SCHEMA_VERSION = "1.0"
 VALID_EVENT_TYPES: frozenset[str] = frozenset({
     "job.submitted",
     "job.assigned",
+    "job.executing",
     "epoch.started",
     "epoch.completed",
     "job.migrated",

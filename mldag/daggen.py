@@ -89,13 +89,12 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
     script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post $JOB $RETURN $JOBID\n'
     return script_txt
 
-def get_service(python_exe: str = "python3", dag_name: str = "") -> str:
-    dagman_log_arg = f" --dagman-log {dag_name}.dagman.out" if dag_name else ""
+def get_service(python_exe: str = "python3") -> str:
     service_txt = textwrap.dedent(f"""\
     SUBMIT-DESCRIPTION provenance_monitor.sub {{
         universe = local
         executable = {python_exe}
-        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir output/provenance{dagman_log_arg}
+        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir output/provenance
         queue
     }}
     SERVICE provenance_monitor provenance_monitor.sub
@@ -176,7 +175,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    dag_txt += textwrap.dedent(get_service(python_exe=sys.executable, dag_name=ename + '.dag'))
+    dag_txt += textwrap.dedent(get_service(python_exe=sys.executable))
 
     # Grab the resources, if targeting is desired
     resources = []
