@@ -27,7 +27,7 @@ def test_main_emits_job_submitted(tmp_path):
 
 
 def test_main_wrong_arg_count_exits_nonzero(tmp_path):
-    with patch("sys.argv", ["provenance_pre", "run-abc"]):
+    with patch("sys.argv", ["provenance_pre"]):
         with pytest.raises(SystemExit) as exc_info:
             main()
     assert exc_info.value.code != 0
@@ -39,3 +39,21 @@ def test_main_uses_provenance_log_dir_env(tmp_path):
         with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(custom_dir)}):
             main()
     assert (custom_dir / "run-xyz.ndjson").exists()
+
+
+def test_main_annex_calls_pre_request_annex(tmp_path):
+    with patch("sys.argv", ["provenance_pre", "run-abc", "run0-train_epoch0", "0", "--annex", "chtc"]):
+        with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+            with patch("subprocess.run") as mock_run:
+                main()
+    mock_run.assert_called_once_with(
+        ["pre_request_annex.sh", "chtc", "chtc_annex"], check=True
+    )
+
+
+def test_main_no_annex_does_not_call_pre_request_annex(tmp_path):
+    with patch("sys.argv", ["provenance_pre", "run-abc", "run0-train_epoch0", "0"]):
+        with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+            with patch("subprocess.run") as mock_run:
+                main()
+    mock_run.assert_not_called()

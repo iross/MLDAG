@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import typer
 from typing_extensions import Annotated
 import textwrap
@@ -75,15 +76,17 @@ def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
     return vars_txt
 
 def get_script(job: Job, resource: Resource, config: dict) -> str:
-    # VARS macros (e.g. $(run_uuid)) are not available in SCRIPT PRE/POST args,
-    # so run_uuid and epoch are embedded directly at DAG generation time.
+    # Use the exact Python that ran mldag-gen so the script works regardless
+    # of PATH in the DAGMan environment.  VARS macros ($(run_uuid)) are not
+    # available in SCRIPT args, so run_uuid and epoch are embedded here.
+    python = sys.executable
     pre_args = f'{job.run_uuid} {job.name} {job.epoch}'
     if resource.resource_type == ResourceType.ANNEX:
-        # Annex name appended so provenance_pre.sh can chain pre_request_annex.sh
-        # (DAGMan allows only one SCRIPT PRE per node).
-        pre_args += f' {resource.name}'
-    script_txt = f'SCRIPT PRE {job.name} provenance_pre.sh {pre_args}\n'
-    script_txt += f'SCRIPT POST {job.name} provenance_post.sh $JOB $RETURN $JOBID\n'
+        # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
+        # DAGMan allows only one SCRIPT PRE per node.
+        pre_args += f' --annex {resource.name}'
+    script_txt = f'SCRIPT PRE  {job.name} {python} -m mldag.provenance.pre {pre_args}\n'
+    script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post $JOB $RETURN $JOBID\n'
     return script_txt
 
 def get_service(python_exe: str = "python3") -> str:
