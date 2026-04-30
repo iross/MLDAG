@@ -98,6 +98,9 @@ def main() -> None:
         )
         sys.exit(1)
     job_name, exit_code_str, cluster_id = sys.argv[1], sys.argv[2], sys.argv[3]
+    # $JOBID expands to ClusterId.ProcId (e.g. "5555662.0"); job_ad_file uses
+    # only ClusterId, so strip the proc part to match the filename.
+    cluster_id = cluster_id.split(".")[0]
     log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
     emit_post_event(job_name, int(exit_code_str), cluster_id, log_dir=log_dir)
 

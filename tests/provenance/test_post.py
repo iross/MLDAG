@@ -1,10 +1,13 @@
 import json
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from mldag.provenance.post import (
     emit_post_event,
+    main,
     parse_classad,
     resource_fields_from_classad,
     run_id_from_classad,
@@ -174,3 +177,18 @@ def test_emit_post_event_completed_no_hold_reason_field(tmp_path):
     emit_post_event("run0-train_epoch0", 0, "12345", log_dir=tmp_path)
     e = _read_events(tmp_path, "run-abc123")[0]
     assert "hold_reason" not in e
+
+
+# --- main(): $JOBID format handling ---
+
+
+def test_main_strips_proc_id_from_jobid(tmp_path):
+    """$JOBID expands to ClusterId.ProcId; main() must strip .ProcId to find the .ad file."""
+    _write_ad(tmp_path, SAMPLE_AD, filename="12345.ad")
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+        with patch.object(sys, "argv", ["post", "run0-train_epoch0", "0", "12345.0"]):
+            main()
+    events = _read_events(tmp_path, "run-abc123")
+    assert len(events) == 1
+    assert events[0]["type"] == "job.completed"
+    assert events[0]["run_id"] == "run-abc123"
