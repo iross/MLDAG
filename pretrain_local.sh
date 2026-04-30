@@ -72,11 +72,6 @@ PYEOF
 
 _provenance_capture_and_emit || exit 1
 
-# Launch checkpoint watcher in background; trap ensures clean shutdown on exit
-python3 -m mldag.provenance.watcher "$PWD" "$run_uuid" &
-WATCHER_PID=$!
-trap 'kill "$WATCHER_PID" 2>/dev/null; wait "$WATCHER_PID" 2>/dev/null || true' EXIT
-
 #echo "Copying ${dataset_name} dataset"
 # cp "/staging/iaross/processed-${dataset_name}.tar.gz" .
 #echo "Untarring ${dataset_name} dataset"
@@ -102,8 +97,13 @@ export WANDB_CACHE_DIR=$PWD/wandb/.cache
 export WANDB_CONFIG_DIR=$PWD/wandb/.config
 export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
+_TRAIN_START=$(python3 -c "import time; print(time.time())")
+
 python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_local.txt \
     --ds_fn "$PWD/${dataset_name}/${dataset_name}.db"   \
     --split_dir "$PWD/${dataset_name}/splits/${splits_dir}" \
     --max_epochs $epochs --uuid=$run_uuid  \
     --random_seed $random_seed
+
+python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" \
+    --one-shot --start-time "$_TRAIN_START"

@@ -71,11 +71,6 @@ PYEOF
 
 _provenance_capture_and_emit || exit 1
 
-# Launch checkpoint watcher in background; trap ensures clean shutdown on exit
-python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" &
-WATCHER_PID=$!
-trap 'kill "$WATCHER_PID" 2>/dev/null; wait "$WATCHER_PID" 2>/dev/null || true' EXIT
-
 echo "Untarring global dataset"
 tar xzvf processed-global.tar.gz
 
@@ -95,10 +90,14 @@ env
 #export WANDB_CONFIG_DIR=$PWD/wandb/.config
 #export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
+_TRAIN_START=$(python3 -c "import time; print(time.time())")
 
 python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_global.txt \
     --ds_fn $PWD/global/global.db   \
     --split_dir $PWD/global/splits/standard_tr0.9_tu0.05_te0.05_w2a93d88bac32_r2098 \
     --max_epochs $epochs --uuid=$run_uuid  \
     --random_seed $random_seed
+
+python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" \
+    --one-shot --start-time "$_TRAIN_START"
 

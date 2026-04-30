@@ -4,7 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from mldag.provenance.watcher import _load_site_info, _parse_val_loss, _sorted_by_mtime, watch_and_emit
+from mldag.provenance.watcher import (
+    _load_site_info,
+    _parse_epoch,
+    _parse_val_loss,
+    _read_metrics_csv,
+    _sorted_by_mtime,
+    scan_once,
+    watch_and_emit,
+)
 
 
 def _make_ckpt(path: Path, content: bytes = b"weights") -> Path:
@@ -223,3 +231,151 @@ def test_watch_and_emit_two_checkpoints_two_completed_events(tmp_path):
     events = _read_events(log_dir, "run-1")
     completed = [e for e in events if e["type"] == "epoch.completed"]
     assert len(completed) == 2
+
+
+# --- _parse_epoch ---
+
+
+def test_parse_epoch_lightning_filename(tmp_path):
+    assert _parse_epoch(tmp_path / "epoch=4-step=102968-val_loss=0.34.ckpt") == 4
+
+
+def test_parse_epoch_no_match_returns_none(tmp_path):
+    assert _parse_epoch(tmp_path / "checkpoint_epoch_5.ckpt") is None
+
+
+def test_parse_epoch_zero(tmp_path):
+    assert _parse_epoch(tmp_path / "epoch=0-step=100.ckpt") == 0
+
+
+# --- _read_metrics_csv ---
+
+
+def _write_metrics_csv(path: Path, rows: list[dict]) -> None:
+    import csv
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        return
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def test_read_metrics_csv_basic(tmp_path):
+    _write_metrics_csv(tmp_path / "metrics.csv", [
+        {"epoch": "0", "step": "100", "val_loss": "0.543", "train_loss": "0.8"},
+        {"epoch": "1", "step": "200", "val_loss": "0.432", "train_loss": "0.7"},
+    ])
+    result = _read_metrics_csv(tmp_path)
+    assert abs(result[0]["val_loss"] - 0.543) < 1e-9
+    assert abs(result[1]["val_loss"] - 0.432) < 1e-9
+
+
+def test_read_metrics_csv_merges_rows_per_epoch(tmp_path):
+    _write_metrics_csv(tmp_path / "metrics.csv", [
+        {"epoch": "0", "step": "50", "train_loss": "0.8", "val_loss": ""},
+        {"epoch": "0", "step": "100", "train_loss": "", "val_loss": "0.543"},
+    ])
+    result = _read_metrics_csv(tmp_path)
+    assert abs(result[0]["val_loss"] - 0.543) < 1e-9
+    assert abs(result[0]["train_loss"] - 0.8) < 1e-9
+
+
+def test_read_metrics_csv_missing_returns_empty(tmp_path):
+    assert _read_metrics_csv(tmp_path) == {}
+
+
+def test_read_metrics_csv_skips_non_numeric(tmp_path):
+    _write_metrics_csv(tmp_path / "metrics.csv", [
+        {"epoch": "0", "step": "100", "val_loss": "0.5", "mode": "train"},
+    ])
+    result = _read_metrics_csv(tmp_path)
+    assert "mode" not in result[0]
+    assert "val_loss" in result[0]
+
+
+# --- scan_once ---
+
+
+def test_scan_once_no_checkpoints_is_noop(tmp_path):
+    log_dir = tmp_path / "provenance"
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+    assert not (log_dir / "run-1.ndjson").exists()
+
+
+def test_scan_once_emits_epoch_events(tmp_path):
+    log_dir = tmp_path / "provenance"
+    _make_ckpt(tmp_path / "epoch=0-step=100.ckpt")
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+    events = _read_events(log_dir, "run-1")
+    assert [e["type"] for e in events] == ["epoch.started", "epoch.completed"]
+
+
+def test_scan_once_uses_parsed_epoch_number(tmp_path):
+    log_dir = tmp_path / "provenance"
+    _make_ckpt(tmp_path / "epoch=3-step=300.ckpt")
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+    events = _read_events(log_dir, "run-1")
+    assert events[0]["epoch"] == 3
+
+
+def test_scan_once_writes_sidecar(tmp_path):
+    log_dir = tmp_path / "provenance"
+    ckpt = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt")
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+    assert Path(str(ckpt) + ".provenance.json").exists()
+
+
+def test_scan_once_duration_s_with_start_time(tmp_path):
+    log_dir = tmp_path / "provenance"
+    ckpt = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt")
+    start = ckpt.stat().st_mtime - 60.0
+    scan_once(tmp_path, "run-1", log_dir=log_dir, start_time=start)
+    events = _read_events(log_dir, "run-1")
+    completed = next(e for e in events if e["type"] == "epoch.completed")
+    assert abs(completed["duration_s"] - 60.0) < 1.0
+
+
+def test_scan_once_no_duration_s_without_start_time(tmp_path):
+    log_dir = tmp_path / "provenance"
+    _make_ckpt(tmp_path / "epoch=0-step=100.ckpt")
+    scan_once(tmp_path, "run-1", log_dir=log_dir, start_time=None)
+    events = _read_events(log_dir, "run-1")
+    completed = next(e for e in events if e["type"] == "epoch.completed")
+    assert "duration_s" not in completed
+
+
+def test_scan_once_val_loss_from_csv_preferred(tmp_path):
+    log_dir = tmp_path / "provenance"
+    _make_ckpt(tmp_path / "epoch=0-step=100-val_loss=0.99.ckpt")
+    _write_metrics_csv(tmp_path / "metrics.csv", [
+        {"epoch": "0", "step": "100", "val_loss": "0.42"},
+    ])
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+    events = _read_events(log_dir, "run-1")
+    completed = next(e for e in events if e["type"] == "epoch.completed")
+    assert abs(completed["val_loss"] - 0.42) < 1e-9
+    assert completed["val_loss_source"] == "metrics_csv"
+
+
+def test_scan_once_val_loss_fallback_to_filename(tmp_path):
+    log_dir = tmp_path / "provenance"
+    _make_ckpt(tmp_path / "epoch=0-step=100-val_loss=0.55.ckpt")
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+    events = _read_events(log_dir, "run-1")
+    completed = next(e for e in events if e["type"] == "epoch.completed")
+    assert abs(completed["val_loss"] - 0.55) < 1e-9
+    assert completed["val_loss_source"] == "checkpoint_filename"
+
+
+def test_scan_once_parent_hash_chain(tmp_path):
+    log_dir = tmp_path / "provenance"
+    ckpt0 = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt", b"w0")
+    time.sleep(0.01)
+    ckpt1 = _make_ckpt(tmp_path / "epoch=1-step=200.ckpt", b"w1")
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+    s0 = json.loads(Path(str(ckpt0) + ".provenance.json").read_text())
+    s1 = json.loads(Path(str(ckpt1) + ".provenance.json").read_text())
+    assert s0["parent_hash"] is None
+    assert s1["parent_hash"] == s0["checkpoint_hash"]
