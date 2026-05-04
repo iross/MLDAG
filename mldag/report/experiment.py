@@ -163,7 +163,7 @@ class ExperimentAnalyzer:
 
         # Calculate summary statistics
         summary_stats = []
-        for resource in longest_executions['Targeted Resource'].unique():
+        for resource in longest_executions['Targeted Resource'].dropna().unique():
             resource_data = longest_executions[longest_executions['Targeted Resource'] == resource]
 
             total_jobs = len(resource_data)
@@ -230,7 +230,7 @@ class ExperimentAnalyzer:
 
         # Calculate summary statistics using the new resource column
         summary_stats = []
-        for resource in longest_executions['Resource (with GLIDEIN)'].unique():
+        for resource in longest_executions['Resource (with GLIDEIN)'].dropna().unique():
             resource_data = longest_executions[longest_executions['Resource (with GLIDEIN)'] == resource]
 
             total_jobs = len(resource_data)
@@ -376,6 +376,8 @@ class ExperimentAnalyzer:
 
     def format_resource_name(self, resource_name):
         """Format resource names for display: ospool -> OSPool, others -> Title Case."""
+        if pd.isna(resource_name):
+            return 'Unknown'
         if resource_name.lower() == 'ospool':
             return 'OSPool'
         else:
@@ -394,6 +396,9 @@ class ExperimentAnalyzer:
             'UIUC-TGI-RAILS-CE1': 'UIUC (OSPool)',
             'PDX-Coeus-CE1': 'PDX-Coeus (OSPool)',
         }
+
+        if pd.isna(resource_name):
+            return 'Unknown'
 
         # Check if it's a GLIDEIN resource
         if resource_name in glidein_mappings:
@@ -423,6 +428,9 @@ class ExperimentAnalyzer:
         # Return colors for the resources present in the data
         colors = []
         for resource in resources:
+            if pd.isna(resource):
+                colors.append('#808080')
+                continue
             resource_key = resource.lower()
             if resource_key in resource_color_map:
                 colors.append(resource_color_map[resource_key])
@@ -458,6 +466,9 @@ class ExperimentAnalyzer:
         # Return colors for the GPU types present in the data
         colors = []
         for gpu_type in gpu_types:
+            if pd.isna(gpu_type):
+                colors.append('#808080')
+                continue
             # Try exact match first
             if gpu_type in gpu_color_map:
                 colors.append(gpu_color_map[gpu_type])
@@ -813,6 +824,8 @@ class ExperimentAnalyzer:
         # Clean up GPU names for better display and create ordered categories
         gpu_runtime_data['GPU Type'] = gpu_runtime_data['GPU Device Name'].str.replace('NVIDIA ', '').str.replace('Tesla ', '')
 
+        gpu_runtime_data['Targeted Resource'] = gpu_runtime_data['Targeted Resource'].fillna('Unknown')
+
         # Create figure with appropriate size
         fig, ax = plt.subplots(1, 1, figsize=(18, 10))
 
@@ -1011,6 +1024,7 @@ class ExperimentAnalyzer:
 
         # Convert End Time to datetime and extract date
         completed_data['End Date'] = completed_data['End Time'].dt.date
+        completed_data['Targeted Resource'] = completed_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, count the epochs completed on that day
         daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
@@ -1145,6 +1159,8 @@ class ExperimentAnalyzer:
             print(f"No completed epoch data found for {month_name}")
             return
 
+        completed_data['Targeted Resource'] = completed_data['Targeted Resource'].fillna('Unknown')
+
         # For each job completion, count the epochs completed on that day
         daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
 
@@ -1260,6 +1276,7 @@ class ExperimentAnalyzer:
 
         # Convert End Time to datetime and extract date
         completed_data['End Date'] = completed_data['End Time'].dt.date
+        completed_data['Targeted Resource'] = completed_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, count the epochs completed on that day
         daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
@@ -1371,6 +1388,7 @@ class ExperimentAnalyzer:
 
         # Convert End Time to datetime and extract date
         gpu_data['End Date'] = gpu_data['End Time'].dt.date
+        gpu_data['Targeted Resource'] = gpu_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, sum the GPU hours used on that day
         daily_gpu_hours = gpu_data.groupby(['End Date', 'Targeted Resource'])['GPU Hours'].sum().reset_index()
@@ -1507,6 +1525,8 @@ class ExperimentAnalyzer:
         if gpu_data.empty:
             print(f"No GPU usage data found for {month_name}")
             return
+
+        gpu_data['Targeted Resource'] = gpu_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, sum the GPU hours used on that day
         daily_gpu_hours = gpu_data.groupby(['End Date', 'Targeted Resource'])['GPU Hours'].sum().reset_index()
@@ -1696,19 +1716,25 @@ class ExperimentAnalyzer:
 
         # For OSPool, use GLIDEIN Resource Name; for others, use Targeted Resource
         def get_site_label(row):
-            if row['Targeted Resource'].lower() == 'ospool':
+            resource = row['Targeted Resource']
+            if pd.isna(resource):
+                return 'Unknown'
+            if resource.lower() == 'ospool':
                 glidein = row.get('GLIDEIN Resource Name', 'Unknown')
                 if pd.isna(glidein) or glidein == '':
                     return 'Unknown'
                 return glidein
             else:
-                return row['Targeted Resource']
+                return resource
 
         def get_site_group(row):
-            if row['Targeted Resource'].lower() == 'ospool':
+            resource = row['Targeted Resource']
+            if pd.isna(resource):
+                return 'Unknown'
+            if resource.lower() == 'ospool':
                 return 'OSPool'
             else:
-                return row['Targeted Resource']
+                return resource
 
         raw_data['Site'] = raw_data.apply(get_site_label, axis=1)
         raw_data['Group'] = raw_data.apply(get_site_group, axis=1)
@@ -1870,14 +1896,26 @@ class ExperimentAnalyzer:
 
         # Transfer efficiency plot removed per user request
 
-    def generate_summary_report(self):
-        """Generate a text summary report with key statistics."""
+    @staticmethod
+    def _count_completed_epochs(df: pd.DataFrame) -> int:
+        """Sum Epochs Completed for successful rows — same logic as the epoch-over-time plots."""
+        mask = (
+            df['Final Status'].isin(['completed', 'checkpointed'])
+            & df['End Time'].notna()
+            & df['Epoch'].notna()
+            & df['Epochs Completed'].notna()
+            & (df['Epochs Completed'] > 0)
+        )
+        return int(df.loc[mask, 'Epochs Completed'].sum())
+
+    def _build_summary_report_lines(self, title: str) -> list[str]:
+        """Build summary report lines using the current self.df."""
         epoch_stats = self.extract_epoch_stats()
         gpu_analysis = self.analyze_gpu_utilization()
         transfer_analysis = self.analyze_data_transfer()
 
         has_completions = not epoch_stats.empty
-        total_completed_epochs = epoch_stats['Successful Jobs'].sum() if has_completions else 0
+        total_completed_epochs = self._count_completed_epochs(self.df)
 
         submit_min = self.df['Submit Time'].dropna().min()
         submit_max = self.df['Submit Time'].dropna().max()
@@ -1887,7 +1925,7 @@ class ExperimentAnalyzer:
         )
 
         report_lines = [
-            "EXPERIMENT ANALYSIS SUMMARY REPORT",
+            title,
             "=" * 50,
             "",
             f"Analysis Period: {period_str}",
@@ -1912,7 +1950,6 @@ class ExperimentAnalyzer:
                     ""
                 ])
 
-        # Overall statistics
         if has_completions:
             total_jobs = epoch_stats['Total Jobs'].sum()
             total_time = epoch_stats['Total Time (hours)'].sum()
@@ -1926,7 +1963,6 @@ class ExperimentAnalyzer:
                 "",
             ])
 
-        # GPU analysis
         if not gpu_analysis['efficiency'].empty:
             report_lines.extend([
                 "GPU UTILIZATION:",
@@ -1941,7 +1977,6 @@ class ExperimentAnalyzer:
 
             report_lines.append("")
 
-        # Data transfer analysis
         if not transfer_analysis['by_resource'].empty:
             report_lines.extend([
                 "DATA TRANSFER:",
@@ -1953,7 +1988,6 @@ class ExperimentAnalyzer:
             for resource, row in transfer_analysis['by_resource'].iterrows():
                 report_lines.append(f"{resource}: {row['Total Transfer (GB)']:,.1f} GB ({row['Job Count']} jobs)")
 
-        # Input file transfer timing analysis
         transfer_timing = self.analyze_transfer_input_timing()
         if transfer_timing['has_data']:
             report_lines.extend([
@@ -1973,13 +2007,44 @@ class ExperimentAnalyzer:
                     f"mean {row['Mean (min)']:.1f} min ({int(row['Job Count'])} jobs)"
                 )
 
-        # Save report
+        return report_lines
+
+    def generate_summary_report(self):
+        """Generate a text summary report with key statistics."""
+        report_lines = self._build_summary_report_lines("EXPERIMENT ANALYSIS SUMMARY REPORT")
         report_text = "\n".join(report_lines)
         report_file = self.output_dir / "experiment_summary_report.txt"
         with open(report_file, 'w') as f:
             f.write(report_text)
 
         print(f"Summary report saved: {report_file}")
+        print("\n" + report_text)
+
+    def generate_monthly_summary_report(self, month: int):
+        """Generate a text summary report filtered to a single month."""
+        month_names = {
+            1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
+            7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
+        }
+        month_name = month_names.get(month, f'Month-{month}')
+
+        original_df = self.df
+        try:
+            self.df = original_df[original_df['End Time'].dt.month == month].copy()
+            if self.df.empty:
+                print(f"No data found for {month_name} — skipping monthly summary report")
+                return
+            title = f"EXPERIMENT ANALYSIS SUMMARY REPORT — {month_name.upper()}"
+            report_lines = self._build_summary_report_lines(title)
+        finally:
+            self.df = original_df
+
+        report_text = "\n".join(report_lines)
+        report_file = self.output_dir / f"experiment_summary_report_{month_name.lower()}.txt"
+        with open(report_file, 'w') as f:
+            f.write(report_text)
+
+        print(f"Monthly summary report saved: {report_file}")
         print("\n" + report_text)
 
     def generate_all_reports(self, monthly_report_month: Optional[int] = None):
@@ -2039,6 +2104,10 @@ class ExperimentAnalyzer:
 
             print("\n9. Generating summary report...")
             self.generate_summary_report()
+
+            if monthly_report_month is not None:
+                print(f"\n9b. Generating monthly summary report ({month_name} only)...")
+                self.generate_monthly_summary_report(monthly_report_month)
 
             print(f"\n✅ All reports generated successfully in {self.output_dir}/")
 
