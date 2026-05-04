@@ -163,7 +163,7 @@ class ExperimentAnalyzer:
 
         # Calculate summary statistics
         summary_stats = []
-        for resource in longest_executions['Targeted Resource'].unique():
+        for resource in longest_executions['Targeted Resource'].dropna().unique():
             resource_data = longest_executions[longest_executions['Targeted Resource'] == resource]
 
             total_jobs = len(resource_data)
@@ -230,7 +230,7 @@ class ExperimentAnalyzer:
 
         # Calculate summary statistics using the new resource column
         summary_stats = []
-        for resource in longest_executions['Resource (with GLIDEIN)'].unique():
+        for resource in longest_executions['Resource (with GLIDEIN)'].dropna().unique():
             resource_data = longest_executions[longest_executions['Resource (with GLIDEIN)'] == resource]
 
             total_jobs = len(resource_data)
@@ -376,6 +376,8 @@ class ExperimentAnalyzer:
 
     def format_resource_name(self, resource_name):
         """Format resource names for display: ospool -> OSPool, others -> Title Case."""
+        if pd.isna(resource_name):
+            return 'Unknown'
         if resource_name.lower() == 'ospool':
             return 'OSPool'
         else:
@@ -394,6 +396,9 @@ class ExperimentAnalyzer:
             'UIUC-TGI-RAILS-CE1': 'UIUC (OSPool)',
             'PDX-Coeus-CE1': 'PDX-Coeus (OSPool)',
         }
+
+        if pd.isna(resource_name):
+            return 'Unknown'
 
         # Check if it's a GLIDEIN resource
         if resource_name in glidein_mappings:
@@ -423,6 +428,9 @@ class ExperimentAnalyzer:
         # Return colors for the resources present in the data
         colors = []
         for resource in resources:
+            if pd.isna(resource):
+                colors.append('#808080')
+                continue
             resource_key = resource.lower()
             if resource_key in resource_color_map:
                 colors.append(resource_color_map[resource_key])
@@ -458,6 +466,9 @@ class ExperimentAnalyzer:
         # Return colors for the GPU types present in the data
         colors = []
         for gpu_type in gpu_types:
+            if pd.isna(gpu_type):
+                colors.append('#808080')
+                continue
             # Try exact match first
             if gpu_type in gpu_color_map:
                 colors.append(gpu_color_map[gpu_type])
@@ -813,6 +824,8 @@ class ExperimentAnalyzer:
         # Clean up GPU names for better display and create ordered categories
         gpu_runtime_data['GPU Type'] = gpu_runtime_data['GPU Device Name'].str.replace('NVIDIA ', '').str.replace('Tesla ', '')
 
+        gpu_runtime_data['Targeted Resource'] = gpu_runtime_data['Targeted Resource'].fillna('Unknown')
+
         # Create figure with appropriate size
         fig, ax = plt.subplots(1, 1, figsize=(18, 10))
 
@@ -1011,6 +1024,7 @@ class ExperimentAnalyzer:
 
         # Convert End Time to datetime and extract date
         completed_data['End Date'] = completed_data['End Time'].dt.date
+        completed_data['Targeted Resource'] = completed_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, count the epochs completed on that day
         daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
@@ -1145,6 +1159,8 @@ class ExperimentAnalyzer:
             print(f"No completed epoch data found for {month_name}")
             return
 
+        completed_data['Targeted Resource'] = completed_data['Targeted Resource'].fillna('Unknown')
+
         # For each job completion, count the epochs completed on that day
         daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
 
@@ -1260,6 +1276,7 @@ class ExperimentAnalyzer:
 
         # Convert End Time to datetime and extract date
         completed_data['End Date'] = completed_data['End Time'].dt.date
+        completed_data['Targeted Resource'] = completed_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, count the epochs completed on that day
         daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
@@ -1371,6 +1388,7 @@ class ExperimentAnalyzer:
 
         # Convert End Time to datetime and extract date
         gpu_data['End Date'] = gpu_data['End Time'].dt.date
+        gpu_data['Targeted Resource'] = gpu_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, sum the GPU hours used on that day
         daily_gpu_hours = gpu_data.groupby(['End Date', 'Targeted Resource'])['GPU Hours'].sum().reset_index()
@@ -1507,6 +1525,8 @@ class ExperimentAnalyzer:
         if gpu_data.empty:
             print(f"No GPU usage data found for {month_name}")
             return
+
+        gpu_data['Targeted Resource'] = gpu_data['Targeted Resource'].fillna('Unknown')
 
         # For each job completion, sum the GPU hours used on that day
         daily_gpu_hours = gpu_data.groupby(['End Date', 'Targeted Resource'])['GPU Hours'].sum().reset_index()
@@ -1696,19 +1716,25 @@ class ExperimentAnalyzer:
 
         # For OSPool, use GLIDEIN Resource Name; for others, use Targeted Resource
         def get_site_label(row):
-            if row['Targeted Resource'].lower() == 'ospool':
+            resource = row['Targeted Resource']
+            if pd.isna(resource):
+                return 'Unknown'
+            if resource.lower() == 'ospool':
                 glidein = row.get('GLIDEIN Resource Name', 'Unknown')
                 if pd.isna(glidein) or glidein == '':
                     return 'Unknown'
                 return glidein
             else:
-                return row['Targeted Resource']
+                return resource
 
         def get_site_group(row):
-            if row['Targeted Resource'].lower() == 'ospool':
+            resource = row['Targeted Resource']
+            if pd.isna(resource):
+                return 'Unknown'
+            if resource.lower() == 'ospool':
                 return 'OSPool'
             else:
-                return row['Targeted Resource']
+                return resource
 
         raw_data['Site'] = raw_data.apply(get_site_label, axis=1)
         raw_data['Group'] = raw_data.apply(get_site_group, axis=1)
