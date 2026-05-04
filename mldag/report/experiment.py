@@ -1870,6 +1870,18 @@ class ExperimentAnalyzer:
 
         # Transfer efficiency plot removed per user request
 
+    @staticmethod
+    def _count_completed_epochs(df: pd.DataFrame) -> int:
+        """Sum Epochs Completed for successful rows — same logic as the epoch-over-time plots."""
+        mask = (
+            df['Final Status'].isin(['completed', 'checkpointed'])
+            & df['End Time'].notna()
+            & df['Epoch'].notna()
+            & df['Epochs Completed'].notna()
+            & (df['Epochs Completed'] > 0)
+        )
+        return int(df.loc[mask, 'Epochs Completed'].sum())
+
     def _build_summary_report_lines(self, title: str) -> list[str]:
         """Build summary report lines using the current self.df."""
         epoch_stats = self.extract_epoch_stats()
@@ -1877,7 +1889,7 @@ class ExperimentAnalyzer:
         transfer_analysis = self.analyze_data_transfer()
 
         has_completions = not epoch_stats.empty
-        total_completed_epochs = epoch_stats['Successful Jobs'].sum() if has_completions else 0
+        total_completed_epochs = self._count_completed_epochs(self.df)
 
         submit_min = self.df['Submit Time'].dropna().min()
         submit_max = self.df['Submit Time'].dropna().max()
@@ -1992,7 +2004,7 @@ class ExperimentAnalyzer:
 
         original_df = self.df
         try:
-            self.df = original_df[original_df['Submit Time'].dt.month == month].copy()
+            self.df = original_df[original_df['End Time'].dt.month == month].copy()
             if self.df.empty:
                 print(f"No data found for {month_name} — skipping monthly summary report")
                 return
