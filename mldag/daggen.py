@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import os
 import sys
+from pathlib import Path
 import typer
 from typing_extensions import Annotated
 import textwrap
@@ -177,6 +177,8 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
     dag_txt += textwrap.dedent(get_service(python_exe=sys.executable))
 
+    Path("output/provenance").mkdir(parents=True, exist_ok=True)
+
     # Grab the resources, if targeting is desired
     resources = []
 #    resources = get_ospool_resources()
@@ -214,8 +216,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         # Initialize the run
         run_prefix = f'run{i}'
 
-        if not os.path.exists(tr.run_uuid):
-            os.makedirs(tr.run_uuid)
+        Path(tr.run_uuid).mkdir(exist_ok=True)
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             resource = tr.resources[j] if tr.resources else Resource(name="default")

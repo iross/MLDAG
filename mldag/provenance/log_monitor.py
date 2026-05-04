@@ -183,6 +183,14 @@ def monitor_once(
         if run_id:
             run_id_cache[cluster_id] = run_id
             del pending_lookups[cluster_id]
+            emit_event(
+                "job.queued",
+                run_id,
+                log_dir=provenance_log_dir,
+                cluster_id=cluster_id,
+                job_name=job_name,
+                source="htcondor_event_log",
+            )
 
     lines, new_offset = _scan_new_lines(log_path, byte_offset)
     for line in lines:
@@ -205,6 +213,14 @@ def monitor_once(
                 run_id = _job_name_to_run_id(job_name, provenance_log_dir)
                 if run_id:
                     run_id_cache[cluster_id] = run_id
+                    emit_event(
+                        "job.queued",
+                        run_id,
+                        log_dir=provenance_log_dir,
+                        cluster_id=cluster_id,
+                        job_name=job_name,
+                        source="htcondor_event_log",
+                    )
                 else:
                     pending_lookups[cluster_id] = job_name
             multiline_state["cluster_id"] = None

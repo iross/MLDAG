@@ -158,6 +158,11 @@ def test_monitor_once_event_000_dag_node_populates_cache(tmp_path):
     cache: dict = {}
     monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache)
     assert cache.get(5055662) == "run-abc"
+    events = _read_events(prov_dir, "run-abc")
+    queued = [e for e in events if e["type"] == "job.queued"]
+    assert len(queued) == 1
+    assert queued[0]["cluster_id"] == 5055662
+    assert queued[0]["job_name"] == "run0-train_epoch0"
 
 
 def test_monitor_once_event_000_then_executing_resolves_run_id(tmp_path):
@@ -175,7 +180,7 @@ def test_monitor_once_event_000_then_executing_resolves_run_id(tmp_path):
     )
     monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
     events = _read_events(prov_dir, "run-abc")
-    assert len(events) == 2  # job.submitted (written earlier) + job.executing
+    assert len(events) == 3  # job.submitted (written earlier) + job.queued + job.executing
     executing = next(e for e in events if e["type"] == "job.executing")
     assert executing["run_id"] == "run-abc"
     assert executing["cluster_id"] == 5055662
@@ -209,6 +214,11 @@ def test_monitor_once_pending_lookup_resolved_on_next_poll(tmp_path):
 
     assert cache.get(5055662) == "run-abc"
     assert 5055662 not in pending
+    events = _read_events(prov_dir, "run-abc")
+    queued = [e for e in events if e["type"] == "job.queued"]
+    assert len(queued) == 1
+    assert queued[0]["cluster_id"] == 5055662
+    assert queued[0]["job_name"] == "run0-train_epoch0"
 
 
 def test_monitor_once_pending_resolved_before_executing_event(tmp_path):
@@ -237,6 +247,9 @@ def test_monitor_once_pending_resolved_before_executing_event(tmp_path):
                  run_id_cache=cache, multiline_state=state, pending_lookups=pending)
 
     events = _read_events(prov_dir, "run-abc")
+    queued = [e for e in events if e["type"] == "job.queued"]
+    assert len(queued) == 1
+    assert queued[0]["cluster_id"] == 5055662
     executing = [e for e in events if e["type"] == "job.executing"]
     assert len(executing) == 1
     assert executing[0]["run_id"] == "run-abc"
@@ -264,6 +277,10 @@ def test_monitor_once_dag_node_across_poll_boundary(tmp_path):
     monitor_once(log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir,
                  run_id_cache=cache, multiline_state=state)
     assert cache.get(5055662) == "run-abc"
+    events = _read_events(prov_dir, "run-abc")
+    queued = [e for e in events if e["type"] == "job.queued"]
+    assert len(queued) == 1
+    assert queued[0]["cluster_id"] == 5055662
 
 
 # --- monitor_once: event emission ---
