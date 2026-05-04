@@ -49,18 +49,23 @@ generate-report-dated pool="ospool":
     uv run mldag-report full_{{ pool }}.csv --output-dir `date +"%Y-%m-%d"`
 
 # Complete workflow: generate CSV and dated report
-full-report pool="ospool": (generate-csv pool) (generate-report-dated pool)
+full-report pool="ospool":
+    just _csv-{{ pool }}
+    uv run mldag-report full_{{ pool }}.csv --output-dir `date +"%Y-%m-%d"`
 
 # Summarize the last 24 hours of job activity
-daily-summary pool="ospool": (generate-csv pool)
+daily-summary pool="ospool":
+    just _csv-{{ pool }}
     uv run mldag-report full_{{ pool }}.csv --hours 24 --output-dir daily_summary
 
 # Summarize the last N hours of job activity (e.g. just recent-summary 48)
-recent-summary hours pool="ospool": (generate-csv pool)
+recent-summary hours pool="ospool":
+    just _csv-{{ pool }}
     uv run mldag-report full_{{ pool }}.csv --hours {{ hours }} --output-dir recent_{{ hours }}h_summary
 
 # Generate interactive HTML dashboard for the last N hours and push to GitHub Pages (ospool only)
-hourly-site hours="24": (generate-csv "ospool")
+hourly-site hours="24":
+    just _csv-ospool
     uv run hourly_dashboard.py full_ospool.csv --output-dir site --hours {{ hours }}
     rm -rf site/.git
     git -C site init
@@ -69,5 +74,6 @@ hourly-site hours="24": (generate-csv "ospool")
     git -C site push --force https://github.com/iross/MLDAG.git HEAD:gh-pages
 
 # Monthly report (e.g. just monthly-report month=10 pool=chtc)
-monthly-report month=MONTH pool="ospool": (generate-csv pool)
+monthly-report month=MONTH pool="ospool":
+    just _csv-{{ pool }}
     uv run mldag-report full_{{ pool }}.csv --month {{ month }} --output-dir month_{{ month }}_reports
