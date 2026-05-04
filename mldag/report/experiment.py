@@ -1870,8 +1870,8 @@ class ExperimentAnalyzer:
 
         # Transfer efficiency plot removed per user request
 
-    def generate_summary_report(self):
-        """Generate a text summary report with key statistics."""
+    def _build_summary_report_lines(self, title: str) -> list[str]:
+        """Build summary report lines using the current self.df."""
         epoch_stats = self.extract_epoch_stats()
         gpu_analysis = self.analyze_gpu_utilization()
         transfer_analysis = self.analyze_data_transfer()
@@ -1887,7 +1887,7 @@ class ExperimentAnalyzer:
         )
 
         report_lines = [
-            "EXPERIMENT ANALYSIS SUMMARY REPORT",
+            title,
             "=" * 50,
             "",
             f"Analysis Period: {period_str}",
@@ -1912,7 +1912,6 @@ class ExperimentAnalyzer:
                     ""
                 ])
 
-        # Overall statistics
         if has_completions:
             total_jobs = epoch_stats['Total Jobs'].sum()
             total_time = epoch_stats['Total Time (hours)'].sum()
@@ -1926,7 +1925,6 @@ class ExperimentAnalyzer:
                 "",
             ])
 
-        # GPU analysis
         if not gpu_analysis['efficiency'].empty:
             report_lines.extend([
                 "GPU UTILIZATION:",
@@ -1941,7 +1939,6 @@ class ExperimentAnalyzer:
 
             report_lines.append("")
 
-        # Data transfer analysis
         if not transfer_analysis['by_resource'].empty:
             report_lines.extend([
                 "DATA TRANSFER:",
@@ -1953,7 +1950,6 @@ class ExperimentAnalyzer:
             for resource, row in transfer_analysis['by_resource'].iterrows():
                 report_lines.append(f"{resource}: {row['Total Transfer (GB)']:,.1f} GB ({row['Job Count']} jobs)")
 
-        # Input file transfer timing analysis
         transfer_timing = self.analyze_transfer_input_timing()
         if transfer_timing['has_data']:
             report_lines.extend([
@@ -1973,13 +1969,44 @@ class ExperimentAnalyzer:
                     f"mean {row['Mean (min)']:.1f} min ({int(row['Job Count'])} jobs)"
                 )
 
-        # Save report
+        return report_lines
+
+    def generate_summary_report(self):
+        """Generate a text summary report with key statistics."""
+        report_lines = self._build_summary_report_lines("EXPERIMENT ANALYSIS SUMMARY REPORT")
         report_text = "\n".join(report_lines)
         report_file = self.output_dir / "experiment_summary_report.txt"
         with open(report_file, 'w') as f:
             f.write(report_text)
 
         print(f"Summary report saved: {report_file}")
+        print("\n" + report_text)
+
+    def generate_monthly_summary_report(self, month: int):
+        """Generate a text summary report filtered to a single month."""
+        month_names = {
+            1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
+            7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
+        }
+        month_name = month_names.get(month, f'Month-{month}')
+
+        original_df = self.df
+        try:
+            self.df = original_df[original_df['Submit Time'].dt.month == month].copy()
+            if self.df.empty:
+                print(f"No data found for {month_name} — skipping monthly summary report")
+                return
+            title = f"EXPERIMENT ANALYSIS SUMMARY REPORT — {month_name.upper()}"
+            report_lines = self._build_summary_report_lines(title)
+        finally:
+            self.df = original_df
+
+        report_text = "\n".join(report_lines)
+        report_file = self.output_dir / f"experiment_summary_report_{month_name.lower()}.txt"
+        with open(report_file, 'w') as f:
+            f.write(report_text)
+
+        print(f"Monthly summary report saved: {report_file}")
         print("\n" + report_text)
 
     def generate_all_reports(self, monthly_report_month: Optional[int] = None):
@@ -2039,6 +2066,10 @@ class ExperimentAnalyzer:
 
             print("\n9. Generating summary report...")
             self.generate_summary_report()
+
+            if monthly_report_month is not None:
+                print(f"\n9b. Generating monthly summary report ({month_name} only)...")
+                self.generate_monthly_summary_report(monthly_report_month)
 
             print(f"\n✅ All reports generated successfully in {self.output_dir}/")
 
