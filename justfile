@@ -77,3 +77,4 @@ hourly-site hours="24":
 monthly-report pool="ospool" month=MONTH:
     just _csv-{{ pool }}
     uv run mldag-report full_{{ pool }}.csv --month {{ month }} --output-dir month_{{ month }}_reports
+    cp full_{{ pool }}.csv month_{{ month }}_reports/
