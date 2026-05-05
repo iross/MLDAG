@@ -76,38 +76,40 @@ def _parse_epoch(checkpoint_path: Path) -> int | None:
 
 
 def _read_metrics_csv(watch_dir: Path) -> dict[int, dict]:
-    """Search for metrics.csv under watch_dir; return {epoch: {metric: value}}.
+    """Search for all metrics.csv files under watch_dir; return {epoch: {metric: value}}.
+
+    All files are read and merged so that resumed runs (which create new Lightning
+    version_N directories, each covering only their own epochs) are combined into a
+    complete picture. Files are processed in sorted path order so later versions win
+    on any duplicate epoch entries.
 
     Multiple rows per epoch are merged; later rows win for duplicate keys.
     Empty and non-numeric values are skipped.
     """
     import csv as _csv
 
-    candidates = sorted(
-        watch_dir.rglob("metrics.csv"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
+    candidates = sorted(watch_dir.rglob("metrics.csv"))
     if not candidates:
         return {}
     result: dict[int, dict] = {}
-    try:
-        with open(candidates[0], newline="") as f:
-            for row in _csv.DictReader(f):
-                try:
-                    epoch = int(float(row["epoch"]))
-                except (KeyError, ValueError, TypeError):
-                    continue
-                metrics = result.setdefault(epoch, {})
-                for k, v in row.items():
-                    if k in ("epoch", "step") or not v:
-                        continue
+    for csv_path in candidates:
+        try:
+            with open(csv_path, newline="") as f:
+                for row in _csv.DictReader(f):
                     try:
-                        metrics[k] = float(v)
-                    except ValueError:
-                        pass
-    except OSError:
-        return {}
+                        epoch = int(float(row["epoch"]))
+                    except (KeyError, ValueError, TypeError):
+                        continue
+                    metrics = result.setdefault(epoch, {})
+                    for k, v in row.items():
+                        if k in ("epoch", "step") or not v:
+                            continue
+                        try:
+                            metrics[k] = float(v)
+                        except ValueError:
+                            pass
+        except OSError:
+            continue
     return result
 
 
@@ -148,6 +150,17 @@ def scan_once(
         parsed = _parse_epoch(ckpt_path)
         epoch = parsed if parsed is not None else seq_index
         ckpt_mtime = ckpt_path.stat().st_mtime
+
+        sidecar_path = Path(str(ckpt_path) + ".provenance.json")
+        if sidecar_path.exists():
+            try:
+                existing = json.loads(sidecar_path.read_text())
+                parent_hash = existing.get("checkpoint_hash")
+            except (json.JSONDecodeError, OSError):
+                pass
+            prev_time = ckpt_mtime
+            continue
+
         duration_s = round(ckpt_mtime - prev_time, 3) if prev_time is not None else None
 
         epoch_csv = csv_metrics.get(epoch, {})

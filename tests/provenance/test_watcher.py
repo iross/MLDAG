@@ -421,3 +421,79 @@ def test_scan_once_parent_hash_chain(tmp_path):
     s1 = json.loads(Path(str(ckpt1) + ".provenance.json").read_text())
     assert s0["parent_hash"] is None
     assert s1["parent_hash"] == s0["checkpoint_hash"]
+
+
+def test_read_metrics_csv_merges_multiple_version_dirs(tmp_path):
+    """Each version_N dir covers only its own epoch; all should be merged."""
+    _write_metrics_csv(tmp_path / "version_0" / "metrics.csv", [
+        {"epoch": "0", "step": "100", "val_loss": "0.9", "train_loss": "1.1"},
+    ])
+    _write_metrics_csv(tmp_path / "version_1" / "metrics.csv", [
+        {"epoch": "1", "step": "200", "val_loss": "0.7", "train_loss": "0.9"},
+    ])
+    result = _read_metrics_csv(tmp_path)
+    assert set(result.keys()) == {0, 1}
+    assert abs(result[0]["val_loss"] - 0.9) < 1e-9
+    assert abs(result[1]["val_loss"] - 0.7) < 1e-9
+
+
+def test_read_metrics_csv_later_version_wins_for_duplicate_epoch(tmp_path):
+    _write_metrics_csv(tmp_path / "version_0" / "metrics.csv", [
+        {"epoch": "0", "step": "100", "val_loss": "0.9"},
+    ])
+    _write_metrics_csv(tmp_path / "version_1" / "metrics.csv", [
+        {"epoch": "0", "step": "100", "val_loss": "0.5"},
+    ])
+    result = _read_metrics_csv(tmp_path)
+    assert abs(result[0]["val_loss"] - 0.5) < 1e-9
+
+
+def test_scan_once_skips_existing_sidecar(tmp_path):
+    """A checkpoint with an existing sidecar must not be overwritten."""
+    log_dir = tmp_path / "provenance"
+    ckpt = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt", b"w0")
+    original_sidecar = {"checkpoint_hash": "sha256:original", "sentinel": True}
+    Path(str(ckpt) + ".provenance.json").write_text(json.dumps(original_sidecar))
+
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+
+    sidecar = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert sidecar.get("sentinel") is True
+
+
+def test_scan_once_skips_existing_threads_parent_hash(tmp_path):
+    """New checkpoint's parent_hash must come from the existing sidecar's checkpoint_hash."""
+    log_dir = tmp_path / "provenance"
+    ckpt0 = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt", b"w0")
+    time.sleep(0.01)
+    ckpt1 = _make_ckpt(tmp_path / "epoch=1-step=200.ckpt", b"w1")
+
+    # Pre-place sidecar for epoch 0 with a known hash
+    existing_hash = "sha256:deadbeef"
+    Path(str(ckpt0) + ".provenance.json").write_text(
+        json.dumps({"checkpoint_hash": existing_hash})
+    )
+
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+
+    s1 = json.loads(Path(str(ckpt1) + ".provenance.json").read_text())
+    assert s1["parent_hash"] == existing_hash
+
+
+def test_scan_once_no_events_for_skipped_checkpoints(tmp_path):
+    """No epoch events should be emitted for checkpoints with existing sidecars."""
+    log_dir = tmp_path / "provenance"
+    ckpt0 = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt", b"w0")
+    time.sleep(0.01)
+    ckpt1 = _make_ckpt(tmp_path / "epoch=1-step=200.ckpt", b"w1")
+
+    Path(str(ckpt0) + ".provenance.json").write_text(
+        json.dumps({"checkpoint_hash": "sha256:deadbeef"})
+    )
+
+    scan_once(tmp_path, "run-1", log_dir=log_dir)
+
+    events = _read_events(log_dir, "run-1")
+    epochs = [e["epoch"] for e in events]
+    assert 0 not in epochs
+    assert 1 in epochs
