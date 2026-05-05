@@ -72,6 +72,10 @@ def emit_post_event(
     log_dir = Path(log_dir)
     ad = parse_classad(log_dir / f"{cluster_id}.ad")
     run_id = run_id_from_classad(ad)
+    if run_id == "unknown":
+        marker = log_dir / f"{cluster_id}.run_id"
+        if marker.exists():
+            run_id = marker.read_text().strip()
     resource = resource_fields_from_classad(ad)
 
     if exit_code == 0:

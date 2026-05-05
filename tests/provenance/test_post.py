@@ -163,13 +163,24 @@ def test_emit_post_event_failed_with_hold_reason(tmp_path):
 
 
 def test_emit_post_event_missing_ad_file(tmp_path):
-    # No ad file written — run_id is unknown, no resource fields
+    # No ad file and no .run_id marker — falls back to "unknown"
     emit_post_event("run0-train_epoch0", 0, "99999", log_dir=tmp_path)
     events = _read_events(tmp_path, "unknown")
     e = events[0]
     assert e["type"] == "job.completed"
     assert e["run_id"] == "unknown"
     assert "wall_time_s" not in e
+
+
+def test_emit_post_event_run_id_marker_fallback(tmp_path):
+    # .ad has no PROVENANCE_RUN_ID but .run_id marker resolves it
+    _write_ad(tmp_path, {k: v for k, v in SAMPLE_AD.items() if k != "Environment"})
+    (tmp_path / "12345.run_id").write_text("run-abc123")
+    emit_post_event("run0-train_epoch0", 0, "12345", log_dir=tmp_path)
+    events = _read_events(tmp_path, "run-abc123")
+    assert len(events) == 1
+    assert events[0]["run_id"] == "run-abc123"
+    assert events[0]["type"] == "job.completed"
 
 
 def test_emit_post_event_completed_no_hold_reason_field(tmp_path):

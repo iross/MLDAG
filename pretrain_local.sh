@@ -32,6 +32,10 @@ def run(cmd):
 gpu_count = torch.cuda.device_count()
 gpu_model = torch.cuda.get_device_name(0) if gpu_count > 0 else "none"
 cuda = torch.version.cuda or "unknown"
+try:
+    gpu_id = str(torch.cuda.get_device_properties(0).uuid) if gpu_count > 0 else "none"
+except AttributeError:
+    gpu_id = "unknown"
 hostname = run(["hostname", "-f"]) or run(["hostname"]) or "unknown"
 python_ver = run([sys.executable, "--version"]).replace("Python ", "")
 commit = run(["git", "rev-parse", "--short", "HEAD"]) or "unknown"
@@ -45,6 +49,7 @@ site_info = {
     "slot": slot,
     "gpu_model": gpu_model,
     "gpu_count": gpu_count,
+    "gpu_id": gpu_id,
 }
 env_info = {
     "python": python_ver,
@@ -111,5 +116,6 @@ python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain
     --max_epochs $epochs --uuid=$run_uuid  \
     --random_seed $random_seed
 
-python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" \
-    --one-shot --start-time "$_TRAIN_START"
+_watcher_args=(--one-shot --start-time "$_TRAIN_START")
+[ -f disk_bench.json ] && _watcher_args+=(--extra-sidecar-json disk_bench.json)
+python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" "${_watcher_args[@]}"

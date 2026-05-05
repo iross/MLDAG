@@ -37,6 +37,7 @@ def test_load_site_info_reads_file(tmp_path):
             "slot": "slot1_1",
             "gpu_model": "A100",
             "gpu_count": 4,
+            "gpu_id": "GPU-abc123",
             "python": "3.11.4",
             "cuda": "12.2",
             "code_commit": "abc123",
@@ -45,8 +46,10 @@ def test_load_site_info_reads_file(tmp_path):
     site, env = _load_site_info(tmp_path)
     assert site["hostname"] == "gpu04.chtc.wisc.edu"
     assert site["gpu_model"] == "A100"
+    assert site["gpu_id"] == "GPU-abc123"
     assert env["python"] == "3.11.4"
     assert env["cuda"] == "12.2"
+    assert "gpu_id" not in env
 
 
 def test_load_site_info_missing_file(tmp_path):
@@ -367,6 +370,45 @@ def test_scan_once_val_loss_fallback_to_filename(tmp_path):
     completed = next(e for e in events if e["type"] == "epoch.completed")
     assert abs(completed["val_loss"] - 0.55) < 1e-9
     assert completed["val_loss_source"] == "checkpoint_filename"
+
+
+def test_scan_once_sidecar_training_populated_from_csv(tmp_path):
+    log_dir = tmp_path / "provenance"
+    ckpt = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt")
+    _write_metrics_csv(tmp_path / "metrics.csv", [
+        {"epoch": "0", "step": "100", "val_loss": "0.42", "train_loss": "0.7"},
+    ])
+    start = ckpt.stat().st_mtime - 30.0
+    scan_once(tmp_path, "run-1", log_dir=log_dir, start_time=start)
+    sidecar = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert abs(sidecar["training"]["val_loss"] - 0.42) < 1e-9
+    assert abs(sidecar["training"]["train_loss"] - 0.7) < 1e-9
+    assert sidecar["training"]["duration_s"] > 0
+
+
+def test_scan_once_sidecar_training_empty_without_csv(tmp_path):
+    log_dir = tmp_path / "provenance"
+    ckpt = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt")
+    scan_once(tmp_path, "run-1", log_dir=log_dir, start_time=None)
+    sidecar = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert sidecar["training"] == {}
+
+
+def test_scan_once_extra_sidecar_written(tmp_path):
+    log_dir = tmp_path / "provenance"
+    ckpt = _make_ckpt(tmp_path / "epoch=0-step=100.ckpt")
+    scan_once(tmp_path, "run-1", log_dir=log_dir, extra_sidecar={"disk_read_mbs": 1200.5})
+    sidecar = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert sidecar["extra"] == {"disk_read_mbs": 1200.5}
+
+
+def test_watch_and_emit_sidecar_training_populated(tmp_path):
+    log_dir = tmp_path / "provenance"
+    ckpt = _make_ckpt(tmp_path / "epoch=0-step=100-val_loss=0.33.ckpt")
+    watch_and_emit(tmp_path, "run-1", poll_interval=0, idle_timeout=0, log_dir=log_dir)
+    sidecar = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert "duration_s" in sidecar["training"]
+    assert abs(sidecar["training"]["val_loss"] - 0.33) < 1e-9
 
 
 def test_scan_once_parent_hash_chain(tmp_path):

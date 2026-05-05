@@ -49,7 +49,7 @@ def _load_site_info(watch_dir: Path) -> tuple[dict, dict]:
         data = json.loads(site_json.read_text())
     except (json.JSONDecodeError, OSError):
         return {}, {}
-    site_keys = {"hostname", "slot", "gpu_model", "gpu_count"}
+    site_keys = {"hostname", "slot", "gpu_model", "gpu_count", "gpu_id"}
     site_info = {k: v for k, v in data.items() if k in site_keys}
     env_info = {k: v for k, v in data.items() if k not in site_keys}
     return site_info, env_info
@@ -118,6 +118,7 @@ def scan_once(
     pattern: str = "*.ckpt",
     log_dir: str | Path = _DEFAULT_LOG_DIR,
     start_time: float | None = None,
+    extra_sidecar: dict | None = None,
 ) -> None:
     """Single-pass scan: emit epoch events and write sidecars for all checkpoints.
 
@@ -149,25 +150,33 @@ def scan_once(
         ckpt_mtime = ckpt_path.stat().st_mtime
         duration_s = round(ckpt_mtime - prev_time, 3) if prev_time is not None else None
 
+        epoch_csv = csv_metrics.get(epoch, {})
+        val_loss = epoch_csv.get("val_loss") or _parse_val_loss(ckpt_path)
+        val_loss_source = "metrics_csv" if "val_loss" in epoch_csv else "checkpoint_filename"
+
+        training_data: dict = {**epoch_csv}
+        if duration_s is not None:
+            training_data["duration_s"] = duration_s
+        if val_loss is not None and "val_loss" not in epoch_csv:
+            training_data["val_loss"] = val_loss
+
         emit_event(
             "epoch.started", run_id, log_dir=log_dir,
             epoch=epoch, checkpoint_in_hash=parent_hash,
             source="checkpoint_file_watcher",
         )
 
-        new_hash = write_sidecar(ckpt_path, run_id, epoch, parent_hash, site_info, env_info, {})
+        new_hash = write_sidecar(
+            ckpt_path, run_id, epoch, parent_hash, site_info, env_info, training_data,
+            extra_sidecar or {},
+        )
 
         completed_fields: dict = {"checkpoint_out_hash": new_hash, "source": "checkpoint_file_watcher"}
         if duration_s is not None:
             completed_fields["duration_s"] = duration_s
-
-        epoch_csv = csv_metrics.get(epoch, {})
-        val_loss = epoch_csv.get("val_loss") or _parse_val_loss(ckpt_path)
         if val_loss is not None:
             completed_fields["val_loss"] = val_loss
-            completed_fields["val_loss_source"] = (
-                "metrics_csv" if "val_loss" in epoch_csv else "checkpoint_filename"
-            )
+            completed_fields["val_loss_source"] = val_loss_source
 
         emit_event("epoch.completed", run_id, log_dir=log_dir, epoch=epoch, **completed_fields)
 
@@ -183,6 +192,7 @@ def watch_and_emit(
     poll_interval: float = 10.0,
     idle_timeout: float = 3600.0,
     log_dir: str | Path = _DEFAULT_LOG_DIR,
+    extra_sidecar: dict | None = None,
 ) -> None:
     """Poll watch_dir until SIGTERM or idle_timeout with no new checkpoints.
 
@@ -221,6 +231,12 @@ def watch_and_emit(
                 source="checkpoint_file_watcher",
             )
 
+            duration_s = round(time.time() - epoch_start, 3)
+            val_loss = _parse_val_loss(ckpt_path)
+            training_data: dict = {"duration_s": duration_s}
+            if val_loss is not None:
+                training_data["val_loss"] = val_loss
+
             new_hash = write_sidecar(
                 ckpt_path,
                 run_id,
@@ -228,16 +244,15 @@ def watch_and_emit(
                 parent_hash,
                 site_info,
                 env_info,
-                {},
+                training_data,
+                extra_sidecar or {},
             )
 
-            duration_s = round(time.time() - epoch_start, 3)
             completed_fields: dict = {
                 "checkpoint_out_hash": new_hash,
                 "duration_s": duration_s,
                 "source": "checkpoint_file_watcher",
             }
-            val_loss = _parse_val_loss(ckpt_path)
             if val_loss is not None:
                 completed_fields["val_loss"] = val_loss
                 completed_fields["val_loss_source"] = "checkpoint_filename"
@@ -268,9 +283,20 @@ def main() -> None:
                         help="Unix timestamp of training start for epoch 0 duration_s")
     parser.add_argument("--poll-interval", type=float, default=10.0, metavar="S")
     parser.add_argument("--idle-timeout", type=float, default=3600.0, metavar="S")
+    parser.add_argument(
+        "--extra-sidecar-json", default=None, metavar="FILE",
+        help="JSON file whose contents are merged into each sidecar's 'extra' field",
+    )
     args = parser.parse_args()
 
     log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
+    extra_sidecar: dict = {}
+    if args.extra_sidecar_json:
+        try:
+            extra_sidecar = json.loads(Path(args.extra_sidecar_json).read_text())
+        except (OSError, json.JSONDecodeError):
+            pass
+
     if args.one_shot:
         scan_once(
             args.watch_dir,
@@ -278,6 +304,7 @@ def main() -> None:
             pattern=args.pattern,
             log_dir=log_dir,
             start_time=args.start_time,
+            extra_sidecar=extra_sidecar,
         )
     else:
         watch_and_emit(
@@ -287,6 +314,7 @@ def main() -> None:
             poll_interval=args.poll_interval,
             idle_timeout=args.idle_timeout,
             log_dir=log_dir,
+            extra_sidecar=extra_sidecar,
         )
 
 
