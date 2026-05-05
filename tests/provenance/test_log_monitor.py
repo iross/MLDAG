@@ -4,7 +4,9 @@ from pathlib import Path
 from mldag.provenance.log_monitor import (
     _parse_event_line,
     _job_name_to_run_id,
+    _load_cache,
     _load_offset,
+    _save_cache,
     _save_offset,
     monitor_once,
 )
@@ -517,3 +519,66 @@ def test_load_offset_returns_zero_on_corrupt_file(tmp_path):
     offset_path = tmp_path / ".log_monitor.offset"
     offset_path.write_text("not-a-number")
     assert _load_offset(offset_path, log) == 0
+
+
+# --- _save_cache / _load_cache (Fix 1: cache persistence across SERVICE restarts) ---
+
+
+def test_save_and_load_cache_roundtrip(tmp_path):
+    cache = {12345: "run-abc", 99: "run-xyz"}
+    cache_path = tmp_path / ".log_monitor.cache.json"
+    _save_cache(cache_path, cache)
+    assert _load_cache(cache_path) == cache
+
+
+def test_load_cache_returns_empty_dict_when_missing(tmp_path):
+    assert _load_cache(tmp_path / ".log_monitor.cache.json") == {}
+
+
+def test_load_cache_returns_empty_dict_on_corrupt(tmp_path):
+    cache_path = tmp_path / ".log_monitor.cache.json"
+    cache_path.write_text("not-json")
+    assert _load_cache(cache_path) == {}
+
+
+def test_monitor_once_prepopulated_cache_resolves_transfer_event(tmp_path):
+    """Cache loaded from disk (e.g. after SERVICE restart) resolves a 040 event."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    log = tmp_path / "metl.log"
+    _write_log(log, "040 (5055662.000.000) 2026-04-29 10:00:00 Started transferring input files\n")
+
+    cache = {5055662: "run-abc"}
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache)
+
+    events = _read_events(prov_dir, "run-abc")
+    assert len(events) == 1
+    assert events[0]["type"] == "transfer.input.started"
+    assert events[0]["run_id"] == "run-abc"
+
+
+# --- Fix 2: inline pending_lookups retry when _resolve_run_id returns unknown ---
+
+
+def test_monitor_once_same_poll_000_and_transfer_with_ndjson_available(tmp_path):
+    """000 and 040 in same poll with NDJSON present: transfer resolves via cache set by 000."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    log = tmp_path / "metl.log"
+    _write_log(log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        "    DAG Node: run0-train_epoch0\n"
+        "...\n"
+        "040 (5055662.000.000) 2026-04-29 10:00:01 Started transferring input files\n"
+    )
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    events = _read_events(prov_dir, "run-abc")
+    types = [e["type"] for e in events]
+    assert "job.queued" in types
+    assert "transfer.input.started" in types
+    transfer = next(e for e in events if e["type"] == "transfer.input.started")
+    assert transfer["run_id"] == "run-abc"

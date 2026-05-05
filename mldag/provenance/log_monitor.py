@@ -238,6 +238,21 @@ def monitor_once(
         else:
             event_type = _CODE_TO_EVENT[code]
         run_id, resource = _resolve_run_id(cluster_id, log_dir, run_id_cache)
+        if run_id.startswith("unknown:") and cluster_id in pending_lookups:
+            job_name = pending_lookups[cluster_id]
+            resolved = _job_name_to_run_id(job_name, provenance_log_dir)
+            if resolved:
+                run_id = resolved
+                run_id_cache[cluster_id] = run_id
+                del pending_lookups[cluster_id]
+                emit_event(
+                    "job.queued",
+                    run_id,
+                    log_dir=provenance_log_dir,
+                    cluster_id=cluster_id,
+                    job_name=job_name,
+                    source="htcondor_event_log",
+                )
         emit_event(
             event_type,
             run_id,
@@ -248,6 +263,22 @@ def monitor_once(
             **resource,
         )
     return new_offset
+
+
+def _save_cache(cache_path: Path, run_id_cache: dict[int, str]) -> None:
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps({str(k): v for k, v in run_id_cache.items()}))
+    except OSError:
+        pass
+
+
+def _load_cache(cache_path: Path) -> dict[int, str]:
+    try:
+        data = json.loads(cache_path.read_text())
+        return {int(k): v for k, v in data.items()}
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
 
 
 def _load_offset(offset_path: Path, log_path: Path) -> int:
@@ -283,8 +314,9 @@ def watch_log(
     provenance_log_dir = Path(provenance_log_dir)
 
     offset_path = provenance_log_dir / ".log_monitor.offset"
+    cache_path = provenance_log_dir / ".log_monitor.cache.json"
     byte_offset = _load_offset(offset_path, log_path)
-    run_id_cache: dict[int, str] = {}
+    run_id_cache = _load_cache(cache_path)
     multiline_state: dict = {"cluster_id": None}
     pending_lookups: dict[int, str] = {}
 
@@ -299,6 +331,7 @@ def watch_log(
             pending_lookups=pending_lookups,
         )
         _save_offset(offset_path, byte_offset)
+        _save_cache(cache_path, run_id_cache)
         time.sleep(poll_interval)
 
 
