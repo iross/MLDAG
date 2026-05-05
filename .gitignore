@@ -32,6 +32,9 @@ data/EventLog*
 data/gel_timestamp.txt
 data/logs/
 
+# Dashboard (managed separately via hourly-site recipe, pushed to gh-pages)
+site/
+
 # Report and experiment output
 archive/
 output/

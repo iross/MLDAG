@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
-import os
+import subprocess
+import sys
+from pathlib import Path
 import typer
 from typing_extensions import Annotated
 import textwrap
-import htcondor
+import htcondor2 as htcondor
 import random
 from pydantic import BaseModel
 import yaml
@@ -13,6 +15,16 @@ from mldag.models.training_run import TrainingRun
 from mldag.models.experiment import Experiment, read_from_config
 
 EVAL=False
+
+
+def _mldag_commit() -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "unknown"
 
 class Job(BaseModel):
     name: str # combination of epoch and type
@@ -75,20 +87,28 @@ def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
     return vars_txt
 
 def get_script(job: Job, resource: Resource, config: dict) -> str:
-    script_txt = ''
-    if resource.resource_type == ResourceType.ANNEX:
-        script_txt += f'SCRIPT PRE {job.name} pre_request_annex.sh {resource.name} {resource.name}_annex\n'
+    # Use the exact Python that ran mldag-gen so the script works regardless
+    # of PATH in the DAGMan environment.  VARS macros ($(run_uuid)) are not
+    # available in SCRIPT args, so run_uuid and epoch are embedded here.
+    python = sys.executable
+    pre_args = f'{job.run_uuid} {job.name} {job.epoch}'
+    if resource.resource_type == ResourceType.ANNEX and resource.annex:
+        # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
+        # DAGMan allows only one SCRIPT PRE per node.
+        pre_args += f' --annex {resource.name}'
+    script_txt = f'SCRIPT PRE  {job.name} {python} -m mldag.provenance.pre {pre_args}\n'
+    script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post $JOB $RETURN $JOBID\n'
     return script_txt
 
-def get_service() -> str:
-    service_txt = textwrap.dedent("""\
-    SUBMIT-DESCRIPTION annex_helper.sub {
+def get_service(python_exe: str = "python3") -> str:
+    service_txt = textwrap.dedent(f"""\
+    SUBMIT-DESCRIPTION provenance_monitor.sub {{
         universe = local
-        executable = /home/ian.ross/MLDAG/.venv/bin/python
-        arguments = annex_helper.py watch --interval 60
+        executable = {python_exe}
+        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir output/provenance
         queue
-    }
-    SERVICE annex_helper annex_helper.sub
+    }}
+    SERVICE provenance_monitor provenance_monitor.sub
     """)
     return service_txt
 
@@ -97,7 +117,7 @@ class EvaluationRun:
         raise NotImplementedError("EvaluationRun is not implemented")
 
 
-def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment) -> str:
+def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment, mldag_commit: str = "unknown") -> str:
     inner_txt = experiment.submit_template.format(resource = resource)
 
     # Hacky. Fix this.
@@ -105,12 +125,13 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
         inner_txt = inner_txt.strip().rstrip("queue")
     if resource.resource_type == ResourceType.OSPOOL:
         inner_txt += f'TARGET.GLIDEIN_ResourceName == "{resource.name}"\n'
-    elif resource.resource_type == ResourceType.ANNEX:
+    elif resource.resource_type == ResourceType.ANNEX and resource.annex:
         inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex"\n'
-    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)"]
+    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)", f"MLDAG_COMMIT={mldag_commit}"]
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
+    inner_txt += 'job_ad_file = output/provenance/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -120,7 +141,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     dag_txt += "}\n"
     return dag_txt
 
-def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
+def get_ospool_submit_description(config: dict, experiment: Experiment, mldag_commit: str = "unknown") -> str:
     """Create a shared submit description for OSPool resources"""
     inner_txt = experiment.submit_template.format(resource=Resource(name="ospool", resource_type=ResourceType.OSPOOL))
 
@@ -131,10 +152,11 @@ def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
     # OSPool resources will use TARGET.GLIDEIN_ResourceName variable instead of hardcoding
     inner_txt += 'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"\n'
 
-    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)"]
+    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)", f"MLDAG_COMMIT={mldag_commit}"]
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
+    inner_txt += 'job_ad_file = output/provenance/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -149,7 +171,9 @@ app = typer.Typer()
 def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")] = 'config.yaml'):
     config = yaml.safe_load(open(config, 'r'))
     experiment = read_from_config("Experiment.yaml")
+    ename = experiment.name.replace(' ', '_').lower()
     dag_txt = ''
+    mldag_commit = _mldag_commit()
 
     num_epoch = experiment.vars['epochs']
     epochs_per_job = experiment.vars['epochs_per_job']
@@ -163,10 +187,13 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # dag_txt += 'JOB sweep_init sweep_init.sub\n'
     # dag_txt += f'VARS sweep_init config_pathname="config.yaml" output_config_pathname="{sweep_config_name}"\n'
 
-    dag_txt += textwrap.dedent(get_service())
+    dag_txt += textwrap.dedent(get_service(python_exe=sys.executable))
+
+    Path("output/provenance").mkdir(parents=True, exist_ok=True)
 
     # Grab the resources, if targeting is desired
-    resources = get_ospool_resources()
+    resources = []
+#    resources = get_ospool_resources()
     resources += get_resources_from_yaml()
 
     # Create experiment permutations and expansion
@@ -189,20 +216,19 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
     # Generate shared ospool submit description if there are any ospool resources
     if ospool_resources:
-        dag_txt += get_ospool_submit_description(config, experiment)
+        dag_txt += get_ospool_submit_description(config, experiment, mldag_commit)
 
     # Generate individual submit descriptions for non-ospool resources
     for resource in resources:
         if resource.resource_type != ResourceType.OSPOOL:
-            dag_txt += get_submit_description(None, resource, config, experiment)
+            dag_txt += get_submit_description(None, resource, config, experiment, mldag_commit)
 
     i = 0
     for tr in experiment.training_runs: # for each shishkabob
         # Initialize the run
         run_prefix = f'run{i}'
 
-        if not os.path.exists(tr.run_uuid):
-            os.makedirs(tr.run_uuid)
+        Path(tr.run_uuid).mkdir(exist_ok=True)
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
             resource = tr.resources[j] if tr.resources else Resource(name="default")
@@ -245,7 +271,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     dag_txt += '\nRETRY ALL_NODES 3\n'
     dag_txt += 'NODE_STATUS_FILE nodes.dag.status 30\n'
 
-    ename = experiment.name.replace(' ', '_').lower()
     with open(f'{ename}.dag', 'w') as f:
         f.write(dag_txt)
     print(f'generated {ename}.dag')

@@ -20,6 +20,7 @@ dependencies = [
     "seaborn>=0.13.2",
     "typer>=0.16.0",
     "plotly>=5.24.0",
+    "htcondor>=25.8.2",
 ]
 
 [project.scripts]
@@ -27,6 +28,10 @@ mldag-gen     = "mldag.daggen:app"
 mldag-csv     = "mldag.report.csv:main"
 mldag-report  = "mldag.report.experiment:main"
 mldag-monitor = "mldag.monitor.htcondor:main"
+mldag-pre         = "mldag.provenance.pre:main"
+mldag-log-monitor = "mldag.provenance.log_monitor:main"
+mldag-post    = "mldag.provenance.post:main"
+mldag-query   = "mldag.provenance.query:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mldag"]

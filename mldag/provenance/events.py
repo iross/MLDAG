@@ -9,6 +9,8 @@ Event log location: <log_dir>/<run_id>.ndjson
 Default log_dir:    output/provenance
 """
 
+from __future__ import annotations
+
 import json
 import os
 from datetime import datetime, timezone
@@ -18,10 +20,20 @@ SCHEMA_VERSION = "1.0"
 
 VALID_EVENT_TYPES: frozenset[str] = frozenset({
     "job.submitted",
+    "job.queued",
     "job.assigned",
+    "job.executing",
+    "job.reconnected",
+    "job.aborted",
+    "transfer.input.started",
+    "transfer.input.completed",
+    "transfer.output.started",
+    "transfer.output.completed",
     "epoch.started",
     "epoch.completed",
     "job.migrated",
+    "job.held",
+    "job.released",
     "job.failed",
     "job.completed",
 })

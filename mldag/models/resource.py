@@ -9,7 +9,6 @@ class ResourceType(Enum):
 
 class Resource(BaseModel):
     name: Optional[str] = "default"
-    # annex_name: Optional[str] = None
     queue_at_system: Optional[str] = None
     login_name: Optional[str] = None
     allocation: Optional[str] = None
@@ -23,6 +22,7 @@ class Resource(BaseModel):
     two_factor_auth: bool = False
     login_node: Optional[str] = None
     resource_type: ResourceType = ResourceType.OSPOOL
+    annex: bool = True
 
 def get_resource_names(yaml_path: str = "resources.yaml") -> list[str]:
     with open(yaml_path, 'r') as f:
@@ -39,4 +39,5 @@ def get_resource_from_yaml(yaml_path: str = "resources.yaml", resource_name: str
         resource_defs['queue_at_system'] = f"{resource_defs['queue']}@{resource_name}"
         resource_defs['name'] = resource_name
         resource_defs['resource_type'] = ResourceType.ANNEX
+        resource_defs.setdefault('annex', True)
         return Resource(**resource_defs)
