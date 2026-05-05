@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import subprocess
 import sys
 from pathlib import Path
 import typer
@@ -14,6 +15,16 @@ from mldag.models.training_run import TrainingRun
 from mldag.models.experiment import Experiment, read_from_config
 
 EVAL=False
+
+
+def _mldag_commit() -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "unknown"
 
 class Job(BaseModel):
     name: str # combination of epoch and type
@@ -106,7 +117,7 @@ class EvaluationRun:
         raise NotImplementedError("EvaluationRun is not implemented")
 
 
-def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment) -> str:
+def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment, mldag_commit: str = "unknown") -> str:
     inner_txt = experiment.submit_template.format(resource = resource)
 
     # Hacky. Fix this.
@@ -116,7 +127,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
         inner_txt += f'TARGET.GLIDEIN_ResourceName == "{resource.name}"\n'
     elif resource.resource_type == ResourceType.ANNEX and resource.annex:
         inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex"\n'
-    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)"]
+    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)", f"MLDAG_COMMIT={mldag_commit}"]
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
@@ -130,7 +141,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     dag_txt += "}\n"
     return dag_txt
 
-def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
+def get_ospool_submit_description(config: dict, experiment: Experiment, mldag_commit: str = "unknown") -> str:
     """Create a shared submit description for OSPool resources"""
     inner_txt = experiment.submit_template.format(resource=Resource(name="ospool", resource_type=ResourceType.OSPOOL))
 
@@ -141,7 +152,7 @@ def get_ospool_submit_description(config: dict, experiment: Experiment) -> str:
     # OSPool resources will use TARGET.GLIDEIN_ResourceName variable instead of hardcoding
     inner_txt += 'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"\n'
 
-    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)"]
+    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)", f"MLDAG_COMMIT={mldag_commit}"]
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
@@ -162,6 +173,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     experiment = read_from_config("Experiment.yaml")
     ename = experiment.name.replace(' ', '_').lower()
     dag_txt = ''
+    mldag_commit = _mldag_commit()
 
     num_epoch = experiment.vars['epochs']
     epochs_per_job = experiment.vars['epochs_per_job']
@@ -204,12 +216,12 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
     # Generate shared ospool submit description if there are any ospool resources
     if ospool_resources:
-        dag_txt += get_ospool_submit_description(config, experiment)
+        dag_txt += get_ospool_submit_description(config, experiment, mldag_commit)
 
     # Generate individual submit descriptions for non-ospool resources
     for resource in resources:
         if resource.resource_type != ResourceType.OSPOOL:
-            dag_txt += get_submit_description(None, resource, config, experiment)
+            dag_txt += get_submit_description(None, resource, config, experiment, mldag_commit)
 
     i = 0
     for tr in experiment.training_runs: # for each shishkabob
