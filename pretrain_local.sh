@@ -16,7 +16,7 @@ export PROVENANCE_RUN_ID="$run_uuid"
 
 # Install mldag at the exact commit baked in at DAG generation time.
 # --no-deps: provenance modules are pure stdlib; avoids pulling in pandas/polars/etc.
-pip install --quiet --no-deps "git+https://github.com/iross/MLDAG@${MLDAG_COMMIT:-main}"
+pip install --quiet --no-deps "git+https://github.com/iross/MLDAG@${MLDAG_COMMIT:-provenance-system}"
 
 _provenance_capture_and_emit() {
     python3 - <<'PYEOF'
