@@ -1,10 +1,11 @@
 ---
 id: TASK-17
 title: Extract mldag into standalone installable Python package
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - claude
 created_date: '2026-05-04 18:54'
-updated_date: '2026-05-05 00:33'
+updated_date: '2026-05-18 15:49'
 labels: []
 dependencies: []
 ---
@@ -85,15 +86,5 @@ The mldag framework (DAG generation, provenance tracking, log monitoring, report
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Versioning constraint: once stable, experiment repos should pin to tagged mldag releases only — no raw commit SHAs or dev builds in production runs. Implications for implementation:
-
-1. _mldag_commit() in daggen.py should become _mldag_version() using importlib.metadata.version('mldag') after the split, returning a semver string like '1.0.2'. The raw SHA approach we currently have is a temporary measure for the monorepo phase.
-
-2. The pip install in pretrain_local.sh should move from git+...@${MLDAG_COMMIT} to a pinned release — either 'pip install mldag==${MLDAG_VERSION}' (PyPI) or 'pip install git+...@v${MLDAG_VERSION}' (tagged git). Either way the experiment repo specifies a version number, not a SHA.
-
-3. Provenance events should emit mldag_version (semver) alongside schema_version. schema_version tracks the event format shape; mldag_version tracks which framework release ran.
-
-4. A tagged release workflow is a hard prerequisite before experiment repos can adopt the package. Need at least: tag, publish (PyPI or just GitHub releases), and a CHANGELOG or release notes so it's clear what changed between versions.
-
-5. During the transition (monorepo → split), raw SHAs are acceptable. Once the first stable tag is cut and the experiment repo is bootstrapped against it, switch to version pinning and don't look back.
+Completed three of the key AC items: (1) deleted provenance_pre.sh and provenance_post.sh — vestigial wrappers since daggen.py already calls python -m mldag.provenance.pre/post directly; (2) moved hourly_dashboard.py into mldag/dashboard.py and registered mldag-dashboard entry point in pyproject.toml; (3) rewrote README with a bootstrap section documenting install, entry points table, and minimal justfile template. Remaining: container image install verification and PyPI publish.
 <!-- SECTION:NOTES:END -->

@@ -14,9 +14,9 @@ fi
 
 export PROVENANCE_RUN_ID="$run_uuid"
 
-# Install mldag at the exact commit baked in at DAG generation time.
+# Install mldag at the exact version baked in at DAG generation time.
 # --no-deps: provenance modules are pure stdlib; avoids pulling in pandas/polars/etc.
-pip install --quiet --no-deps "git+https://github.com/iross/MLDAG@${MLDAG_COMMIT:-provenance-system}"
+pip install --quiet --no-deps "git+https://github.com/iross/MLDAG@v${MLDAG_VERSION:?MLDAG_VERSION not set}"
 
 _provenance_capture_and_emit() {
     python3 - <<'PYEOF'
@@ -41,7 +41,7 @@ python_ver = run([sys.executable, "--version"]).replace("Python ", "")
 commit = run(["git", "rev-parse", "--short", "HEAD"]) or "unknown"
 slot = os.environ.get("_CONDOR_SLOT", "unknown")
 run_id = os.environ.get("PROVENANCE_RUN_ID", "unknown")
-mldag_commit = os.environ.get("MLDAG_COMMIT", "unknown")
+mldag_version = os.environ.get("MLDAG_VERSION", "unknown")
 log_dir = Path(os.environ.get("PROVENANCE_LOG_DIR", "output/provenance"))
 
 site_info = {
@@ -55,7 +55,7 @@ env_info = {
     "python": python_ver,
     "cuda": cuda,
     "code_commit": commit,
-    "mldag_commit": mldag_commit,
+    "mldag_version": mldag_version,
 }
 
 Path("site_info.json").write_text(json.dumps({**site_info, **env_info}, indent=2))

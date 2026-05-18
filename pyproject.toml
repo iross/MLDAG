@@ -31,7 +31,12 @@ mldag-monitor = "mldag.monitor.htcondor:main"
 mldag-pre         = "mldag.provenance.pre:main"
 mldag-log-monitor = "mldag.provenance.log_monitor:main"
 mldag-post    = "mldag.provenance.post:main"
-mldag-query   = "mldag.provenance.query:main"
+mldag-query       = "mldag.provenance.query:main"
+mldag-dashboard   = "mldag.dashboard:main"
+
+[project.urls]
+Homepage = "https://github.com/iross/MLDAG"
+Repository = "https://github.com/iross/MLDAG"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mldag"]
