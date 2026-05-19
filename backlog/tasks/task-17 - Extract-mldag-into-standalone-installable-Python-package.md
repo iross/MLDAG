@@ -18,8 +18,12 @@ The mldag framework (DAG generation, provenance tracking, log monitoring, report
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 mldag package is published and installable via pip/uv (PyPI or git URL),Experiment repo contains only Experiment.yaml, resources.yaml, config.yaml, and run output — no framework code,All current CLI entry points (daggen, provenance query, monitoring) work after install,Package versioning allows pinning a specific mldag version per experiment repo,README documents how to bootstrap a new experiment repo against the package
-- [ ] #2 mldag package is installable via uv/pip from PyPI or git URL,All current CLI entry points (mldag-gen, mldag-csv, mldag-report, provenance query) work post-install,Package versioning allows pinning mldag per experiment repo,A minimal experiment repo bootstraps correctly with only the files listed in the implementation plan,provenance_pre.sh and provenance_post.sh are removed — DAG already calls python -m mldag.provenance.pre/post directly,hourly_dashboard.py is a proper package CLI entry point not a loose script,Container image used by execute-node jobs has mldag installed so provenance capture in pretrain scripts can call package entry points
+- [x] `provenance_pre.sh` and `provenance_post.sh` removed — DAG calls `python -m mldag.provenance.pre/post` directly
+- [x] `hourly_dashboard.py` promoted to `mldag-dashboard` CLI entry point registered in pyproject.toml
+- [x] README documents how to bootstrap a new experiment repo against the package
+- [ ] mldag package is installable via pip/uv from PyPI or git URL
+- [ ] All CLI entry points (`mldag-gen`, `mldag-csv`, `mldag-report`, `mldag-dashboard`, provenance query) work after install
+- [ ] A minimal experiment repo bootstraps correctly with only Experiment.yaml, resources.yaml, config.yaml, and run artifacts — no framework code
 <!-- AC:END -->
 
 ## Implementation Plan

@@ -20,7 +20,7 @@ pip install --quiet --no-deps "git+https://github.com/iross/MLDAG@v${MLDAG_VERSI
 
 _provenance_capture_and_emit() {
     python3 - <<'PYEOF'
-import json, os, subprocess, sys
+import glob, json, os, re, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 import torch
@@ -35,7 +35,9 @@ cuda = torch.version.cuda or "unknown"
 try:
     gpu_id = str(torch.cuda.get_device_properties(0).uuid) if gpu_count > 0 else "none"
 except AttributeError:
-    gpu_id = "unknown"
+    infos = glob.glob("/proc/driver/nvidia/gpus/*/information")
+    m = re.search(r"GPU UUID:\s+(\S+)", open(infos[0]).read()) if infos else None
+    gpu_id = m.group(1) if m else "unknown"
 hostname = run(["hostname", "-f"]) or run(["hostname"]) or "unknown"
 python_ver = run([sys.executable, "--version"]).replace("Python ", "")
 commit = run(["git", "rev-parse", "--short", "HEAD"]) or "unknown"
