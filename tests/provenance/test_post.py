@@ -198,8 +198,43 @@ def test_main_strips_proc_id_from_jobid(tmp_path):
     _write_ad(tmp_path, SAMPLE_AD, filename="12345.ad")
     with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
         with patch.object(sys, "argv", ["post", "run0-train_epoch0", "0", "12345.0"]):
-            main()
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 0
     events = _read_events(tmp_path, "run-abc123")
     assert len(events) == 1
     assert events[0]["type"] == "job.completed"
     assert events[0]["run_id"] == "run-abc123"
+
+
+def test_main_exits_zero_on_job_success(tmp_path):
+    """DAGMan reads the post-script exit code; exit 0 means the node succeeded."""
+    _write_ad(tmp_path, SAMPLE_AD)
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+        with patch.object(sys, "argv", ["post", "run0-train_epoch0", "0", "12345"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 0
+
+
+def test_main_exits_nonzero_on_job_failure(tmp_path):
+    """DAGMan reads the post-script exit code; non-zero stops downstream nodes."""
+    _write_ad(tmp_path, SAMPLE_AD)
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+        with patch.object(sys, "argv", ["post", "run0-train_epoch0", "1", "12345"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 1
+    # Provenance event must still be emitted before exiting
+    events = _read_events(tmp_path, "run-abc123")
+    assert events[0]["type"] == "job.failed"
+
+
+def test_main_propagates_exit_code(tmp_path):
+    """Exit code from the job is passed through unchanged, not collapsed to 1."""
+    _write_ad(tmp_path, SAMPLE_AD)
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+        with patch.object(sys, "argv", ["post", "run0-train_epoch0", "42", "12345"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 42

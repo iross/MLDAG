@@ -107,6 +107,7 @@ def main() -> None:
     cluster_id = cluster_id.split(".")[0]
     log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
     emit_post_event(job_name, int(exit_code_str), cluster_id, log_dir=log_dir)
+    sys.exit(int(exit_code_str))
 
 
 if __name__ == "__main__":
