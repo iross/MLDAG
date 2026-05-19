@@ -87,12 +87,12 @@ _provenance_capture_and_emit || exit 1
 
 #echo "Copying ${dataset_name} dataset"
 # cp "/staging/iaross/processed-${dataset_name}.tar.gz" .
-#echo "Untarring ${dataset_name} dataset"
-#mkdir -p ${dataset_name}
-#tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
+echo "Untarring ${dataset_name} dataset"
+mkdir -p ${dataset_name}
+tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
 
 #unzip cleaned_data_test.zip -d precleaned
-# rm "processed-${dataset_name}.tar.gz"
+rm "processed-${dataset_name}.tar.gz"
 
 ln -s /workspace/metl/data/
 
