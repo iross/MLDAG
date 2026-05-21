@@ -9,10 +9,15 @@ else
     epochs=$1
     run_uuid=$2
     random_seed=$3
+    dataset_name="${4:-gb1}"
 fi
 
-#echo "Copying global dataset"
-# cp /staging/iaross/processed-global.tar.gz .
+export PROVENANCE_RUN_ID="$run_uuid"
+
+# Install mldag at the exact version baked in at DAG generation time.
+# --no-deps: provenance modules are pure stdlib; avoids pulling in pandas/polars/etc.
+pip install --quiet --no-deps "git+https://github.com/iross/MLDAG@v${MLDAG_VERSION:?MLDAG_VERSION not set}"
+
 _provenance_capture_and_emit() {
     python3 - <<'PYEOF'
 import glob, json, os, re, subprocess, sys
@@ -38,6 +43,7 @@ python_ver = run([sys.executable, "--version"]).replace("Python ", "")
 commit = run(["git", "rev-parse", "--short", "HEAD"]) or "unknown"
 slot = os.environ.get("_CONDOR_SLOT", "unknown")
 run_id = os.environ.get("PROVENANCE_RUN_ID", "unknown")
+mldag_version = os.environ.get("MLDAG_VERSION", "unknown")
 log_dir = Path(os.environ.get("PROVENANCE_LOG_DIR", "output/provenance"))
 
 site_info = {
@@ -51,6 +57,7 @@ env_info = {
     "python": python_ver,
     "cuda": cuda,
     "code_commit": commit,
+    "mldag_version": mldag_version,
 }
 
 Path("site_info.json").write_text(json.dumps({**site_info, **env_info}, indent=2))
@@ -78,33 +85,39 @@ PYEOF
 
 _provenance_capture_and_emit || exit 1
 
-echo "Untarring global dataset"
-tar xzvf processed-global.tar.gz
+#echo "Copying ${dataset_name} dataset"
+# cp "/staging/iaross/processed-${dataset_name}.tar.gz" .
+echo "Untarring ${dataset_name} dataset"
+mkdir -p ${dataset_name}
+tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
 
 #unzip cleaned_data_test.zip -d precleaned
-rm processed-global.tar.gz
+rm "processed-${dataset_name}.tar.gz"
 
 ln -s /workspace/metl/data/
+
+parent_dir=$(realpath "${PWD}/${dataset_name}"/splits/*/)
+splits_dir=$(basename "${parent_dir}")
 
 pwd
 env
 
-#mkdir wandb
-#mkdir wandb_data
-#export WANDB_DIR=$PWD/wandb
-#xport WANDB_DATA_DIR=$PWD/wandb_data
-#export WANDB_CACHE_DIR=$PWD/wandb/.cache
-#export WANDB_CONFIG_DIR=$PWD/wandb/.config
-#export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+mkdir wandb
+mkdir wandb_data
+export WANDB_DIR=$PWD/wandb
+export WANDB_DATA_DIR=$PWD/wandb_data
+export WANDB_CACHE_DIR=$PWD/wandb/.cache
+export WANDB_CONFIG_DIR=$PWD/wandb/.config
+export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 _TRAIN_START=$(python3 -c "import time; print(time.time())")
 
-python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_global.txt \
-    --ds_fn $PWD/global/global.db   \
-    --split_dir $PWD/global/splits/standard_tr0.9_tu0.05_te0.05_w2a93d88bac32_r2098 \
+python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_local.txt \
+    --ds_fn "$PWD/${dataset_name}/${dataset_name}.db"   \
+    --split_dir "$PWD/${dataset_name}/splits/${splits_dir}" \
     --max_epochs $epochs --uuid=$run_uuid  \
     --random_seed $random_seed
 
-python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" \
-    --one-shot --start-time "$_TRAIN_START"
-
+_watcher_args=(--one-shot --start-time "$_TRAIN_START")
+[ -f disk_bench.json ] && _watcher_args+=(--extra-sidecar-json disk_bench.json)
+python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" "${_watcher_args[@]}"

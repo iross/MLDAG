@@ -5,31 +5,32 @@
 # know that it's a good requirement.
 # Conceptually the current separation makes sense, since some are dependent on
 # externalities like the target resource, but it needs cleaner definitions.
-name: "Global Pretraining"
+name: "GB1 Pretraining"
 submit_template: |
   universe = container
-  container_image = osdf:///ospool/ap40/data/ian.ross/metl_global_fixed_time.sif
+  container_image = file:///staging/iaross/metl_gb1.sif
 
-  request_disk = {resource.disk}
-  request_memory = {resource.mem_mb}
-  request_cpus = {resource.cpus}
-  request_gpus = {resource.gpus}
-  gpus_minimum_memory = {resource.gpu_memory}
-  gpus_minimum_capability = 7.5
+  epoch = $(epoch:1)
 
-  #environment = "WANDB_API_KEY=123"
-  environment = "WANDB_API_KEY=0713980c153b1601f06370cb13f67b1182ff0221"
+  request_disk = 40GB
+  request_memory = 20000
+  retry_request_memory = 60000
+  request_cpus = 4
+  request_gpus = 1
+  gpus_minimum_memory = 32000
 
-  +is_resumable = true
-  +JobDurationCategory = "Long"
-  +ProjectName = "PATh_MLSupplement"
+  environment = "WANDB_API_KEY=a1bbea51509891a9a9fb5d9b301a31a5e146bcdf"
+
+  +WantGPULab = true
+  #+is_resumable = true
+  +JobDurationCategory = "Short"
+  #+ProjectName = "PATh_MLSupplement"
 
   executable = /bin/bash
   transfer_executable = false
-  arguments = pretrain.sh $(epoch) $(run_uuid) $(random_seed)
-
+  arguments = pretrain_local.sh $(epoch) $(run_uuid) $(random_seed)
   preserve_relative_paths = true
-  transfer_input_files = pretrain.sh, osdf:///ospool/ap40/data/ian.ross/processed-global.tar.gz
+  transfer_input_files = pretrain_local.sh, osdf:///chtc/staging/iaross/processed-gb1.tar.gz?pack=auto
   if defined continue_from_checkpoint
       transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
   endif
@@ -39,11 +40,13 @@ submit_template: |
 
   output = $(run_uuid)/$(epoch)_$(CLUSTERID).out
   error = $(run_uuid)/$(epoch)_$(CLUSTERID).err
-  stream_output = true
-  stream_error = true
+  stream_output = True
+  stream_error = True
   log = metl.log
+  priority = $(epoch)
 
   queue
+
 vars:
   epochs:
     value: 30
@@ -54,12 +57,6 @@ vars:
     type: value
     description: "Number of epochs to train in each job"
   run_number:
-    stop: 5
+    stop: 1
     type: range
     description: "Number of runs to generate"
-  test:
-    start: 0
-    stop: 10
-    step: 1
-    type: range
-    description: "Test variable"

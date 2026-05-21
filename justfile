@@ -66,7 +66,7 @@ recent-summary hours pool="ospool":
 # Generate interactive HTML dashboard for the last N hours and push to GitHub Pages (ospool only)
 hourly-site hours="24":
     just _csv-ospool
-    uv run hourly_dashboard.py full_ospool.csv --output-dir site --hours {{ hours }}
+    uv run mldag-dashboard full_ospool.csv --output-dir site --hours {{ hours }}
     rm -rf site/.git
     git -C site init
     git -C site add -A

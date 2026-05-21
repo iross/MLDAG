@@ -90,6 +90,27 @@ def test_write_sidecar_returns_hash_for_chaining(tmp_path):
     assert returned == "sha256:" + hashlib.sha256(b"weights").hexdigest()
 
 
+def test_write_sidecar_extra_field_included(tmp_path):
+    ckpt = _make_checkpoint(tmp_path)
+    write_sidecar(ckpt, "run-abc", 0, None, SITE_INFO, ENV_INFO, METRICS, {"disk_read_mbs": 1200.5})
+    data = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert data["extra"] == {"disk_read_mbs": 1200.5}
+
+
+def test_write_sidecar_no_extra_field_when_omitted(tmp_path):
+    ckpt = _make_checkpoint(tmp_path)
+    write_sidecar(ckpt, "run-abc", 0, None, SITE_INFO, ENV_INFO, METRICS)
+    data = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert "extra" not in data
+
+
+def test_write_sidecar_no_extra_field_when_empty(tmp_path):
+    ckpt = _make_checkpoint(tmp_path)
+    write_sidecar(ckpt, "run-abc", 0, None, SITE_INFO, ENV_INFO, METRICS, {})
+    data = json.loads(Path(str(ckpt) + ".provenance.json").read_text())
+    assert "extra" not in data
+
+
 def test_write_sidecar_parent_chain_across_epochs(tmp_path):
     ckpt0 = _make_checkpoint(tmp_path, "epoch0.ckpt", b"epoch0 weights")
     ckpt1 = _make_checkpoint(tmp_path, "epoch1.ckpt", b"epoch1 weights")

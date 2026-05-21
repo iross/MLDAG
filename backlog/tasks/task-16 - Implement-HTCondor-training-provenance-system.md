@@ -1,9 +1,10 @@
 ---
 id: task-16
 title: Implement HTCondor training provenance system
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-28 20:49'
+updated_date: '2026-04-29 00:45'
 labels: []
 dependencies:
   - task-9
@@ -127,9 +128,15 @@ The `parent_hash` field chains sidecars together across epochs and sites. Walkin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] A complete provenance record exists for any training run: run ID, submission metadata, per-epoch site and environment, checkpoint hashes, and resource usage
-- [ ] The full training history of any checkpoint is reconstructable by walking the sidecar chain without consulting any external system
-- [ ] All lifecycle events (submitted, assigned, epoch started/completed, completed/failed) are queryable by run ID from the NDJSON event log
-- [ ] Resource usage (wall time, CPU, GPU, memory) is captured for every completed job via HTCondor ClassAds
-- [ ] The system works across job migrations and retries — the run ID threads through all attempts
+- [ ] #1 A complete provenance record exists for any training run: run ID, submission metadata, per-epoch site and environment, checkpoint hashes, and resource usage
+- [ ] #2 The full training history of any checkpoint is reconstructable by walking the sidecar chain without consulting any external system
+- [ ] #3 All lifecycle events (submitted, assigned, epoch started/completed, completed/failed) are queryable by run ID from the NDJSON event log
+- [ ] #4 Resource usage (wall time, CPU, GPU, memory) is captured for every completed job via HTCondor ClassAds
+- [ ] #5 The system works across job migrations and retries — the run ID threads through all attempts
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+All subtasks complete: task-9 (PROVENANCE_RUN_ID in daggen), task-10 (site fingerprint in pretrain.sh), task-11 (sidecar writer), task-12 (NDJSON event emitter), task-13 (POST script + job.submitted), task-14 (checkpoint watcher), task-15 (lineage/events CLI). New modules: mldag/provenance/{__init__,events,sidecar,post,watcher,query}.py. New scripts: provenance_post.sh. 72 tests, all passing.
+<!-- SECTION:NOTES:END -->

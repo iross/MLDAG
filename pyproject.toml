@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mldag"
-version = "0.1.0"
+version = "0.1.0rc7"
 description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -20,6 +20,7 @@ dependencies = [
     "seaborn>=0.13.2",
     "typer>=0.16.0",
     "plotly>=5.24.0",
+    "htcondor>=25.8.2; sys_platform == 'linux'",
 ]
 
 [project.scripts]
@@ -27,6 +28,15 @@ mldag-gen     = "mldag.daggen:app"
 mldag-csv     = "mldag.report.csv:main"
 mldag-report  = "mldag.report.experiment:main"
 mldag-monitor = "mldag.monitor.htcondor:main"
+mldag-pre         = "mldag.provenance.pre:main"
+mldag-log-monitor = "mldag.provenance.log_monitor:main"
+mldag-post    = "mldag.provenance.post:main"
+mldag-query       = "mldag.provenance.query:main"
+mldag-dashboard   = "mldag.dashboard:main"
+
+[project.urls]
+Homepage = "https://github.com/iross/MLDAG"
+Repository = "https://github.com/iross/MLDAG"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mldag"]
