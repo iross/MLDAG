@@ -205,7 +205,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     # TODO: It doesn't really make sense to do both resource and var expansions,
     # but should be mulled over a bit
     # experiment._add_var_permutations()
-    experiment._add_resource_permutations(resources)
+    experiment._add_var_permutations()
 
     # Create job descriptions for each resource.
     resources = []
