@@ -236,7 +236,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
         Path(tr.run_uuid).mkdir(exist_ok=True)
 
         for j, epoch in enumerate(range(epochs_per_job, num_epoch+1, epochs_per_job)): #gross hack
-            resource = tr.resources[j] if tr.resources else Resource(name="default")
+            resource = tr.resources[min(j, len(tr.resources) - 1)] if tr.resources else Resource(name="default")
             # input_model_postfix = 'init' if j == 0 else f'epoch{j-1}'
             submit_file = "ospool_pretrain.sub" if resource.resource_type == ResourceType.OSPOOL else f"{resource.name}_pretrain.sub"
             job = Job(name=f'{run_prefix}-train_epoch{j}',
