@@ -281,6 +281,22 @@ def _load_cache(cache_path: Path) -> dict[int, str]:
         return {}
 
 
+def _save_pending(pending_path: Path, pending_lookups: dict[int, str]) -> None:
+    try:
+        pending_path.parent.mkdir(parents=True, exist_ok=True)
+        pending_path.write_text(json.dumps({str(k): v for k, v in pending_lookups.items()}))
+    except OSError:
+        pass
+
+
+def _load_pending(pending_path: Path) -> dict[int, str]:
+    try:
+        data = json.loads(pending_path.read_text())
+        return {int(k): v for k, v in data.items()}
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+
+
 def _load_offset(offset_path: Path, log_path: Path) -> int:
     """Return the saved byte offset, or 0 if none or the log was recreated."""
     try:
@@ -315,10 +331,11 @@ def watch_log(
 
     offset_path = provenance_log_dir / ".log_monitor.offset"
     cache_path = provenance_log_dir / ".log_monitor.cache.json"
+    pending_path = provenance_log_dir / ".log_monitor.pending.json"
     byte_offset = _load_offset(offset_path, log_path)
     run_id_cache = _load_cache(cache_path)
     multiline_state: dict = {"cluster_id": None}
-    pending_lookups: dict[int, str] = {}
+    pending_lookups: dict[int, str] = _load_pending(pending_path)
 
     while True:
         byte_offset = monitor_once(
@@ -332,6 +349,7 @@ def watch_log(
         )
         _save_offset(offset_path, byte_offset)
         _save_cache(cache_path, run_id_cache)
+        _save_pending(pending_path, pending_lookups)
         time.sleep(poll_interval)
 
 
