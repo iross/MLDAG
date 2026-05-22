@@ -103,6 +103,9 @@ def get_script(job: Job, resource: Resource, config: dict, post_hook: str = "") 
         pre_args += f' --annex {resource.name}'
     post_args = '$JOB $RETURN $JOBID'
     if post_hook:
+        # post_hook is appended verbatim; DAGMan expands $MACRO tokens at runtime.
+        # Available POST macros: $NODE $RETURN $JOBID $CLUSTERID $RETRY
+        # $MAX_RETRIES $SUCCESS $PRE_SCRIPT_RETURN $EXIT_CODES $DAGID $DAG_STATUS
         post_args += f' --post-hook {post_hook}'
     script_txt = f'SCRIPT PRE  {job.name} {python} -m mldag.provenance.pre {pre_args}\n'
     script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post {post_args}\n'

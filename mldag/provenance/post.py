@@ -101,9 +101,13 @@ def main() -> None:
     parser.add_argument("exit_code", type=int)
     parser.add_argument("cluster_id")
     parser.add_argument(
-        "--post-hook", default="", metavar="CMD",
-        help="Optional command to run after provenance is recorded. "
-             "Receives job_name exit_code cluster_id as positional args.",
+        "--post-hook", nargs=argparse.REMAINDER, default=[],
+        metavar="CMD [ARGS...]",
+        help="Optional command + args to run after provenance is recorded. "
+             "Everything after --post-hook is forwarded as-is; DAGMan expands "
+             "$MACRO tokens before this script is called. POST-script macros: "
+             "$NODE $RETURN $JOBID $CLUSTERID $RETRY $MAX_RETRIES $SUCCESS "
+             "$PRE_SCRIPT_RETURN $EXIT_CODES $DAGID $DAG_STATUS.",
     )
     args = parser.parse_args()
     # $JOBID expands to ClusterId.ProcId (e.g. "5555662.0"); job_ad_file uses
@@ -113,12 +117,10 @@ def main() -> None:
     emit_post_event(args.job_name, args.exit_code, cluster_id, log_dir=log_dir)
     if args.post_hook:
         import subprocess
-        result = subprocess.run(
-            [args.post_hook, args.job_name, str(args.exit_code), cluster_id],
-        )
+        result = subprocess.run(args.post_hook)
         if result.returncode != 0:
             print(
-                f"WARNING: post-hook {args.post_hook!r} exited {result.returncode}",
+                f"WARNING: post-hook {args.post_hook[0]!r} exited {result.returncode}",
                 file=sys.stderr,
             )
     sys.exit(args.exit_code)
