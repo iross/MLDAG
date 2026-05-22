@@ -31,6 +31,7 @@ class Experiment(BaseModel):
     training_runs: Optional[list[TrainingRun]] = []
     submit_template: str
     vars: dict
+    post_script: Optional[str] = None
     
     def __init__(self, **data) -> None:
       super().__init__(**data)

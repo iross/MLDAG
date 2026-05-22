@@ -95,19 +95,33 @@ def emit_post_event(
 
 
 def main() -> None:
-    if len(sys.argv) != 4:
-        print(
-            f"Usage: {sys.argv[0]} <job_name> <exit_code> <cluster_id>",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    job_name, exit_code_str, cluster_id = sys.argv[1], sys.argv[2], sys.argv[3]
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("job_name")
+    parser.add_argument("exit_code", type=int)
+    parser.add_argument("cluster_id")
+    parser.add_argument(
+        "--post-hook", default="", metavar="CMD",
+        help="Optional command to run after provenance is recorded. "
+             "Receives job_name exit_code cluster_id as positional args.",
+    )
+    args = parser.parse_args()
     # $JOBID expands to ClusterId.ProcId (e.g. "5555662.0"); job_ad_file uses
     # only ClusterId, so strip the proc part to match the filename.
-    cluster_id = cluster_id.split(".")[0]
+    cluster_id = args.cluster_id.split(".")[0]
     log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
-    emit_post_event(job_name, int(exit_code_str), cluster_id, log_dir=log_dir)
-    sys.exit(int(exit_code_str))
+    emit_post_event(args.job_name, args.exit_code, cluster_id, log_dir=log_dir)
+    if args.post_hook:
+        import subprocess
+        result = subprocess.run(
+            [args.post_hook, args.job_name, str(args.exit_code), cluster_id],
+        )
+        if result.returncode != 0:
+            print(
+                f"WARNING: post-hook {args.post_hook!r} exited {result.returncode}",
+                file=sys.stderr,
+            )
+    sys.exit(args.exit_code)
 
 
 if __name__ == "__main__":

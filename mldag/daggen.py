@@ -91,7 +91,7 @@ def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
         """)
     return vars_txt
 
-def get_script(job: Job, resource: Resource, config: dict) -> str:
+def get_script(job: Job, resource: Resource, config: dict, post_hook: str = "") -> str:
     # Use the exact Python that ran mldag-gen so the script works regardless
     # of PATH in the DAGMan environment.  VARS macros ($(run_uuid)) are not
     # available in SCRIPT args, so run_uuid and epoch are embedded here.
@@ -101,8 +101,11 @@ def get_script(job: Job, resource: Resource, config: dict) -> str:
         # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
         # DAGMan allows only one SCRIPT PRE per node.
         pre_args += f' --annex {resource.name}'
+    post_args = '$JOB $RETURN $JOBID'
+    if post_hook:
+        post_args += f' --post-hook {post_hook}'
     script_txt = f'SCRIPT PRE  {job.name} {python} -m mldag.provenance.pre {pre_args}\n'
-    script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post $JOB $RETURN $JOBID\n'
+    script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post {post_args}\n'
     return script_txt
 
 def get_service(python_exe: str = "python3") -> str:
@@ -248,7 +251,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
                     {'JOB {job.eval_name} {job.eval_submit}' if EVAL else ''}''')
             vars_txt += get_vars(job, resource, tr)
 
-            script_txt += get_script(job, resource, config)
+            script_txt += get_script(job, resource, config, post_hook=experiment.post_script or "")
 
             # includes pre and post scripts for early stopping mechanism
             # TODO: why is earlystopdetector.py being called in both a pre and post?
