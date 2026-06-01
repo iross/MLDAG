@@ -1,0 +1,75 @@
+000 (12637504.000.000) 2025-05-30 14:57:26 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2550587_1c9b>
+...
+040 (12637504.000.000) 2025-06-10 22:22:45 Started transferring input files
+	Transferring to host: <10.8.3.15:41435?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#4&PrivNet=v021.pvt.bridges2.psc.edu&addrs=10.8.3.15-41435&alias=v021.pvt.bridges2.psc.edu&noUDP&sock=slot1_1_25443_a524_2>
+...
+040 (12637504.000.000) 2025-06-10 22:26:31 Finished transferring input files
+...
+001 (12637504.000.000) 2025-06-10 22:26:31 Job executing on host: <10.8.3.15:41435?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#4&PrivNet=v021.pvt.bridges2.psc.edu&addrs=10.8.3.15-41435&alias=v021.pvt.bridges2.psc.edu&noUDP&sock=startd_25431_2114>
+	SlotName: slot1_1@v021.pvt.bridges2.psc.edu
+	AvailableGPUs = { GPUs_GPU_2c3e6b68,GPUs_GPU_377a8378 }
+	CondorScratchDir = "/ocean/projects/cis240135p/iaross/hpc-annex/scratch/pilot.tdoRW5rT/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/v021.pvt.bridges2.psc.edu/execute/dir_25703"
+	Cpus = 8
+	Disk = 83887104
+	GPUs = 2
+	GPUs_GPU_2c3e6b68 = [ Id = "GPU-2c3e6b68"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "2c3e6b68-e0f5-c2d5-2671-4e2352a329b2"; ECCEnabled = true; DriverVersion = 12.6; DevicePciBusId = "0000:16:00.0"; GlobalMemoryMb = 32494; MaxSupportedVersion = 12060 ]
+	GPUs_GPU_377a8378 = [ Id = "GPU-377a8378"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "377a8378-46f4-4fd3-21b6-b981a46a0b77"; ECCEnabled = true; DriverVersion = 12.6; DevicePciBusId = "0000:89:00.0"; GlobalMemoryMb = 32494; MaxSupportedVersion = 12060 ]
+	Memory = 131072
+...
+006 (12637504.000.000) 2025-06-10 22:26:40 Image size of job updated: 1500
+	4  -  MemoryUsage of job (MB)
+	3704  -  ResidentSetSize of job (KB)
+...
+006 (12637504.000.000) 2025-06-10 22:31:40 Image size of job updated: 3945384
+	66  -  MemoryUsage of job (MB)
+	67348  -  ResidentSetSize of job (KB)
+...
+006 (12637504.000.000) 2025-06-10 22:36:41 Image size of job updated: 363513676
+	72513  -  MemoryUsage of job (MB)
+	74253228  -  ResidentSetSize of job (KB)
+...
+006 (12637504.000.000) 2025-06-10 22:41:41 Image size of job updated: 366160812
+	72572  -  MemoryUsage of job (MB)
+	74312780  -  ResidentSetSize of job (KB)
+...
+006 (12637504.000.000) 2025-06-10 22:46:41 Image size of job updated: 366185132
+	72615  -  MemoryUsage of job (MB)
+	74356956  -  ResidentSetSize of job (KB)
+...
+006 (12637504.000.000) 2025-06-10 22:51:41 Image size of job updated: 366211724
+	72672  -  MemoryUsage of job (MB)
+	74416040  -  ResidentSetSize of job (KB)
+...
+006 (12637504.000.000) 2025-06-10 22:56:41 Image size of job updated: 366236200
+	72711  -  MemoryUsage of job (MB)
+	74455864  -  ResidentSetSize of job (KB)
+...
+006 (12637504.000.000) 2025-06-10 23:01:41 Image size of job updated: 366263404
+	72748  -  MemoryUsage of job (MB)
+	74493232  -  ResidentSetSize of job (KB)
+...
+022 (12637504.000.000) 2025-06-10 23:11:01 Job disconnected, attempting to reconnect
+    Socket between submit and execute hosts closed unexpectedly
+    Trying to reconnect to slot1_1@v021.pvt.bridges2.psc.edu <10.8.3.15:41435?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#4&PrivNet=v021.pvt.bridges2.psc.edu&addrs=10.8.3.15-41435&alias=v021.pvt.bridges2.psc.edu&noUDP&sock=startd_25431_2114>
+...
+024 (12637504.000.000) 2025-06-10 23:51:01 Job reconnection failed
+    Job disconnected too long: JobLeaseDuration (2400 seconds) expired
+    Can not reconnect to slot1_1@v021.pvt.bridges2.psc.edu, rescheduling job
+...
+004 (12637504.000.000) 2025-06-10 23:51:11 Job was evicted. Code 1008 Subcode 0
+	(0) CPU times
+		Usr 0 01:10:34, Sys 0 00:08:16  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	1618  -  Run Bytes Received By Job
+	Reason: Job disconnected too long: JobLeaseDuration (2400 seconds) expired
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        2.67        8         8 
+	   Disk (KB)            : 74989993    83886080  83887104 
+	   GPUs                 :                    2         2 "GPU-2c3e6b68,GPU-377a8378"
+	   GpusMemory (MB)      :    12968                       
+	   Memory (MB)          :    72748      131072    131072 
+...
+009 (12637504.000.000) 2025-06-11 13:21:34 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

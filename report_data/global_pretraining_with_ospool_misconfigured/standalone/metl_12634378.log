@@ -1,0 +1,5 @@
+009 (12634378.000.000) 2025-04-16 13:03:13 Job was aborted.
+	via condor_rm (by user ian.ross)
+
+	Job terminated by <128.105.68.62:9618> at 2025-04-16T18:03:10Z (using method 1: DEACTIVATE_CLAIM).
+...

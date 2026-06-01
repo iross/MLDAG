@@ -1,0 +1,50 @@
+000 (12642407.000.000) 2025-07-03 15:10:10 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_1629459_eb7d>
+...
+040 (12642407.000.000) 2025-07-03 15:10:11 Started transferring input files
+	Transferring to host: <3.93.218.45:9618?addrs=3.93.218.45-9618&alias=ip-172-31-61-246.ec2.internal&noUDP&sock=slot1_1_3172_b5fa_6>
+...
+040 (12642407.000.000) 2025-07-03 15:32:12 Finished transferring input files
+...
+001 (12642407.000.000) 2025-07-03 15:32:12 Job executing on host: <3.93.218.45:9618?addrs=3.93.218.45-9618&alias=ip-172-31-61-246.ec2.internal&noUDP&sock=startd_3137_4caf>
+	SlotName: slot1_1@ip-172-31-61-246.ec2.internal
+	AvailableGPUs = { GPUs_GPU_72c87065 }
+	CondorScratchDir = "/mnt/execute/dir_6289"
+	Cpus = 2
+	Disk = 83887104
+	GPUs = 1
+	GPUs_GPU_72c87065 = [ Id = "GPU-72c87065"; Capability = 8.9; DeviceName = "NVIDIA L4"; DeviceUuid = "72c87065-a990-ac57-e351-041be20935c5"; ECCEnabled = true; NvidiaDriver = "575.57.08"; DriverVersion = 12.9; DevicePciBusId = "0000:31:00.0"; GlobalMemoryMb = 22563; MaxSupportedVersion = 12090 ]
+	Memory = 12288
+...
+006 (12642407.000.000) 2025-07-03 15:32:25 Image size of job updated: 15936
+	16  -  MemoryUsage of job (MB)
+	15936  -  ResidentSetSize of job (KB)
+...
+006 (12642407.000.000) 2025-07-03 15:37:26 Image size of job updated: 15956
+	16  -  MemoryUsage of job (MB)
+	15956  -  ResidentSetSize of job (KB)
+...
+006 (12642407.000.000) 2025-07-03 15:40:34 Image size of job updated: 7444580
+	16  -  MemoryUsage of job (MB)
+	15956  -  ResidentSetSize of job (KB)
+...
+040 (12642407.000.000) 2025-07-03 15:40:34 Started transferring output files
+...
+040 (12642407.000.000) 2025-07-03 15:40:34 Finished transferring output files
+...
+004 (12642407.000.000) 2025-07-03 15:40:34 Job was evicted.
+	(0) CPU times
+		Usr 0 00:09:37, Sys 0 00:02:21  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	209184  -  Run Bytes Sent By Job
+	26278938101  -  Run Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        3.94        2         2 
+	   Disk (KB)            : 72142591    83886080  83887104 
+	   GPUs                 :                    1         1 "GPU-72c87065"
+	   Memory (MB)          :       16       12288     12288 
+	   TimeExecute (s)      :      502                       
+	   TimeSlotBusy (s)     :     1823                       
+...
+009 (12642407.000.000) 2025-07-03 15:40:34 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

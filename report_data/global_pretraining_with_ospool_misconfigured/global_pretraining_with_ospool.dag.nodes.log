@@ -1,0 +1,450 @@
+000 (12651289.000.000) 2025-08-15 11:45:17 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch22
+...
+000 (12651290.000.000) 2025-08-15 11:45:17 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run5-train_epoch26
+...
+001 (12651289.000.000) 2025-08-15 11:46:47 Job executing on host: <10.1.1.131:41727?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66849890%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector4#47461703&PrivNet=gpu01&addrs=10.1.1.131-41727&alias=gpu01&noUDP>
+	SlotName: slot1_1@glidein_978959_368207202@gpu01
+	AvailableGPUs = { GPUs_GPU_23ecf0d7 }
+	CondorScratchDir = "/tmp/glide_zKtB4T/execute/dir_1002992"
+	Cpus = 4
+	Disk = 93888126
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_23ecf0d7 = [ Id = "GPU-23ecf0d7"; ClockMhz = 1740.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA A40"; DeviceUuid = "23ecf0d7-cfa9-de5a-f254-f54e1a8da719"; ECCEnabled = true; ComputeUnits = 84; NvidiaDriver = "575.57.08"; DriverVersion = 12.9; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 45739; MaxSupportedVersion = 12090 ]
+	Memory = 65536
+...
+001 (12651290.000.000) 2025-08-15 11:51:23 Job executing on host: <10.1.1.136:42523?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector2#88399769%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector8#47474730&PrivNet=gpu06&addrs=10.1.1.136-42523&alias=gpu06&noUDP>
+	SlotName: slot1_1@glidein_2638624_52501716@gpu06
+	AvailableGPUs = { GPUs_GPU_fa61c53e }
+	CondorScratchDir = "/tmp/glide_LNfraf/execute/dir_2660400"
+	Cpus = 6
+	Disk = 94373502
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_fa61c53e = [ Id = "GPU-fa61c53e"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "fa61c53e-3506-9117-ac65-053dd1571005"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+004 (12651289.000.000) 2025-08-15 12:04:53 Job was evicted. Code 1013 Subcode 0
+	(0) CPU times
+		Usr 0 00:56:19, Sys 0 00:04:48  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	27038178989  -  Run Bytes Received By Job
+	Reason: Startd was shutdown
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.88        4         4 
+	   Disk (KB)            : 75440205    83886080  93888126 
+	   GPUs                 :        0.35        1         1 "GPU-23ecf0d7"
+	   GpusMemory (MB)      :    10096                       
+	   Memory (MB)          :    40950       65536     65536 
+	   TimeExecute (s)      :     1086                       
+	   TimeSlotBusy (s)     :     1176                       
+...
+001 (12651289.000.000) 2025-08-15 12:08:24 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_762272"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651290.000.000) 2025-08-15 15:55:57 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:49:30, Sys 0 01:06:33  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:49:30, Sys 0 01:06:33  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	756503880  -  Run Bytes Sent By Job
+	27219140933  -  Run Bytes Received By Job
+	756503880  -  Total Bytes Sent By Job
+	27219140933  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.83        6         6 
+	   Disk (KB)            : 75330044    94371840  94373502 
+	   GPUs                 :        0.73        1         1 "GPU-fa61c53e"
+	   GpusMemory (MB)      :    10283                       
+	   Memory (MB)          :    45207       65536     65536 
+	   TimeExecute (s)      :    14644                       
+	   TimeSlotBusy (s)     :    14754                       
+...
+000 (12651321.000.000) 2025-08-15 15:56:05 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run5-train_epoch27
+...
+001 (12651321.000.000) 2025-08-15 15:59:03 Job executing on host: <10.1.1.136:42523?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector2#88399769%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector8#47474730&PrivNet=gpu06&addrs=10.1.1.136-42523&alias=gpu06&noUDP>
+	SlotName: slot1_1@glidein_2638624_52501716@gpu06
+	AvailableGPUs = { GPUs_GPU_fa61c53e }
+	CondorScratchDir = "/tmp/glide_LNfraf/execute/dir_2724848"
+	Cpus = 5
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_fa61c53e = [ Id = "GPU-fa61c53e"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "fa61c53e-3506-9117-ac65-053dd1571005"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651289.000.000) 2025-08-15 16:12:42 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:41:53, Sys 0 01:06:19  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 18:38:12, Sys 0 01:11:07  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	575541871  -  Run Bytes Sent By Job
+	27038178989  -  Run Bytes Received By Job
+	575541871  -  Total Bytes Sent By Job
+	54076357978  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.77        4         4 
+	   Disk (KB)            : 75206066    83886080  83887742 
+	   GPUs                 :        0.73        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45185       65536     65536 
+	   TimeExecute (s)      :    14632                       
+	   TimeSlotBusy (s)     :    14742                       
+...
+000 (12651326.000.000) 2025-08-15 16:12:51 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch23
+...
+001 (12651326.000.000) 2025-08-15 16:15:32 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_827227"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+004 (12651321.000.000) 2025-08-15 18:03:26 Job was evicted. Code 1013 Subcode 0
+	(0) CPU times
+		Usr 0 08:53:49, Sys 0 00:33:51  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	27249376405  -  Run Bytes Received By Job
+	Reason: Startd was shutdown
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.84        5         5 
+	   Disk (KB)            : 75222742    83886080  83887742 
+	   GPUs                 :        0.74        1         1 "GPU-fa61c53e"
+	   GpusMemory (MB)      :    10283                       
+	   Memory (MB)          :    43225       65536     65536 
+	   TimeExecute (s)      :     7463                       
+	   TimeSlotBusy (s)     :     7588                       
+...
+001 (12651321.000.000) 2025-08-15 18:11:33 Job executing on host: <10.1.1.139:42991?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector9#66860510%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector5#47495773&PrivNet=gpu09&addrs=10.1.1.139-42991&alias=gpu09&noUDP>
+	SlotName: slot1_1@glidein_1781027_247595526@gpu09
+	AvailableGPUs = { GPUs_GPU_c1a2e02a }
+	CondorScratchDir = "/tmp/glide_aHYsSQ/execute/dir_1802945"
+	Cpus = 5
+	Disk = 83887654
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_c1a2e02a = [ Id = "GPU-c1a2e02a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "c1a2e02a-787e-f742-3a36-1ed3714d9c25"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651326.000.000) 2025-08-15 20:19:58 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:46:02, Sys 0 01:06:31  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:46:02, Sys 0 01:06:31  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	576195801  -  Run Bytes Sent By Job
+	27038832831  -  Run Bytes Received By Job
+	576195801  -  Total Bytes Sent By Job
+	27038832831  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.86        4         4 
+	   Disk (KB)            : 75192043    83886080  83887742 
+	   GPUs                 :        0.73        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45497       65536     65536 
+	   TimeExecute (s)      :    14641                       
+	   TimeSlotBusy (s)     :    14749                       
+...
+000 (12651333.000.000) 2025-08-15 20:20:05 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch24
+...
+001 (12651333.000.000) 2025-08-15 20:23:42 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_890892"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651321.000.000) 2025-08-15 22:16:36 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:51:53, Sys 0 01:07:02  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 1 02:45:42, Sys 0 01:40:53  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	786739361  -  Run Bytes Sent By Job
+	27249376405  -  Run Bytes Received By Job
+	786739361  -  Total Bytes Sent By Job
+	54498752810  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.91        5         5 
+	   Disk (KB)            : 75280457    83886080  83887654 
+	   GPUs                 :        0.72        1         1 "GPU-c1a2e02a"
+	   GpusMemory (MB)      :    10283                       
+	   Memory (MB)          :    45104       65536     65536 
+	   TimeExecute (s)      :    14672                       
+	   TimeSlotBusy (s)     :    14792                       
+...
+000 (12651336.000.000) 2025-08-15 22:16:41 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run5-train_epoch28
+...
+001 (12651336.000.000) 2025-08-15 22:19:09 Job executing on host: <10.1.1.139:42991?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector9#66860510%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector5#47495773&PrivNet=gpu09&addrs=10.1.1.139-42991&alias=gpu09&noUDP>
+	SlotName: slot1_1@glidein_1781027_247595526@gpu09
+	AvailableGPUs = { GPUs_GPU_c1a2e02a }
+	CondorScratchDir = "/tmp/glide_aHYsSQ/execute/dir_1868890"
+	Cpus = 4
+	Disk = 83887654
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_c1a2e02a = [ Id = "GPU-c1a2e02a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "c1a2e02a-787e-f742-3a36-1ed3714d9c25"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651333.000.000) 2025-08-16 00:28:55 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:51:36, Sys 0 01:06:32  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:51:36, Sys 0 01:06:32  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	606438824  -  Run Bytes Sent By Job
+	27069068322  -  Run Bytes Received By Job
+	606438824  -  Total Bytes Sent By Job
+	27069068322  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.81        4         4 
+	   Disk (KB)            : 75098630    83886080  83887742 
+	   GPUs                 :        0.72        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45167       65536     65536 
+	   TimeExecute (s)      :    14687                       
+	   TimeSlotBusy (s)     :    14810                       
+...
+000 (12651339.000.000) 2025-08-16 00:29:03 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch25
+...
+001 (12651339.000.000) 2025-08-16 00:31:51 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_954662"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651336.000.000) 2025-08-16 02:23:40 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:48:41, Sys 0 01:06:22  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:48:41, Sys 0 01:06:22  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	787393261  -  Run Bytes Sent By Job
+	27250030333  -  Run Bytes Received By Job
+	787393261  -  Total Bytes Sent By Job
+	27250030333  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.84        4         4 
+	   Disk (KB)            : 75454001    83886080  83887654 
+	   GPUs                 :        0.73        1         1 "GPU-c1a2e02a"
+	   GpusMemory (MB)      :    10283                       
+	   Memory (MB)          :    45264       65536     65536 
+	   TimeExecute (s)      :    14640                       
+	   TimeSlotBusy (s)     :    14759                       
+...
+000 (12651340.000.000) 2025-08-16 02:23:48 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run5-train_epoch29
+...
+001 (12651340.000.000) 2025-08-16 02:25:43 Job executing on host: <10.1.1.131:35445?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector9#66894573%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector9#47544244&PrivNet=gpu01&addrs=10.1.1.131-35445&alias=gpu01&noUDP>
+	SlotName: slot1_1@glidein_1837375_641657452@gpu01
+	AvailableGPUs = { GPUs_GPU_23ecf0d7 }
+	CondorScratchDir = "/tmp/glide_kKXxgi/execute/dir_1862188"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_23ecf0d7 = [ Id = "GPU-23ecf0d7"; ClockMhz = 1740.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA A40"; DeviceUuid = "23ecf0d7-cfa9-de5a-f254-f54e1a8da719"; ECCEnabled = true; ComputeUnits = 84; NvidiaDriver = "575.57.08"; DriverVersion = 12.9; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 45739; MaxSupportedVersion = 12090 ]
+	Memory = 65536
+...
+005 (12651339.000.000) 2025-08-16 04:36:39 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:47:19, Sys 0 01:06:12  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:47:19, Sys 0 01:06:12  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	636674597  -  Run Bytes Sent By Job
+	27099311669  -  Run Bytes Received By Job
+	636674597  -  Total Bytes Sent By Job
+	27099311669  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.82        4         4 
+	   Disk (KB)            : 75106384    83886080  83887742 
+	   GPUs                 :        0.72        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45112       65536     65536 
+	   TimeExecute (s)      :    14661                       
+	   TimeSlotBusy (s)     :    14780                       
+...
+000 (12651341.000.000) 2025-08-16 04:36:45 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch26
+...
+001 (12651341.000.000) 2025-08-16 04:39:26 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_1018751"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651340.000.000) 2025-08-16 06:26:15 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:41:09, Sys 0 01:06:01  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:41:09, Sys 0 01:06:01  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	817628805  -  Run Bytes Sent By Job
+	27250684237  -  Run Bytes Received By Job
+	817628805  -  Total Bytes Sent By Job
+	27250684237  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.84        4         4 
+	   Disk (KB)            : 75477298    83886080  83887742 
+	   GPUs                 :        0.71        1         1 "GPU-23ecf0d7"
+	   GpusMemory (MB)      :    10488                       
+	   Memory (MB)          :    45250       65536     65536 
+	   TimeExecute (s)      :    14398                       
+	   TimeSlotBusy (s)     :    14516                       
+...
+005 (12651341.000.000) 2025-08-16 08:44:22 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:47:36, Sys 0 01:06:46  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:47:36, Sys 0 01:06:46  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	666910037  -  Run Bytes Sent By Job
+	27129547126  -  Run Bytes Received By Job
+	666910037  -  Total Bytes Sent By Job
+	27129547126  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.83        4         4 
+	   Disk (KB)            : 75485432    83886080  83887742 
+	   GPUs                 :        0.72        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45226       65536     65536 
+	   TimeExecute (s)      :    14669                       
+	   TimeSlotBusy (s)     :    14776                       
+...
+000 (12651346.000.000) 2025-08-16 08:44:28 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch27
+...
+001 (12651346.000.000) 2025-08-16 08:47:44 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_1083784"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651346.000.000) 2025-08-16 12:52:45 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:52:18, Sys 0 01:06:37  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:52:18, Sys 0 01:06:37  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	667563935  -  Run Bytes Sent By Job
+	27130201013  -  Run Bytes Received By Job
+	667563935  -  Total Bytes Sent By Job
+	27130201013  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.88        4         4 
+	   Disk (KB)            : 75429649    83886080  83887742 
+	   GPUs                 :        0.72        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45139       65536     65536 
+	   TimeExecute (s)      :    14674                       
+	   TimeSlotBusy (s)     :    14812                       
+...
+000 (12651347.000.000) 2025-08-16 12:52:50 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch28
+...
+001 (12651347.000.000) 2025-08-16 12:55:22 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_1150687"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651347.000.000) 2025-08-16 16:59:32 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:43:49, Sys 0 01:07:29  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:43:49, Sys 0 01:07:29  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	697799316  -  Run Bytes Sent By Job
+	27160436472  -  Run Bytes Received By Job
+	697799316  -  Total Bytes Sent By Job
+	27160436472  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.81        4         4 
+	   Disk (KB)            : 75315347    83886080  83887742 
+	   GPUs                 :        0.72        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45272       65536     65536 
+	   TimeExecute (s)      :    14622                       
+	   TimeSlotBusy (s)     :    14746                       
+...
+000 (12651350.000.000) 2025-08-16 16:59:38 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_606137_24e7>
+    DAG Node: run11-train_epoch29
+...
+001 (12651350.000.000) 2025-08-16 17:03:16 Job executing on host: <10.1.1.137:41269?CCBID=128.105.82.148:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-87-d439-a1c8-2a11-24fa]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector8#66851050%20192.170.231.11:9618%3faddrs%3d192.170.231.11-9618+[fd85-ee78-d8a6-8607--1-947a]-9618%26alias%3dospool-ccb.osgprod.tempest.chtc.io%26noUDP%26sock%3dcollector6#47495899&PrivNet=gpu07&addrs=10.1.1.137-41269&alias=gpu07&noUDP>
+	SlotName: slot1_1@glidein_737109_560491984@gpu07
+	AvailableGPUs = { GPUs_GPU_d1542b1a }
+	CondorScratchDir = "/tmp/glide_9Me2tM/execute/dir_1216923"
+	Cpus = 4
+	Disk = 83887742
+	GLIDEIN_ResourceName = "PDX-Coeus-CE1"
+	GPUs = 1
+	GPUs_GPU_d1542b1a = [ Id = "GPU-d1542b1a"; ClockMhz = 1695.0; Capability = 8.6; CoresPerCU = 128; DeviceName = "NVIDIA RTX A5000"; DeviceUuid = "d1542b1a-c11c-e204-12a3-72f5c904e272"; ECCEnabled = false; ComputeUnits = 64; NvidiaDriver = "570.124.06"; DriverVersion = 12.8; DevicePciBusId = "0000:01:00.0"; GlobalMemoryMb = 24361; MaxSupportedVersion = 12080 ]
+	Memory = 65536
+...
+005 (12651350.000.000) 2025-08-16 21:08:10 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 17:51:55, Sys 0 01:06:42  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 17:51:55, Sys 0 01:06:42  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	757616434  -  Run Bytes Sent By Job
+	27190671857  -  Run Bytes Received By Job
+	757616434  -  Total Bytes Sent By Job
+	27190671857  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        4.87        4         4 
+	   Disk (KB)            : 75514084    83886080  83887742 
+	   GPUs                 :        0.72        1         1 "GPU-d1542b1a"
+	   GpusMemory (MB)      :     9931                       
+	   Memory (MB)          :    45075       65536     65536 
+	   TimeExecute (s)      :    14664                       
+	   TimeSlotBusy (s)     :    14811                       
+...

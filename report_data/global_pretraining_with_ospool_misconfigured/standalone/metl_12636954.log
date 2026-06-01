@@ -1,0 +1,72 @@
+000 (12636954.000.000) 2025-05-28 12:15:46 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2550587_1c9b>
+...
+040 (12636954.000.000) 2025-05-28 12:15:50 Started transferring input files
+	Transferring to host: <141.142.254.16:38999?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#179&PrivNet=gpua016.delta.ncsa.illinois.edu&addrs=141.142.254.16-38999&alias=gpua016.delta.ncsa.illinois.edu&noUDP&sock=slot1_1_2464499_3e93_5>
+...
+021 (12636954.000.000) 2025-05-28 13:16:10 Error from starter on slot1_1@gpua016.delta.ncsa.illinois.edu:
+	Input File transfer stalled for 3620 seconds
+...
+004 (12636954.000.000) 2025-05-28 13:16:10 Job was evicted. Code 1007 Subcode 0
+	(0) CPU times
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	0  -  Run Bytes Received By Job
+	Reason: Error from slot1_1@gpua016.delta.ncsa.illinois.edu: Input File transfer stalled for 3620 seconds
+	Partitionable Resources :    Usage  Request Allocated Assigned
+	   Cpus                 :                 2         2 
+	   Disk (KB)            :   750000 83886080  83887104 
+	   GPUs                 :                 2         2 "GPU-bd720515,GPU-c5cd7407"
+	   Memory (MB)          :            131072    131072 
+...
+040 (12636954.000.000) 2025-05-28 13:16:18 Started transferring input files
+	Transferring to host: <141.142.254.16:38999?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#179&PrivNet=gpua016.delta.ncsa.illinois.edu&addrs=141.142.254.16-38999&alias=gpua016.delta.ncsa.illinois.edu&noUDP&sock=slot1_1_2464499_3e93_6>
+...
+040 (12636954.000.000) 2025-05-28 13:21:41 Finished transferring input files
+...
+001 (12636954.000.000) 2025-05-28 13:21:41 Job executing on host: <141.142.254.16:38999?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#179&PrivNet=gpua016.delta.ncsa.illinois.edu&addrs=141.142.254.16-38999&alias=gpua016.delta.ncsa.illinois.edu&noUDP&sock=startd_2464488_5bf1>
+	SlotName: slot1_1@gpua016.delta.ncsa.illinois.edu
+	AvailableGPUs = { GPUs_GPU_bd720515,GPUs_GPU_c5cd7407 }
+	CondorScratchDir = "/scratch/bdrj/iaross/pilot.9sE2RiTR/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/gpua016.delta.ncsa.illinois.edu/execute/dir_424132"
+	Cpus = 2
+	Disk = 83887104
+	GPUs = 2
+	GPUs_GPU_bd720515 = [ Id = "GPU-bd720515"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "bd720515-b609-802c-af27-52615915df3d"; ECCEnabled = true; DriverVersion = 12.4; DevicePciBusId = "0000:46:00.0"; GlobalMemoryMb = 40326; MaxSupportedVersion = 12040 ]
+	GPUs_GPU_c5cd7407 = [ Id = "GPU-c5cd7407"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "c5cd7407-84fb-4a09-97fb-5dd9e29d5a03"; ECCEnabled = true; DriverVersion = 12.4; DevicePciBusId = "0000:07:00.0"; GlobalMemoryMb = 40326; MaxSupportedVersion = 12040 ]
+	Memory = 131072
+...
+006 (12636954.000.000) 2025-05-28 13:21:53 Image size of job updated: 2737344
+	42  -  MemoryUsage of job (MB)
+	42212  -  ResidentSetSize of job (KB)
+...
+006 (12636954.000.000) 2025-05-28 13:26:54 Image size of job updated: 2737344
+	50  -  MemoryUsage of job (MB)
+	50916  -  ResidentSetSize of job (KB)
+...
+006 (12636954.000.000) 2025-05-28 13:28:02 Image size of job updated: 14405088
+	465  -  MemoryUsage of job (MB)
+	475468  -  ResidentSetSize of job (KB)
+...
+040 (12636954.000.000) 2025-05-28 13:28:02 Started transferring output files
+...
+040 (12636954.000.000) 2025-05-28 13:28:08 Finished transferring output files
+...
+005 (12636954.000.000) 2025-05-28 13:28:08 Job terminated.
+	(1) Normal termination (return value 1)
+		Usr 0 00:04:49, Sys 0 00:02:53  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 00:04:49, Sys 0 00:02:53  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	597332312  -  Run Bytes Sent By Job
+	597325970  -  Run Bytes Received By Job
+	597332312  -  Total Bytes Sent By Job
+	597325970  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        0.00        2         2 
+	   Disk (KB)            : 75648032    83886080  83887104 
+	   GPUs                 :        0           2         2 "GPU-bd720515,GPU-c5cd7407"
+	   GpusMemory (MB)      :      638                       
+	   Memory (MB)          :      465      131072    131072 
+	   TimeExecute (s)      :      381                       
+	   TimeSlotBusy (s)     :      711                       
+...

@@ -1,0 +1,33 @@
+000 (14627658.000.000) 2026-05-04 14:09:47 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_9426_07cb>
+    DAG Node: run0-train_epoch29
+...
+001 (14627658.000.000) 2026-05-04 14:16:22 Job executing on host: <141.142.254.25:39447?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#1&PrivNet=gpua025.delta.ncsa.illinois.edu&addrs=141.142.254.25-39447&alias=gpua025.delta.ncsa.illinois.edu&noUDP&sock=startd_1208587_bc09>
+	SlotName: slot1_1@gpua025.delta.ncsa.illinois.edu
+	AvailableGPUs = { GPUs_GPU_8684ab34,GPUs_GPU_bf76deec }
+	CondorScratchDir = "/scratch/bdrj/iaross/pilot.Zg79hb6t/condor-25.6.1-1-x86_64_AlmaLinux9-stripped/gpua025.delta.ncsa.illinois.edu/execute/dir_1208843/scratch"
+	Cpus = 4
+	Disk = 104857600
+	GPUs = 2
+	GPUs_GPU_8684ab34 = [ Id = "GPU-8684ab34"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "8684ab34-b524-ad94-6ed5-53490423bfe3"; ECCEnabled = true; NvidiaDriver = "570.148.08"; DriverVersion = 12.8; DevicePciBusId = "0000:07:00.0"; GlobalMemoryMb = 40442; MaxSupportedVersion = 12080 ]
+	GPUs_GPU_bf76deec = [ Id = "GPU-bf76deec"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "bf76deec-1582-915f-4b10-c081b0383c0f"; ECCEnabled = true; NvidiaDriver = "570.148.08"; DriverVersion = 12.8; DevicePciBusId = "0000:46:00.0"; GlobalMemoryMb = 40442; MaxSupportedVersion = 12080 ]
+	Memory = 220032
+...
+005 (14627658.000.000) 2026-05-04 15:53:58 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 01:07:45, Sys 0 00:36:54  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 01:07:45, Sys 0 00:36:54  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	699656242  -  Run Bytes Sent By Job
+	27255831925  -  Run Bytes Received By Job
+	699656242  -  Total Bytes Sent By Job
+	27255831925  -  Total Bytes Received By Job
+	Partitionable Resources :       Usage   Request Allocated Assigned
+	   Cpus                 :        0.45         4         4 
+	   Disk (KB)            : 75885982    104857600 104857600 
+	   GPUs                 :                     2         2 "GPU-8684ab34,GPU-bf76deec"
+	   GpusMemory (MB)      :     4628                        
+	   Memory (MB)          :    26744       220000    220032 
+	   TimeExecute (s)      :     5835                        
+	   TimeSlotBusy (s)     :     6081                        
+...

@@ -1,0 +1,40 @@
+000 (12635521.000.000) 2025-05-08 08:11:24 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2550587_1c9b>
+...
+040 (12635521.000.000) 2025-05-08 13:25:52 Started transferring input files
+	Transferring to host: <198.202.101.228:42913?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#145&PrivNet=exp-9-59.expanse.sdsc.edu&addrs=198.202.101.228-42913&alias=exp-9-59.expanse.sdsc.edu&noUDP&sock=slot1_1_1638716_6ac7_2>
+...
+040 (12635521.000.000) 2025-05-08 14:25:45 Finished transferring input files
+...
+001 (12635521.000.000) 2025-05-08 14:25:46 Job executing on host: <198.202.101.228:42913?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#145&PrivNet=exp-9-59.expanse.sdsc.edu&addrs=198.202.101.228-42913&alias=exp-9-59.expanse.sdsc.edu&noUDP&sock=startd_1638705_e826>
+	SlotName: slot1_1@exp-9-59.expanse.sdsc.edu
+	AvailableGPUs = { GPUs_GPU_aa48d36c }
+	CondorScratchDir = "/expanse/lustre/scratch/iaross/temp_project/pilot.eYWNZuSR/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/exp-9-59.expanse.sdsc.edu/execute/dir_1639101"
+	Cpus = 1
+	Disk = 84817555
+	GPUs = 1
+	GPUs_GPU_aa48d36c = [ Id = "GPU-aa48d36c"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "aa48d36c-90dd-e141-157c-6bb222738b10"; ECCEnabled = true; DriverVersion = 12.0; DevicePciBusId = "0000:86:00.0"; GlobalMemoryMb = 32501; MaxSupportedVersion = 12000 ]
+	Memory = 131072
+...
+006 (12635521.000.000) 2025-05-08 14:25:55 Image size of job updated: 3565424
+	44  -  MemoryUsage of job (MB)
+	44268  -  ResidentSetSize of job (KB)
+...
+006 (12635521.000.000) 2025-05-08 14:35:56 Image size of job updated: 129374616
+	34874  -  MemoryUsage of job (MB)
+	35710500  -  ResidentSetSize of job (KB)
+...
+006 (12635521.000.000) 2025-05-08 14:35:57 Image size of job updated: 129376632
+	34876  -  MemoryUsage of job (MB)
+	35712048  -  ResidentSetSize of job (KB)
+...
+040 (12635521.000.000) 2025-05-08 14:35:57 Started transferring output files
+...
+040 (12635521.000.000) 2025-05-08 14:36:07 Finished transferring output files
+...
+012 (12635521.000.000) 2025-05-08 14:36:08 Job was held.
+	Excessive CPU usage. Job used 2 CPUs, while request_cpus=1. Please verify that the code is configured to use a limited number of cpus/threads, and matches request_cpus.
+	Code 26 Subcode 102
+...
+009 (12635521.000.000) 2025-05-08 16:39:22 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

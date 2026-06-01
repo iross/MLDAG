@@ -1,0 +1,49 @@
+000 (12638843.000.000) 2025-06-18 15:35:25 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2842583_149f>
+...
+040 (12638843.000.000) 2025-06-18 15:36:27 Started transferring input files
+	Transferring to host: <198.202.103.195:36287?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#88&PrivNet=exp-1-60.expanse.sdsc.edu&addrs=198.202.103.195-36287&alias=exp-1-60.expanse.sdsc.edu&noUDP&sock=slot1_1_265004_0a91_2>
+...
+040 (12638843.000.000) 2025-06-18 15:37:28 Finished transferring input files
+...
+001 (12638843.000.000) 2025-06-18 15:37:28 Job executing on host: <198.202.103.195:36287?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#88&PrivNet=exp-1-60.expanse.sdsc.edu&addrs=198.202.103.195-36287&alias=exp-1-60.expanse.sdsc.edu&noUDP&sock=startd_264993_bc3c>
+	SlotName: slot1_1@exp-1-60.expanse.sdsc.edu
+	AvailableGPUs = { GPUs_GPU_97809f02,GPUs_GPU_a2b91fbb }
+	CondorScratchDir = "/expanse/lustre/scratch/iaross/temp_project/pilot.cihvHYJB/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/exp-1-60.expanse.sdsc.edu/execute/dir_265368"
+	Cpus = 2
+	Disk = 84760503
+	GPUs = 2
+	GPUs_GPU_97809f02 = [ Id = "GPU-97809f02"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "97809f02-4090-9642-fb7b-16b49dcfbf39"; ECCEnabled = true; DriverVersion = 12.0; DevicePciBusId = "0000:86:00.0"; GlobalMemoryMb = 32501; MaxSupportedVersion = 12000 ]
+	GPUs_GPU_a2b91fbb = [ Id = "GPU-a2b91fbb"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "a2b91fbb-5381-50e1-f366-dbabbdfd9299"; ECCEnabled = true; DriverVersion = 12.0; DevicePciBusId = "0000:18:00.0"; GlobalMemoryMb = 32501; MaxSupportedVersion = 12000 ]
+	Memory = 131072
+...
+006 (12638843.000.000) 2025-06-18 15:37:37 Image size of job updated: 1500
+	4  -  MemoryUsage of job (MB)
+	4088  -  ResidentSetSize of job (KB)
+...
+006 (12638843.000.000) 2025-06-18 15:38:15 Image size of job updated: 16632940
+	595  -  MemoryUsage of job (MB)
+	609120  -  ResidentSetSize of job (KB)
+...
+040 (12638843.000.000) 2025-06-18 15:38:15 Started transferring output files
+...
+040 (12638843.000.000) 2025-06-18 15:38:15 Finished transferring output files
+...
+005 (12638843.000.000) 2025-06-18 15:38:16 Job terminated.
+	(1) Normal termination (return value 1)
+		Usr 0 00:00:02, Sys 0 00:00:02  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 00:00:02, Sys 0 00:00:02  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	59427  -  Run Bytes Sent By Job
+	1767  -  Run Bytes Received By Job
+	59427  -  Total Bytes Sent By Job
+	1767  -  Total Bytes Received By Job
+	Partitionable Resources :      Usage  Request Allocated Assigned
+	   Cpus                 :       0.05        2         2 
+	   Disk (KB)            : 5896535    83886080  84760503 
+	   GPUs                 :                   2         2 "GPU-97809f02,GPU-a2b91fbb"
+	   GpusMemory (MB)      :     271                       
+	   Memory (MB)          :     595      131072    131072 
+	   TimeExecute (s)      :      47                       
+	   TimeSlotBusy (s)     :     108                       
+...

@@ -1,0 +1,83 @@
+000 (12636821.000.000) 2025-05-26 15:10:37 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2550587_1c9b>
+...
+040 (12636821.000.000) 2025-05-26 15:12:13 Started transferring input files
+	Transferring to host: <141.142.254.12:39551?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#176&PrivNet=gpua012.delta.ncsa.illinois.edu&addrs=141.142.254.12-39551&alias=gpua012.delta.ncsa.illinois.edu&noUDP&sock=slot1_1_2811229_e567_2>
+...
+021 (12636821.000.000) 2025-05-26 16:12:33 Error from starter on slot1_1@gpua012.delta.ncsa.illinois.edu:
+	Input File transfer stalled for 3620 seconds
+...
+004 (12636821.000.000) 2025-05-26 16:12:33 Job was evicted. Code 1007 Subcode 0
+	(0) CPU times
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	0  -  Run Bytes Received By Job
+	Reason: Error from slot1_1@gpua012.delta.ncsa.illinois.edu: Input File transfer stalled for 3620 seconds
+	Partitionable Resources :    Usage  Request Allocated Assigned
+	   Cpus                 :                 2         2 
+	   Disk (KB)            :   750000 83886080  83887104 
+	   GPUs                 :                 2         2 "GPU-08d964f6,GPU-ef611fd2"
+	   Memory (MB)          :            131072    131072 
+...
+040 (12636821.000.000) 2025-05-26 16:12:42 Started transferring input files
+	Transferring to host: <141.142.254.12:39551?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#176&PrivNet=gpua012.delta.ncsa.illinois.edu&addrs=141.142.254.12-39551&alias=gpua012.delta.ncsa.illinois.edu&noUDP&sock=slot1_1_2811229_e567_3>
+...
+040 (12636821.000.000) 2025-05-26 16:18:26 Finished transferring input files
+...
+001 (12636821.000.000) 2025-05-26 16:18:26 Job executing on host: <141.142.254.12:39551?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#176&PrivNet=gpua012.delta.ncsa.illinois.edu&addrs=141.142.254.12-39551&alias=gpua012.delta.ncsa.illinois.edu&noUDP&sock=startd_2811218_4ca5>
+	SlotName: slot1_1@gpua012.delta.ncsa.illinois.edu
+	AvailableGPUs = { GPUs_GPU_08d964f6,GPUs_GPU_ef611fd2 }
+	CondorScratchDir = "/scratch/bdrj/iaross/pilot.ykWFJsWr/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/gpua012.delta.ncsa.illinois.edu/execute/dir_3417949"
+	Cpus = 2
+	Disk = 83887104
+	GPUs = 2
+	GPUs_GPU_08d964f6 = [ Id = "GPU-08d964f6"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "08d964f6-b3b6-ce74-bd0c-ec8317e05569"; ECCEnabled = true; DriverVersion = 12.4; DevicePciBusId = "0000:46:00.0"; GlobalMemoryMb = 40326; MaxSupportedVersion = 12040 ]
+	GPUs_GPU_ef611fd2 = [ Id = "GPU-ef611fd2"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "ef611fd2-dcf2-8836-e4f5-e88f17c132f2"; ECCEnabled = true; DriverVersion = 12.4; DevicePciBusId = "0000:07:00.0"; GlobalMemoryMb = 40326; MaxSupportedVersion = 12040 ]
+	Memory = 131072
+...
+006 (12636821.000.000) 2025-05-26 16:18:37 Image size of job updated: 2736320
+	42  -  MemoryUsage of job (MB)
+	42308  -  ResidentSetSize of job (KB)
+...
+006 (12636821.000.000) 2025-05-26 16:23:37 Image size of job updated: 2736320
+	59  -  MemoryUsage of job (MB)
+	59804  -  ResidentSetSize of job (KB)
+...
+006 (12636821.000.000) 2025-05-26 16:28:39 Image size of job updated: 15263328
+	1191  -  MemoryUsage of job (MB)
+	1219064  -  ResidentSetSize of job (KB)
+...
+006 (12636821.000.000) 2025-05-26 16:33:39 Image size of job updated: 193846948
+	23439  -  MemoryUsage of job (MB)
+	24001036  -  ResidentSetSize of job (KB)
+...
+006 (12636821.000.000) 2025-05-26 16:38:39 Image size of job updated: 193846948
+	23464  -  MemoryUsage of job (MB)
+	24026156  -  ResidentSetSize of job (KB)
+...
+006 (12636821.000.000) 2025-05-26 16:41:54 Image size of job updated: 193846948
+	23469  -  MemoryUsage of job (MB)
+	24031944  -  ResidentSetSize of job (KB)
+...
+040 (12636821.000.000) 2025-05-26 16:41:54 Started transferring output files
+...
+040 (12636821.000.000) 2025-05-26 16:42:02 Finished transferring output files
+...
+004 (12636821.000.000) 2025-05-26 16:42:02 Job was evicted.
+	(0) CPU times
+		Usr 0 00:14:13, Sys 0 00:04:37  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	597317836  -  Run Bytes Sent By Job
+	597311256  -  Run Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        0           2         2 
+	   Disk (KB)            : 59267037    83886080  83887104 
+	   GPUs                 :        0.02        2         2 "GPU-08d964f6,GPU-ef611fd2"
+	   GpusMemory (MB)      :     4014                       
+	   Memory (MB)          :    23469      131072    131072 
+	   TimeExecute (s)      :     1408                       
+	   TimeSlotBusy (s)     :     1761                       
+...
+009 (12636821.000.000) 2025-05-26 16:42:02 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

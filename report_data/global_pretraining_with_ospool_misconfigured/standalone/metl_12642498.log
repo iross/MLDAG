@@ -1,0 +1,102 @@
+000 (12642498.000.000) 2025-07-07 14:22:21 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_1629459_eb7d>
+...
+040 (12642498.000.000) 2025-07-07 14:24:37 Started transferring input files
+	Transferring to host: <3.222.117.101:9618?addrs=3.222.117.101-9618&alias=ip-172-31-69-51.ec2.internal&noUDP&sock=slot1_1_3155_bb99_2>
+...
+021 (12642498.000.000) 2025-07-07 15:24:57 Error from starter on slot1_1@ip-172-31-69-51.ec2.internal:
+	Input File transfer stalled for 3620 seconds
+...
+004 (12642498.000.000) 2025-07-07 15:24:57 Job was evicted. Code 1007 Subcode 0
+	(0) CPU times
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	0  -  Run Bytes Received By Job
+	Reason: Error from slot1_1@ip-172-31-69-51.ec2.internal: Input File transfer stalled for 3620 seconds
+	Partitionable Resources :    Usage  Request Allocated Assigned
+	   Cpus                 :                 2         2 
+	   Disk (KB)            :     1500 83886080  83887104 
+	   GPUs                 :                 1         1 "GPU-cbcfd5f4"
+	   Memory (MB)          :             12288     12288 
+...
+040 (12642498.000.000) 2025-07-07 15:25:02 Started transferring input files
+	Transferring to host: <3.222.117.101:9618?addrs=3.222.117.101-9618&alias=ip-172-31-69-51.ec2.internal&noUDP&sock=slot1_1_3155_bb99_4>
+...
+040 (12642498.000.000) 2025-07-07 15:27:31 Finished transferring input files
+...
+001 (12642498.000.000) 2025-07-07 15:27:31 Job executing on host: <3.222.117.101:9618?addrs=3.222.117.101-9618&alias=ip-172-31-69-51.ec2.internal&noUDP&sock=startd_3121_532b>
+	SlotName: slot1_1@ip-172-31-69-51.ec2.internal
+	AvailableGPUs = { GPUs_GPU_cbcfd5f4 }
+	CondorScratchDir = "/mnt/execute/dir_6923"
+	Cpus = 2
+	Disk = 83887104
+	GPUs = 1
+	GPUs_GPU_cbcfd5f4 = [ Id = "GPU-cbcfd5f4"; Capability = 8.9; DeviceName = "NVIDIA L4"; DeviceUuid = "cbcfd5f4-f230-94a1-429b-e9278e47be26"; ECCEnabled = true; NvidiaDriver = "575.57.08"; DriverVersion = 12.9; DevicePciBusId = "0000:31:00.0"; GlobalMemoryMb = 22563; MaxSupportedVersion = 12090 ]
+	Memory = 12288
+...
+006 (12642498.000.000) 2025-07-07 15:27:45 Image size of job updated: 16500
+	17  -  MemoryUsage of job (MB)
+	16500  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 15:32:46 Image size of job updated: 21044
+	21  -  MemoryUsage of job (MB)
+	21044  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 15:37:46 Image size of job updated: 7627956
+	7450  -  MemoryUsage of job (MB)
+	7627956  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 15:42:46 Image size of job updated: 7686384
+	7507  -  MemoryUsage of job (MB)
+	7686384  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 15:47:46 Image size of job updated: 7769324
+	7588  -  MemoryUsage of job (MB)
+	7769324  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 15:52:46 Image size of job updated: 7838056
+	7655  -  MemoryUsage of job (MB)
+	7838056  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 15:57:46 Image size of job updated: 7918164
+	7733  -  MemoryUsage of job (MB)
+	7918164  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 16:02:46 Image size of job updated: 7985276
+	7799  -  MemoryUsage of job (MB)
+	7985276  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 16:07:46 Image size of job updated: 8073564
+	7885  -  MemoryUsage of job (MB)
+	8073564  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 16:12:46 Image size of job updated: 8148272
+	7958  -  MemoryUsage of job (MB)
+	8148272  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 16:17:46 Image size of job updated: 8232848
+	8040  -  MemoryUsage of job (MB)
+	8232848  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 16:22:46 Image size of job updated: 8293040
+	8099  -  MemoryUsage of job (MB)
+	8293040  -  ResidentSetSize of job (KB)
+...
+006 (12642498.000.000) 2025-07-07 16:25:47 Image size of job updated: 8380952
+	8099  -  MemoryUsage of job (MB)
+	8293040  -  ResidentSetSize of job (KB)
+...
+040 (12642498.000.000) 2025-07-07 16:25:47 Started transferring output files
+...
+040 (12642498.000.000) 2025-07-07 16:25:47 Finished transferring output files
+...
+012 (12642498.000.000) 2025-07-07 16:25:47 Job was held.
+	Excessive CPU usage. Job used 4 CPUs, while request_cpus=2. Please verify that the code is configured to use a limited number of cpus/threads, and matches request_cpus.
+	Code 26 Subcode 102
+...
+013 (12642498.000.000) 2025-07-08 08:22:37 Job was released.
+	via condor_release (by user ian.ross)
+...
+009 (12642498.000.000) 2025-07-08 08:22:41 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

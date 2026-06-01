@@ -1,2 +1,5 @@
 # SCM syntax highlighting & preventing 3-way merges
 pixi.lock merge=binary linguist-language=YAML linguist-generated=true
+*.dagman.out !text !filter !merge !diff
+metl.log !text !filter !merge !diff
+*.out.zip !text !filter !merge !diff

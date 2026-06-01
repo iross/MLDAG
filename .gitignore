@@ -76,6 +76,16 @@ __pycache__/
 .DS_Store
 *.docx
 
+# report_data/ contains curated source files that should be tracked despite
+# matching the general ignore patterns above
+!report_data/
+!report_data/**
+!report_data/**/*.log
+!report_data/**/*.out
+!report_data/**/*.dagman.out
+!report_data/**/*.nodes.log
+!report_data/**/*.zip
+
 # Task / local tooling
 .cursor
 .cursorrules

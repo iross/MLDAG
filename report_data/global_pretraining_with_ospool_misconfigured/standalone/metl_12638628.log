@@ -1,0 +1,57 @@
+000 (12638628.000.000) 2025-06-16 15:52:09 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2842583_149f>
+...
+040 (12638628.000.000) 2025-06-16 16:09:16 Started transferring input files
+	Transferring to host: <198.202.101.45:44547?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#71&PrivNet=exp-13-58.expanse.sdsc.edu&addrs=198.202.101.45-44547&alias=exp-13-58.expanse.sdsc.edu&noUDP&sock=slot1_1_3037962_ce4b_2>
+...
+040 (12638628.000.000) 2025-06-16 16:20:06 Finished transferring input files
+...
+001 (12638628.000.000) 2025-06-16 16:20:06 Job executing on host: <198.202.101.45:44547?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#71&PrivNet=exp-13-58.expanse.sdsc.edu&addrs=198.202.101.45-44547&alias=exp-13-58.expanse.sdsc.edu&noUDP&sock=startd_3037948_3886>
+	SlotName: slot1_1@exp-13-58.expanse.sdsc.edu
+	AvailableGPUs = { GPUs_GPU_219f9dc7,GPUs_GPU_671c1a61 }
+	CondorScratchDir = "/expanse/lustre/scratch/iaross/temp_project/pilot.1iS3m9Sx/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/exp-13-58.expanse.sdsc.edu/execute/dir_3038323"
+	Cpus = 2
+	Disk = 84717838
+	GPUs = 2
+	GPUs_GPU_219f9dc7 = [ Id = "GPU-219f9dc7"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "219f9dc7-f3bf-3bf1-3734-6dbff2812d14"; ECCEnabled = true; DriverVersion = 12.0; DevicePciBusId = "0000:18:00.0"; GlobalMemoryMb = 32501; MaxSupportedVersion = 12000 ]
+	GPUs_GPU_671c1a61 = [ Id = "GPU-671c1a61"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "671c1a61-554c-5f45-ffc5-07815e14374c"; ECCEnabled = true; DriverVersion = 12.0; DevicePciBusId = "0000:3B:00.0"; GlobalMemoryMb = 32501; MaxSupportedVersion = 12000 ]
+	Memory = 131072
+...
+006 (12638628.000.000) 2025-06-16 16:20:16 Image size of job updated: 1500
+	4  -  MemoryUsage of job (MB)
+	4084  -  ResidentSetSize of job (KB)
+...
+006 (12638628.000.000) 2025-06-16 16:25:16 Image size of job updated: 3565424
+	44  -  MemoryUsage of job (MB)
+	44668  -  ResidentSetSize of job (KB)
+...
+040 (12638628.000.000) 2025-06-16 16:25:55 Started transferring output files
+...
+040 (12638628.000.000) 2025-06-16 16:25:55 Finished transferring output files
+...
+021 (12638628.000.000) 2025-06-16 16:25:56 Error from starter on slot1_1@exp-13-58.expanse.sdsc.edu:
+	STARTER at 198.202.101.45 failed to send file(s) to <128.105.68.62:9618>: |Error: reading from file /expanse/lustre/scratch/iaross/temp_project/pilot.1iS3m9Sx/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/exp-13-58.expanse.sdsc.edu/execute/dir_3038323/output: (errno 2) No such file or directory; SHADOW failed to receive file(s) from <198.202.101.45:39509>
+	Code 13 Subcode 2
+...
+004 (12638628.000.000) 2025-06-16 16:26:16 Job was evicted. Code 12 Subcode 2
+	(0) CPU times
+		Usr 0 00:04:46, Sys 0 00:01:13  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	1628  -  Run Bytes Received By Job
+	Reason: Transfer output files failure at execution point slot1_1@exp-13-58.expanse.sdsc.edu while sending files to access point ap40. Details: reading from file /expanse/lustre/scratch/iaross/temp_project/pilot.1iS3m9Sx/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/exp-13-58.expanse.sdsc.edu/execute/dir_3038323/output: (errno 2) No such file or directory
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        1.14        2         2 
+	   Disk (KB)            : 72516345    83886080  84717838 
+	   GPUs                 :                    2         2 "GPU-219f9dc7,GPU-671c1a61"
+	   GpusMemory (MB)      :      271                       
+	   Memory (MB)          :       44      131072    131072 
+	   TimeExecute (s)      :      349                       
+	   TimeSlotBusy (s)     :     1000                       
+...
+012 (12638628.000.000) 2025-06-16 16:26:16 Job was held.
+	Transfer output files failure at execution point slot1_1@exp-13-58.expanse.sdsc.edu while sending files to access point ap40. Details: reading from file /expanse/lustre/scratch/iaross/temp_project/pilot.1iS3m9Sx/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/exp-13-58.expanse.sdsc.edu/execute/dir_3038323/output: (errno 2) No such file or directory
+	Code 12 Subcode 2
+...
+009 (12638628.000.000) 2025-06-17 09:34:28 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

@@ -1,0 +1,45 @@
+000 (12638295.000.000) 2025-06-11 15:01:08 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2842583_149f>
+...
+040 (12638295.000.000) 2025-06-11 15:03:24 Started transferring input files
+	Transferring to host: <172.18.92.43:36379?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#22&PrivNet=g005.anvil.rcac.purdue.edu&addrs=172.18.92.43-36379&alias=g005.anvil.rcac.purdue.edu&noUDP&sock=slot1_1_3951179_cbba_2>
+...
+040 (12638295.000.000) 2025-06-11 15:05:56 Finished transferring input files
+...
+001 (12638295.000.000) 2025-06-11 15:05:56 Job executing on host: <172.18.92.43:36379?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#22&PrivNet=g005.anvil.rcac.purdue.edu&addrs=172.18.92.43-36379&alias=g005.anvil.rcac.purdue.edu&noUDP&sock=startd_3951176_ab74>
+	SlotName: slot1_1@g005.anvil.rcac.purdue.edu
+	AvailableGPUs = { GPUs_GPU_7bfa2e14,GPUs_GPU_95960220 }
+	CondorScratchDir = "/anvil/scratch/ross505/pilot.qQW8sBZz/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/g005.anvil.rcac.purdue.edu/execute/dir_3951519"
+	Cpus = 1
+	Disk = 89253964
+	GPUs = 2
+	GPUs_GPU_7bfa2e14 = [ Id = "GPU-7bfa2e14"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "7bfa2e14-c668-7cf6-bc32-8d668c1494c9"; ECCEnabled = true; DriverVersion = 12.6; DevicePciBusId = "0000:C1:00.0"; GlobalMemoryMb = 40444; MaxSupportedVersion = 12060 ]
+	GPUs_GPU_95960220 = [ Id = "GPU-95960220"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "95960220-fb8c-14b1-8673-6e95377d5493"; ECCEnabled = true; DriverVersion = 12.6; DevicePciBusId = "0000:81:00.0"; GlobalMemoryMb = 40444; MaxSupportedVersion = 12060 ]
+	Memory = 64000
+...
+006 (12638295.000.000) 2025-06-11 15:06:05 Image size of job updated: 1500
+	7  -  MemoryUsage of job (MB)
+	6892  -  ResidentSetSize of job (KB)
+...
+006 (12638295.000.000) 2025-06-11 15:11:06 Image size of job updated: 1450488
+	28  -  MemoryUsage of job (MB)
+	28364  -  ResidentSetSize of job (KB)
+...
+006 (12638295.000.000) 2025-06-11 15:16:07 Image size of job updated: 194319964
+	46262  -  MemoryUsage of job (MB)
+	47371948  -  ResidentSetSize of job (KB)
+...
+006 (12638295.000.000) 2025-06-11 15:21:07 Image size of job updated: 366134116
+	81345  -  MemoryUsage of job (MB)
+	83296600  -  ResidentSetSize of job (KB)
+...
+040 (12638295.000.000) 2025-06-11 15:21:09 Started transferring output files
+...
+040 (12638295.000.000) 2025-06-11 15:21:09 Finished transferring output files
+...
+012 (12638295.000.000) 2025-06-11 15:21:10 Job was held.
+	Memory usage exceeded request_memory
+	Code 26 Subcode 103
+...
+009 (12638295.000.000) 2025-06-14 09:46:02 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

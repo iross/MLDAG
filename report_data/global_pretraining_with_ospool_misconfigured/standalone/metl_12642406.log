@@ -1,0 +1,22 @@
+000 (12642406.000.000) 2025-07-03 15:09:48 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_1629459_eb7d>
+...
+040 (12642406.000.000) 2025-07-03 15:09:49 Started transferring input files
+	Transferring to host: <3.93.218.45:9618?addrs=3.93.218.45-9618&alias=ip-172-31-61-246.ec2.internal&noUDP&sock=slot1_1_3172_b5fa_5>
+...
+040 (12642406.000.000) 2025-07-03 15:10:01 Finished transferring input files
+...
+004 (12642406.000.000) 2025-07-03 15:10:01 Job was evicted.
+	(0) CPU times
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	0  -  Run Bytes Received By Job
+	Partitionable Resources :    Usage  Request Allocated Assigned
+	   Cpus                 :        0        2         2 
+	   Disk (KB)            :     1910 83886080  83887104 
+	   GPUs                 :                 1         1 "GPU-72c87065"
+	   Memory (MB)          :             12288     12288 
+...
+009 (12642406.000.000) 2025-07-03 15:10:01 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

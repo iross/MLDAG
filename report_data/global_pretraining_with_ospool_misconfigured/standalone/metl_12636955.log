@@ -1,0 +1,88 @@
+000 (12636955.000.000) 2025-05-28 13:43:49 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2550587_1c9b>
+...
+040 (12636955.000.000) 2025-05-28 13:45:35 Started transferring input files
+	Transferring to host: <141.142.254.82:37019?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#181&PrivNet=gpua082.delta.ncsa.illinois.edu&addrs=141.142.254.82-37019&alias=gpua082.delta.ncsa.illinois.edu&noUDP&sock=slot1_1_219503_7877_2>
+...
+040 (12636955.000.000) 2025-05-28 14:09:03 Finished transferring input files
+...
+001 (12636955.000.000) 2025-05-28 14:09:03 Job executing on host: <141.142.254.82:37019?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#181&PrivNet=gpua082.delta.ncsa.illinois.edu&addrs=141.142.254.82-37019&alias=gpua082.delta.ncsa.illinois.edu&noUDP&sock=startd_219492_d57b>
+	SlotName: slot1_1@gpua082.delta.ncsa.illinois.edu
+	AvailableGPUs = { GPUs_GPU_59c54a86,GPUs_GPU_7075769e }
+	CondorScratchDir = "/scratch/bdrj/iaross/pilot.nDXfmM3d/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/gpua082.delta.ncsa.illinois.edu/execute/dir_219654"
+	Cpus = 2
+	Disk = 83887104
+	GPUs = 2
+	GPUs_GPU_59c54a86 = [ Id = "GPU-59c54a86"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "59c54a86-c295-93a7-dd55-b60a61e3fea4"; ECCEnabled = true; DriverVersion = 12.4; DevicePciBusId = "0000:C7:00.0"; GlobalMemoryMb = 40326; MaxSupportedVersion = 12040 ]
+	GPUs_GPU_7075769e = [ Id = "GPU-7075769e"; Capability = 8.0; DeviceName = "NVIDIA A100-SXM4-40GB"; DeviceUuid = "7075769e-1f9f-765f-2004-668a76b76c70"; ECCEnabled = true; DriverVersion = 12.4; DevicePciBusId = "0000:85:00.0"; GlobalMemoryMb = 40326; MaxSupportedVersion = 12040 ]
+	Memory = 131072
+...
+006 (12636955.000.000) 2025-05-28 14:09:15 Image size of job updated: 2736832
+	38  -  MemoryUsage of job (MB)
+	38308  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:19:15 Image size of job updated: 362411640
+	81844  -  MemoryUsage of job (MB)
+	83807856  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:24:15 Image size of job updated: 368589652
+	81862  -  MemoryUsage of job (MB)
+	83826156  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:29:15 Image size of job updated: 368602316
+	81892  -  MemoryUsage of job (MB)
+	83856744  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:34:15 Image size of job updated: 368615072
+	81904  -  MemoryUsage of job (MB)
+	83869104  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:39:16 Image size of job updated: 368627340
+	81916  -  MemoryUsage of job (MB)
+	83881596  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:44:16 Image size of job updated: 368639480
+	81945  -  MemoryUsage of job (MB)
+	83911024  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:49:18 Image size of job updated: 368652140
+	81974  -  MemoryUsage of job (MB)
+	83940892  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:54:19 Image size of job updated: 368663792
+	81986  -  MemoryUsage of job (MB)
+	83953528  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 14:59:20 Image size of job updated: 368675972
+	82000  -  MemoryUsage of job (MB)
+	83967308  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 15:04:20 Image size of job updated: 368688460
+	82029  -  MemoryUsage of job (MB)
+	83996956  -  ResidentSetSize of job (KB)
+...
+006 (12636955.000.000) 2025-05-28 15:04:38 Image size of job updated: 368689844
+	82030  -  MemoryUsage of job (MB)
+	83997844  -  ResidentSetSize of job (KB)
+...
+040 (12636955.000.000) 2025-05-28 15:04:39 Started transferring output files
+...
+040 (12636955.000.000) 2025-05-28 15:04:46 Finished transferring output files
+...
+004 (12636955.000.000) 2025-05-28 15:04:46 Job was evicted.
+	(0) CPU times
+		Usr 0 01:19:58, Sys 0 00:15:02  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	597342644  -  Run Bytes Sent By Job
+	597333823  -  Run Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        0.00        2         2 
+	   Disk (KB)            : 75228837    83886080  83887104 
+	   GPUs                 :                    2         2 "GPU-59c54a86,GPU-7075769e"
+	   GpusMemory (MB)      :     9086                       
+	   Memory (MB)          :    82030      131072    131072 
+	   TimeExecute (s)      :     3335                       
+	   TimeSlotBusy (s)     :     4751                       
+...
+009 (12636955.000.000) 2025-05-28 15:04:46 Job was aborted.
+	via condor_rm (by user ian.ross)
+...

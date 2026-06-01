@@ -1,0 +1,48 @@
+000 (12637660.000.000) 2025-06-02 08:44:43 Job submitted from host: <128.105.68.62:9618?addrs=128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618&alias=ap40.uw.osg-htc.org&noUDP&sock=schedd_2550587_1c9b>
+...
+040 (12637660.000.000) 2025-06-02 13:59:03 Started transferring input files
+	Transferring to host: <198.202.101.169:40367?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#195&PrivNet=exp-10-58.expanse.sdsc.edu&addrs=198.202.101.169-40367&alias=exp-10-58.expanse.sdsc.edu&noUDP&sock=slot1_1_338295_2e56_2>
+...
+040 (12637660.000.000) 2025-06-02 14:00:11 Finished transferring input files
+...
+001 (12637660.000.000) 2025-06-02 14:01:53 Job executing on host: <198.202.101.169:40367?CCBID=128.105.68.62:9618%3faddrs%3d128.105.68.62-9618+[2607-f388-2200-100-eaeb-d3ff-fea3-416e]-9618%26alias%3dap40.uw.osg-htc.org%26noUDP%26sock%3dap_collector#195&PrivNet=exp-10-58.expanse.sdsc.edu&addrs=198.202.101.169-40367&alias=exp-10-58.expanse.sdsc.edu&noUDP&sock=startd_338278_2653>
+	SlotName: slot1_1@exp-10-58.expanse.sdsc.edu
+	AvailableGPUs = { GPUs_GPU_23ba213c,GPUs_GPU_521b5321 }
+	CondorScratchDir = "/expanse/lustre/scratch/iaross/temp_project/pilot.J3iqSyly/condor-23.8.1-1-x86_64_AlmaLinux8-stripped/exp-10-58.expanse.sdsc.edu/execute/dir_338813"
+	Cpus = 2
+	Disk = 85170447
+	GPUs = 2
+	GPUs_GPU_23ba213c = [ Id = "GPU-23ba213c"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "23ba213c-5cc0-6fd5-3e69-c10fb4be8a13"; ECCEnabled = true; DriverVersion = 12.0; DevicePciBusId = "0000:86:00.0"; GlobalMemoryMb = 32501; MaxSupportedVersion = 12000 ]
+	GPUs_GPU_521b5321 = [ Id = "GPU-521b5321"; Capability = 7.0; DeviceName = "Tesla V100-SXM2-32GB"; DeviceUuid = "521b5321-df8e-d5f4-f812-72e7ac4c3fd1"; ECCEnabled = true; DriverVersion = 12.0; DevicePciBusId = "0000:AF:00.0"; GlobalMemoryMb = 32501; MaxSupportedVersion = 12000 ]
+	Memory = 131072
+...
+006 (12637660.000.000) 2025-06-02 14:02:03 Image size of job updated: 3565424
+	45  -  MemoryUsage of job (MB)
+	45176  -  ResidentSetSize of job (KB)
+...
+006 (12637660.000.000) 2025-06-02 14:10:39 Image size of job updated: 36360468
+	6244  -  MemoryUsage of job (MB)
+	6392916  -  ResidentSetSize of job (KB)
+...
+040 (12637660.000.000) 2025-06-02 14:11:44 Started transferring output files
+...
+040 (12637660.000.000) 2025-06-02 14:12:08 Finished transferring output files
+...
+004 (12637660.000.000) 2025-06-02 14:13:11 Job was evicted.
+	(0) CPU times
+		Usr 0 00:08:36, Sys 0 00:01:24  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	962028046  -  Run Bytes Sent By Job
+	961961185  -  Run Bytes Received By Job
+	Partitionable Resources :       Usage  Request Allocated Assigned
+	   Cpus                 :        0.08        2         2 
+	   Disk (KB)            : 75701619    83886080  85170447 
+	   GPUs                 :        0.00        2         2 "GPU-23ba213c,GPU-521b5321"
+	   GpusMemory (MB)      :     1455                       
+	   Memory (MB)          :     6244      131072    131072 
+	   TimeExecute (s)      :      578                       
+	   TimeSlotBusy (s)     :      919                       
+...
+009 (12637660.000.000) 2025-06-02 14:13:44 Job was aborted.
+	via condor_rm (by user ian.ross)
+...
