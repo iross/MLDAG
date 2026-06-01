@@ -80,13 +80,14 @@ class JobAttempt:
 class SimpleCSVGenerator:
     """Generate CSV reports using DAG files, DAGMan output files, and metl.log."""
 
-    def __init__(self, dag_files: Optional[List[str]] = None, metl_logs: Optional[List[str]] = None, include_standalone: bool = False):
+    def __init__(self, dag_files: Optional[List[str]] = None, metl_logs: Optional[List[str]] = None, include_standalone: bool = False, standalone_dir: str = "standalone"):
         """Initialize the generator.
 
         Args:
             dag_files: List of DAG files. If None, auto-detect *.dag files.
             metl_logs: List of metl.log files. If None, use ["metl.log"].
             include_standalone: Whether to include standalone training runs from standalone/ directory and UUID 861e7e66 runs.
+            standalone_dir: Path to directory containing standalone metl_*.log and .out files.
         """
         if dag_files is None:
             dag_files = glob.glob("*.dag")
@@ -103,6 +104,7 @@ class SimpleCSVGenerator:
             raise FileNotFoundError("No metl.log files found")
 
         self.include_standalone = include_standalone
+        self.standalone_dir = Path(standalone_dir)
 
         # Find corresponding .dag.dagman.out files (contain cluster-to-job mappings)
         self.dagman_out_files = []
@@ -429,9 +431,8 @@ class SimpleCSVGenerator:
 
         # Parse standalone metl_*.log files for UUID 861e7e66 training runs (only if enabled)
         if self.include_standalone:
-            standalone_dir = Path("standalone")
-            if standalone_dir.exists():
-                standalone_logs = list(standalone_dir.glob("metl_*.log"))
+            if self.standalone_dir.exists():
+                standalone_logs = list(self.standalone_dir.glob("metl_*.log"))
                 print(f"Found {len(standalone_logs)} standalone metl_*.log files")
 
                 for log_file in standalone_logs:
@@ -440,7 +441,7 @@ class SimpleCSVGenerator:
                         standalone_lines = f.readlines()
                     self._parse_log_lines(standalone_lines, cluster_attempts)
             else:
-                print("Standalone directory not found")
+                print(f"Standalone directory not found: {self.standalone_dir}")
 
             # Add standalone training runs with UUID 861e7e66
             self._add_standalone_861e7e66_runs(cluster_attempts)
@@ -644,15 +645,14 @@ class SimpleCSVGenerator:
 
     def _add_standalone_861e7e66_runs(self, cluster_attempts: Dict[int, List[Dict[str, Any]]]):
         """Add synthetic entries for standalone training runs with UUID 861e7e66."""
-        standalone_dir = Path("standalone")
-        if not standalone_dir.exists():
+        if not self.standalone_dir.exists():
             return
 
         # Find all .out files for UUID 861e7e66 training runs
         uuid_pattern = "861e7e66"
         relevant_files = []
 
-        for out_file in standalone_dir.glob("*.out"):
+        for out_file in self.standalone_dir.glob("*.out"):
             # Quick check if file contains our UUID
             try:
                 with open(out_file, 'r') as f:
@@ -1363,6 +1363,7 @@ Examples:
     parser.add_argument("--dag-files", nargs="+", help="Specific DAG files to use")
     parser.add_argument("--metl-logs", nargs="+", help="Specific metl.log files to use (default: metl.log)")
     parser.add_argument("--include-standalone", action="store_true", help="Include standalone training runs from standalone/ directory and UUID 861e7e66 runs")
+    parser.add_argument("--standalone-dir", default="standalone", help="Path to standalone directory (default: standalone)")
     parser.add_argument("output_file", nargs="?", help="Output CSV file path (legacy positional argument - use --output instead)")
 
     args = parser.parse_args()
@@ -1370,7 +1371,7 @@ Examples:
     # Determine output file - prioritize positional argument for backwards compatibility
     output_file = args.output_file if args.output_file else args.output
 
-    generator = SimpleCSVGenerator(args.dag_files, metl_logs=args.metl_logs, include_standalone=args.include_standalone)
+    generator = SimpleCSVGenerator(args.dag_files, metl_logs=args.metl_logs, include_standalone=args.include_standalone, standalone_dir=args.standalone_dir)
     generator.export_csv(output_file)
     print(f"CSV exported to: {output_file}")
 
