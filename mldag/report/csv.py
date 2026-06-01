@@ -947,6 +947,8 @@ class SimpleCSVGenerator:
                     attempt['actual_resource'] = "bridges2"
                 elif "anvil.rcac.purdue.edu" in line:
                     attempt['actual_resource'] = "anvil"
+                elif ".chtc.wisc.edu" in line:
+                    attempt['actual_resource'] = "chtc"
 
         for i in range(line_index + 1, min(line_index + 20, len(lines))):
             line = lines[i].strip()
@@ -1219,7 +1221,7 @@ class SimpleCSVGenerator:
 
     def _map_resource_name(self, resource_name: str) -> str:
         """Map resource names using dagman_monitor's logic: keep major resources, others become 'ospool'."""
-        major_resources = {"expanse", "bridges2", "delta", "anvil", "aws"}
+        major_resources = {"expanse", "bridges2", "delta", "anvil", "aws", "chtc"}
 
         if resource_name and resource_name.lower() in major_resources:
             return resource_name

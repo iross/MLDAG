@@ -380,8 +380,9 @@ class ExperimentAnalyzer:
             return 'Unknown'
         if resource_name.lower() == 'ospool':
             return 'OSPool'
-        else:
-            return resource_name.title()
+        if resource_name.lower() == 'chtc':
+            return 'CHTC'
+        return resource_name.title()
 
     def format_resource_name_with_glidein(self, resource_name):
         """Format resource names with GLIDEIN breakdown and NAIRR/OSPool labels.
@@ -422,7 +423,8 @@ class ExperimentAnalyzer:
             'expanse': '#4169E1',   # Royal Blue
             'delta': '#FF6347',     # Tomato
             'bridges2': '#9370DB',  # Medium Purple
-            'anvil': '#FF8C00'      # Dark Orange
+            'anvil': '#FF8C00',     # Dark Orange
+            'chtc': '#C0392B',      # Crimson
         }
 
         # Return colors for the resources present in the data
