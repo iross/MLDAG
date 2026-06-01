@@ -4,10 +4,14 @@ MONTH := env_var_or_default("MONTH", "11")
 install:
     uv sync
 
+# Remove generated DAG files, run UUID directories, logs, and provenance output
+clean:
+    rm -f *.dag *.dag.* metl.log nodes.dag.status
+    find . -maxdepth 1 -type d -name '????????' -exec rm -rf {} +
+    rm -rf output/
+
 # Private per-pool implementations (hidden from just --list)
 _refresh-ospool:
-    scp ap40:"/home/ian.ross/MLDAG_AWS/metl.log" metl_aws.log
-    scp ap40:"/home/ian.ross/MLDAG_AWS/global_pretraining_in_aws.dag*" .
     scp ap40:"/home/ian.ross/MLDAG_fixed_global/global_pretraining.dag*" .
     scp ap40:"/home/ian.ross/MLDAG_fixed_global/bigger_global_pretraining.dag*" .
     scp ap40:"/home/ian.ross/MLDAG_fixed_global/ospool_pretraining.dag*" .
@@ -22,8 +26,8 @@ _refresh-chtc:
 _csv-ospool:
     uv run mldag-csv \
         --dag-files bigger_global_pretraining.dag global_pretraining.dag \
-                    global_pretraining_in_aws.dag ospool_pretraining.dag \
-        --metl-logs metl.log metl_aws.log \
+                    ospool_pretraining.dag \
+        --metl-logs metl.log \
         --output full_ospool.csv
 
 _csv-chtc:
@@ -66,7 +70,7 @@ recent-summary hours pool="ospool":
 # Generate interactive HTML dashboard for the last N hours and push to GitHub Pages (ospool only)
 hourly-site hours="24":
     just _csv-ospool
-    uv run hourly_dashboard.py full_ospool.csv --output-dir site --hours {{ hours }}
+    uv run mldag-dashboard full_ospool.csv --output-dir site --hours {{ hours }}
     rm -rf site/.git
     git -C site init
     git -C site add -A
@@ -77,4 +81,30 @@ hourly-site hours="24":
 monthly-report pool="ospool" month=MONTH:
     just _csv-{{ pool }}
     uv run mldag-report full_{{ pool }}.csv --month {{ month }} --output-dir month_{{ month }}_reports
-    cp full_{{ pool }}.csv month_{{ month }}_reports/
+
+_csv-global-pretraining:
+    uv run mldag-csv \
+        --dag-files report_data/global_pretraining/bigger_global_pretraining.dag \
+                    report_data/global_pretraining/global_pretraining.dag \
+                    report_data/global_pretraining/ospool_pretraining.dag \
+        --metl-logs report_data/global_pretraining/metl.log \
+        --output full_global_pretraining.csv
+
+_csv-ospool-misconfigured:
+    uv run mldag-csv \
+        --dag-files report_data/global_pretraining_with_ospool_misconfigured/global_pretraining_with_ospool.dag \
+                    report_data/global_pretraining_with_ospool_misconfigured/global_pretraining_with_ospool_w_anvil.dag \
+        --metl-logs report_data/global_pretraining_with_ospool_misconfigured/metl.log \
+        --include-standalone \
+        --standalone-dir report_data/global_pretraining_with_ospool_misconfigured/standalone \
+        --output full_ospool_misconfigured.csv
+
+# Full report for report_data/global_pretraining
+full-report-global-pretraining:
+    just _csv-global-pretraining
+    uv run mldag-report full_global_pretraining.csv --output-dir final_report/global_pretraining
+
+# Full report for report_data/global_pretraining_with_ospool_misconfigured
+full-report-ospool-misconfigured:
+    just _csv-ospool-misconfigured
+    uv run mldag-report full_ospool_misconfigured.csv --output-dir final_report/ospool_misconfigured

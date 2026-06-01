@@ -1,3 +1,0 @@
-[submodule "htcondor"]
-	path = htcondor
-	url = https://github.com/htcondor/htcondor/

@@ -1,10 +1,4 @@
-#!/usr/bin/env python3
-"""
-Hourly Dashboard Generator
-
-Generates a self-contained interactive HTML dashboard from HPC experiment CSV data
-and (optionally) pushes it to the gh-pages branch for GitHub Pages hosting.
-"""
+"""Interactive HTML dashboard generator from experiment CSV data."""
 
 import argparse
 import textwrap
@@ -414,6 +408,7 @@ main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
 h2 { color: #1a1a2e; font-size: 1.1rem; margin: 0 0 0.75rem; }
 """
 
+
 def assemble_html(summary_html: str, chart_htmls: list[str], hours: Optional[int]) -> str:
     window_label = f"Last {hours} Hours" if hours else "All Time"
     charts_block = "\n".join(f'<div class="chart-card">{c}</div>' for c in chart_htmls)
@@ -495,7 +490,3 @@ def main() -> None:
         output_dir=Path(args.output_dir),
         hours=args.hours,
     )
-
-
-if __name__ == "__main__":
-    main()

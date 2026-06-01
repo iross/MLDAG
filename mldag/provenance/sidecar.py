@@ -6,6 +6,8 @@ parent_hash chain makes the full training lineage reconstructable from
 the files alone — no database required.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -32,6 +34,7 @@ def write_sidecar(
     site_info: dict,
     env_info: dict,
     training_metrics: dict,
+    extra: dict | None = None,
 ) -> str:
     """Write a .provenance.json sidecar alongside the checkpoint.
 
@@ -65,6 +68,8 @@ def write_sidecar(
         "environment": env_info,
         "training": training_metrics,
     }
+    if extra:
+        sidecar["extra"] = extra
 
     sidecar_path = Path(str(checkpoint_path) + ".provenance.json")
     sidecar_path.write_text(json.dumps(sidecar, indent=2))
