@@ -101,7 +101,8 @@ def get_script(job: Job, resource: Resource, config: dict, post_hook: str = "") 
         # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
         # DAGMan allows only one SCRIPT PRE per node.
         pre_args += f' --annex {resource.name}'
-    post_args = '$JOB $RETURN $JOBID'
+    # --run-id must come before --post-hook because --post-hook uses REMAINDER.
+    post_args = f'$JOB $RETURN $JOBID --run-id {job.run_uuid}'
     if post_hook:
         # post_hook is appended verbatim; DAGMan expands $MACRO tokens at runtime.
         # Available POST macros: $NODE $RETURN $JOBID $CLUSTERID $RETRY

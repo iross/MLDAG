@@ -172,6 +172,22 @@ def test_emit_post_event_missing_ad_file(tmp_path):
     assert "wall_time_s" not in e
 
 
+def test_emit_post_event_run_id_hint_used_when_ad_missing(tmp_path):
+    # No .ad file, no .run_id marker — hint is the final fallback
+    emit_post_event("run0-train_epoch0", 0, "99999", log_dir=tmp_path, run_id_hint="abc123")
+    events = _read_events(tmp_path, "abc123")
+    assert events[0]["run_id"] == "abc123"
+    assert events[0]["type"] == "job.completed"
+
+
+def test_emit_post_event_ad_run_id_takes_precedence_over_hint(tmp_path):
+    # When the ClassAd resolves run_id, hint is ignored
+    _write_ad(tmp_path, SAMPLE_AD)
+    emit_post_event("run0-train_epoch0", 0, "12345", log_dir=tmp_path, run_id_hint="wrong-hint")
+    events = _read_events(tmp_path, "run-abc123")
+    assert events[0]["run_id"] == "run-abc123"
+
+
 def test_emit_post_event_run_id_marker_fallback(tmp_path):
     # .ad has no PROVENANCE_RUN_ID but .run_id marker resolves it
     _write_ad(tmp_path, {k: v for k, v in SAMPLE_AD.items() if k != "Environment"})
@@ -238,3 +254,15 @@ def test_main_propagates_exit_code(tmp_path):
             with pytest.raises(SystemExit) as exc:
                 main()
     assert exc.value.code == 42
+
+
+def test_main_run_id_flag_used_when_ad_missing(tmp_path):
+    """--run-id provides the run_uuid when job_ad_file is not written by the schedd."""
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+        with patch.object(sys, "argv", ["post", "run0-train_epoch0", "0", "99999", "--run-id", "abc123"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 0
+    events = _read_events(tmp_path, "abc123")
+    assert events[0]["run_id"] == "abc123"
+    assert events[0]["type"] == "job.completed"
