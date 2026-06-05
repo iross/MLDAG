@@ -67,8 +67,15 @@ def emit_post_event(
     cluster_id: str,
     *,
     log_dir: str | Path = _DEFAULT_LOG_DIR,
+    run_id_hint: str | None = None,
 ) -> None:
-    """Emit job.completed or job.failed using data from the HTCondor ClassAd."""
+    """Emit job.completed or job.failed using data from the HTCondor ClassAd.
+
+    Args:
+        run_id_hint: run_id to use when ClassAd and .run_id marker both fail.
+            Pass the run_uuid from DAG generation so the event is always
+            attributed even when job_ad_file is not supported by the schedd.
+    """
     log_dir = Path(log_dir)
     ad = parse_classad(log_dir / f"{cluster_id}.ad")
     run_id = run_id_from_classad(ad)
@@ -76,6 +83,8 @@ def emit_post_event(
         marker = log_dir / f"{cluster_id}.run_id"
         if marker.exists():
             run_id = marker.read_text().strip()
+    if run_id == "unknown" and run_id_hint:
+        run_id = run_id_hint
     resource = resource_fields_from_classad(ad)
 
     if exit_code == 0:
@@ -101,6 +110,11 @@ def main() -> None:
     parser.add_argument("exit_code", type=int)
     parser.add_argument("cluster_id")
     parser.add_argument(
+        "--run-id", default=None, dest="run_id",
+        help="run_uuid embedded at DAG generation time; used as fallback when "
+             "the ClassAd file is unavailable (e.g. job_ad_file not supported).",
+    )
+    parser.add_argument(
         "--post-hook", nargs=argparse.REMAINDER, default=[],
         metavar="CMD [ARGS...]",
         help="Optional command + args to run after provenance is recorded. "
@@ -114,7 +128,7 @@ def main() -> None:
     # only ClusterId, so strip the proc part to match the filename.
     cluster_id = args.cluster_id.split(".")[0]
     log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
-    emit_post_event(args.job_name, args.exit_code, cluster_id, log_dir=log_dir)
+    emit_post_event(args.job_name, args.exit_code, cluster_id, log_dir=log_dir, run_id_hint=args.run_id)
     if args.post_hook:
         import subprocess
         result = subprocess.run(args.post_hook)
