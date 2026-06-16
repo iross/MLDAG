@@ -88,17 +88,22 @@ _provenance_capture_and_emit || exit 1
 
 #echo "Copying ${dataset_name} dataset"
 # cp "/staging/iaross/processed-${dataset_name}.tar.gz" .
-echo "Untarring ${dataset_name} dataset"
-mkdir -p ${dataset_name}
-tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
+#echo "Untarring ${dataset_name} dataset"
+#mkdir -p ${dataset_name}
+#tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
 
 #unzip cleaned_data_test.zip -d precleaned
-rm "processed-${dataset_name}.tar.gz"
+#rm "processed-${dataset_name}.tar.gz"
+echo "Looking around a bit"
+pwd
+ls
 
 ln -s /workspace/metl/data/
 
-parent_dir=$(realpath "${PWD}/${dataset_name}"/splits/*/)
-splits_dir=$(basename "${parent_dir}")
+split_dir=$(find "${dataset_name}/splits" -mindepth 1 -maxdepth 1 -type d | head -1)
+[[ -n "$split_dir" ]] || { echo "No splits subdirectory found in ${dataset_name}/splits" >&2; exit 1; }
+
+echo "Using $split_dir as split path"
 
 pwd
 env
@@ -115,7 +120,7 @@ _TRAIN_START=$(python3 -c "import time; print(time.time())")
 
 python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_local.txt \
     --ds_fn "$PWD/${dataset_name}/${dataset_name}.db"   \
-    --split_dir "$PWD/${dataset_name}/splits/${splits_dir}" \
+    --split_dir "$PWD/${split_dir}" \
     --max_epochs $epochs --uuid=$run_uuid  \
     --random_seed $random_seed
 
