@@ -20,8 +20,8 @@ Run this as a DAGMan SERVICE so it stays alive for the life of the DAG:
 
 The ClusterId → run_id mapping is resolved in order:
   1. In-memory cache — populated by reading event 000 (job submitted) blocks
-     from metl.log itself, which contains "DAG Node: <name>" body lines when
-     submitted via DAGMan.  The node name is cross-referenced against NDJSON
+     from metl.log itself, which contains `DAGNodeName = "<name>"` ClassAd lines
+     when submitted via DAGMan.  The node name is cross-referenced against NDJSON
      files where the PRE script wrote a job.submitted event with both
      job_name and run_id.
   2. <cluster_id>.run_id marker written by the job at start (requires shared FS)
@@ -39,13 +39,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from mldag.provenance.events import _DEFAULT_LOG_DIR, emit_event
-from mldag.provenance.post import parse_classad, run_id_from_classad, resource_fields_from_classad
+from mldag.provenance.post import (
+    parse_classad,
+    run_id_from_classad,
+    resource_fields_from_classad,
+)
 
 # Matches any HTCondor event log header line; groups: (code, cluster_id, ...)
-_TS_NEW = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+_TS_NEW = re.compile(
+    r"^(\d{3}) \((\d+)\.\d+\.\d+\) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"
+)
 _TS_OLD = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}) (\d{2}:\d{2}:\d{2})")
 _ANY_HEADER_RE = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\)")
-_DAGNODE_RE = re.compile(r"DAG Node:\s+(\S+)")
+_DAGNODE_RE = re.compile(r'DAGNodeName\s*=\s*"([^"]+)"')
 
 # Codes that emit provenance events
 _CODES = {"001", "004", "009", "012", "013", "023", "040"}
@@ -61,11 +67,13 @@ _CODE_TO_EVENT = {
 }
 
 # HTCondor uses code 040 for all file transfer events; direction and phase are in the description
-_TRANSFER_RE = re.compile(r"\b(Started|Finished) transferring (input|output) files", re.IGNORECASE)
+_TRANSFER_RE = re.compile(
+    r"\b(Started|Finished) transferring (input|output) files", re.IGNORECASE
+)
 _TRANSFER_EVENT_MAP = {
-    ("started",  "input"):  "transfer.input.started",
-    ("finished", "input"):  "transfer.input.completed",
-    ("started",  "output"): "transfer.output.started",
+    ("started", "input"): "transfer.input.started",
+    ("finished", "input"): "transfer.input.completed",
+    ("started", "output"): "transfer.output.started",
     ("finished", "output"): "transfer.output.completed",
 }
 
@@ -102,7 +110,10 @@ def _job_name_to_run_id(job_name: str, provenance_log_dir: Path) -> str | None:
                 if not line:
                     continue
                 event = json.loads(line)
-                if event.get("type") == "job.submitted" and event.get("job_name") == job_name:
+                if (
+                    event.get("type") == "job.submitted"
+                    and event.get("job_name") == job_name
+                ):
                     return event.get("run_id")
         except (json.JSONDecodeError, OSError):
             continue
@@ -182,6 +193,7 @@ def monitor_once(
         run_id = _job_name_to_run_id(job_name, provenance_log_dir)
         if run_id:
             run_id_cache[cluster_id] = run_id
+            (log_dir / f"{cluster_id}.run_id").write_text(run_id)
             del pending_lookups[cluster_id]
             emit_event(
                 "job.queued",
@@ -197,7 +209,7 @@ def monitor_once(
         stripped = line.strip()
 
         # Track event 000 blocks to build cluster_id → run_id cache.
-        # Event 000 body contains "DAG Node: <name>" when submitted by DAGMan.
+        # Event 000 body contains `DAGNodeName = "<name>"` when submitted by DAGMan.
         hm = _ANY_HEADER_RE.match(stripped)
         if hm:
             if hm.group(1) == "000":
@@ -213,6 +225,7 @@ def monitor_once(
                 run_id = _job_name_to_run_id(job_name, provenance_log_dir)
                 if run_id:
                     run_id_cache[cluster_id] = run_id
+                    (log_dir / f"{cluster_id}.run_id").write_text(run_id)
                     emit_event(
                         "job.queued",
                         run_id,
@@ -244,6 +257,7 @@ def monitor_once(
             if resolved:
                 run_id = resolved
                 run_id_cache[cluster_id] = run_id
+                (log_dir / f"{cluster_id}.run_id").write_text(run_id)
                 del pending_lookups[cluster_id]
                 emit_event(
                     "job.queued",
@@ -284,7 +298,9 @@ def _load_cache(cache_path: Path) -> dict[int, str]:
 def _save_pending(pending_path: Path, pending_lookups: dict[int, str]) -> None:
     try:
         pending_path.parent.mkdir(parents=True, exist_ok=True)
-        pending_path.write_text(json.dumps({str(k): v for k, v in pending_lookups.items()}))
+        pending_path.write_text(
+            json.dumps({str(k): v for k, v in pending_lookups.items()})
+        )
     except OSError:
         pass
 
@@ -356,8 +372,12 @@ def watch_log(
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="HTCondor event log provenance monitor")
-    parser.add_argument("--log-file", default="metl.log", help="HTCondor event log to watch")
+    parser = argparse.ArgumentParser(
+        description="HTCondor event log provenance monitor"
+    )
+    parser.add_argument(
+        "--log-file", default="metl.log", help="HTCondor event log to watch"
+    )
     parser.add_argument(
         "--classad-dir",
         default="output/provenance",

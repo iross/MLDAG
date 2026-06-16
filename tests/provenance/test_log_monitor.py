@@ -6,8 +6,11 @@ from mldag.provenance.log_monitor import (
     _job_name_to_run_id,
     _load_cache,
     _load_offset,
+    _load_pending,
+    _resolve_run_id,
     _save_cache,
     _save_offset,
+    _save_pending,
     monitor_once,
 )
 
@@ -24,7 +27,7 @@ def _write_ad(ad_dir: Path, cluster_id: int, run_id: str) -> None:
     (ad_dir / f"{cluster_id}.ad").write_text(
         f'Environment = "PROVENANCE_RUN_ID={run_id} OTHER=val"\n'
         f'GLIDEIN_ResourceName = "Expanse"\n'
-        f'RemoteWallClockTime = 3600\n'
+        f"RemoteWallClockTime = 3600\n"
     )
 
 
@@ -152,13 +155,16 @@ def test_monitor_once_event_000_dag_node_populates_cache(tmp_path):
     prov_dir = tmp_path / "provenance"
     _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
     log = tmp_path / "metl.log"
-    _write_log(log,
+    _write_log(
+        log,
         "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
-        "    DAG Node: run0-train_epoch0\n"
-        "...\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
+        "...\n",
     )
     cache: dict = {}
-    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache)
+    monitor_once(
+        log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache
+    )
     assert cache.get(5055662) == "run-abc"
     events = _read_events(prov_dir, "run-abc")
     queued = [e for e in events if e["type"] == "job.queued"]
@@ -173,16 +179,19 @@ def test_monitor_once_event_000_then_executing_resolves_run_id(tmp_path):
     prov_dir = tmp_path / "provenance"
     _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
     log = tmp_path / "metl.log"
-    _write_log(log,
+    _write_log(
+        log,
         "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
-        "    DAG Node: run0-train_epoch0\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
         "...\n"
         "001 (5055662.000.000) 2026-04-29 10:05:00 Job executing on host: <10.0.0.1:1234>\n"
-        "...\n"
+        "...\n",
     )
     monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
     events = _read_events(prov_dir, "run-abc")
-    assert len(events) == 3  # job.submitted (written earlier) + job.queued + job.executing
+    assert (
+        len(events) == 3
+    )  # job.submitted (written earlier) + job.queued + job.executing
     executing = next(e for e in events if e["type"] == "job.executing")
     assert executing["run_id"] == "run-abc"
     assert executing["cluster_id"] == 5055662
@@ -195,24 +204,39 @@ def test_monitor_once_pending_lookup_resolved_on_next_poll(tmp_path):
     prov_dir = tmp_path / "provenance"
     log = tmp_path / "metl.log"
 
-    _write_log(log,
+    _write_log(
+        log,
         "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
-        "    DAG Node: run0-train_epoch0\n"
-        "...\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
+        "...\n",
     )
     cache: dict = {}
     state: dict = {"cluster_id": None}
     pending: dict = {}
-    offset = monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir,
-                          run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+    offset = monitor_once(
+        log,
+        0,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        multiline_state=state,
+        pending_lookups=pending,
+    )
 
     assert cache.get(5055662) is None
     assert pending.get(5055662) == "run0-train_epoch0"
 
     _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
 
-    monitor_once(log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir,
-                 run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+    monitor_once(
+        log,
+        offset,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        multiline_state=state,
+        pending_lookups=pending,
+    )
 
     assert cache.get(5055662) == "run-abc"
     assert 5055662 not in pending
@@ -230,23 +254,40 @@ def test_monitor_once_pending_resolved_before_executing_event(tmp_path):
     prov_dir = tmp_path / "provenance"
     log = tmp_path / "metl.log"
 
-    _write_log(log,
+    _write_log(
+        log,
         "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
-        "    DAG Node: run0-train_epoch0\n"
-        "...\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
+        "...\n",
     )
     cache: dict = {}
     state: dict = {"cluster_id": None}
     pending: dict = {}
-    offset = monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir,
-                          run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+    offset = monitor_once(
+        log,
+        0,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        multiline_state=state,
+        pending_lookups=pending,
+    )
 
     _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
     with open(log, "a") as f:
-        f.write("001 (5055662.000.000) 2026-04-29 10:05:00 Job executing on host: <10.0.0.1:1234>\n...\n")
+        f.write(
+            "001 (5055662.000.000) 2026-04-29 10:05:00 Job executing on host: <10.0.0.1:1234>\n...\n"
+        )
 
-    monitor_once(log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir,
-                 run_id_cache=cache, multiline_state=state, pending_lookups=pending)
+    monitor_once(
+        log,
+        offset,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        multiline_state=state,
+        pending_lookups=pending,
+    )
 
     events = _read_events(prov_dir, "run-abc")
     queued = [e for e in events if e["type"] == "job.queued"]
@@ -269,15 +310,29 @@ def test_monitor_once_dag_node_across_poll_boundary(tmp_path):
     log.write_text(first)
     cache: dict = {}
     state: dict = {"cluster_id": None}
-    offset = monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir,
-                          run_id_cache=cache, multiline_state=state)
+    offset = monitor_once(
+        log,
+        0,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        multiline_state=state,
+    )
     assert cache.get(5055662) is None  # DAG Node line not seen yet
     assert state["cluster_id"] == 5055662  # pending
 
     with open(log, "a") as f:
-        f.write("    DAG Node: run0-train_epoch0\n...\n")
-    monitor_once(log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir,
-                 run_id_cache=cache, multiline_state=state)
+        f.write(
+            '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n...\n'
+        )
+    monitor_once(
+        log,
+        offset,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        multiline_state=state,
+    )
     assert cache.get(5055662) == "run-abc"
     events = _read_events(prov_dir, "run-abc")
     queued = [e for e in events if e["type"] == "job.queued"]
@@ -294,11 +349,12 @@ def test_monitor_once_transfer_events_emitted(tmp_path):
     _write_ad(ad_dir, 12345, "run-abc")
     log = tmp_path / "metl.log"
     # HTCondor uses code 040 for all file transfer events; direction is in the description
-    _write_log(log,
+    _write_log(
+        log,
         "040 (12345.000.000) 2026-04-29 10:00:00 Started transferring input files\n"
         "040 (12345.000.000) 2026-04-29 10:01:00 Finished transferring input files\n"
         "040 (12345.000.000) 2026-04-29 11:00:00 Started transferring output files\n"
-        "040 (12345.000.000) 2026-04-29 11:05:00 Finished transferring output files\n"
+        "040 (12345.000.000) 2026-04-29 11:05:00 Finished transferring output files\n",
     )
 
     monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
@@ -396,7 +452,9 @@ def test_monitor_once_cache_resolves_hold_without_classad(tmp_path):
     _write_log(log, "012 (88.000.000) 2026-04-01 11:00:00 Job was held.\n")
 
     cache = {88: "run-cached"}
-    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache)
+    monitor_once(
+        log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache
+    )
 
     events = _read_events(prov_dir, "run-cached")
     assert len(events) == 1
@@ -547,10 +605,15 @@ def test_monitor_once_prepopulated_cache_resolves_transfer_event(tmp_path):
     ad_dir.mkdir()
     prov_dir = tmp_path / "provenance"
     log = tmp_path / "metl.log"
-    _write_log(log, "040 (5055662.000.000) 2026-04-29 10:00:00 Started transferring input files\n")
+    _write_log(
+        log,
+        "040 (5055662.000.000) 2026-04-29 10:00:00 Started transferring input files\n",
+    )
 
     cache = {5055662: "run-abc"}
-    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache)
+    monitor_once(
+        log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, run_id_cache=cache
+    )
 
     events = _read_events(prov_dir, "run-abc")
     assert len(events) == 1
@@ -568,11 +631,12 @@ def test_monitor_once_same_poll_000_and_transfer_with_ndjson_available(tmp_path)
     prov_dir = tmp_path / "provenance"
     _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
     log = tmp_path / "metl.log"
-    _write_log(log,
+    _write_log(
+        log,
         "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
-        "    DAG Node: run0-train_epoch0\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
         "...\n"
-        "040 (5055662.000.000) 2026-04-29 10:00:01 Started transferring input files\n"
+        "040 (5055662.000.000) 2026-04-29 10:00:01 Started transferring input files\n",
     )
     monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
 
@@ -582,3 +646,165 @@ def test_monitor_once_same_poll_000_and_transfer_with_ndjson_available(tmp_path)
     assert "transfer.input.started" in types
     transfer = next(e for e in events if e["type"] == "transfer.input.started")
     assert transfer["run_id"] == "run-abc"
+
+
+# --- _save_pending / _load_pending ---
+
+
+def test_save_and_load_pending_roundtrip(tmp_path):
+    pending = {12345: "run0-train_epoch0", 99: "run1-train_epoch3"}
+    pending_path = tmp_path / ".log_monitor.pending.json"
+    _save_pending(pending_path, pending)
+    assert _load_pending(pending_path) == pending
+
+
+def test_load_pending_returns_empty_dict_when_missing(tmp_path):
+    assert _load_pending(tmp_path / ".log_monitor.pending.json") == {}
+
+
+def test_load_pending_returns_empty_dict_on_corrupt(tmp_path):
+    pending_path = tmp_path / ".log_monitor.pending.json"
+    pending_path.write_text("not-json")
+    assert _load_pending(pending_path) == {}
+
+
+# --- _resolve_run_id ---
+
+
+def test_resolve_run_id_from_cache(tmp_path):
+    cache = {12345: "run-cached"}
+    run_id, resource = _resolve_run_id(12345, tmp_path, cache)
+    assert run_id == "run-cached"
+    assert resource == {}
+
+
+def test_resolve_run_id_from_run_id_marker(tmp_path):
+    (tmp_path / "99.run_id").write_text("run-from-marker")
+    cache: dict = {}
+    run_id, resource = _resolve_run_id(99, tmp_path, cache)
+    assert run_id == "run-from-marker"
+    assert cache[99] == "run-from-marker"
+
+
+def test_resolve_run_id_from_classad(tmp_path):
+    _write_ad(tmp_path, 77, "run-from-ad")
+    cache: dict = {}
+    run_id, resource = _resolve_run_id(77, tmp_path, cache)
+    assert run_id == "run-from-ad"
+    assert cache[77] == "run-from-ad"
+    assert resource.get("resource_name") == "Expanse"
+
+
+def test_resolve_run_id_unknown_fallback(tmp_path):
+    cache: dict = {}
+    run_id, resource = _resolve_run_id(55555, tmp_path, cache)
+    assert run_id == "unknown:55555"
+    assert 55555 not in cache
+
+
+# --- .run_id file written on resolution ---
+
+
+def test_monitor_once_run_id_file_written_on_000_resolution(tmp_path):
+    """When run_id resolved from DAGNodeName in 000 block, .run_id file is written."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    log = tmp_path / "metl.log"
+    _write_log(
+        log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
+        "...\n",
+    )
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    run_id_file = ad_dir / "5055662.run_id"
+    assert run_id_file.exists(), ".run_id file should be written after 000 resolution"
+    assert run_id_file.read_text().strip() == "run-abc"
+
+
+def test_monitor_once_run_id_file_written_on_pending_resolution(tmp_path):
+    """When pending lookup resolves on next poll, .run_id file is written."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    log = tmp_path / "metl.log"
+    _write_log(
+        log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
+        "...\n",
+    )
+    cache: dict = {}
+    pending: dict = {}
+    offset = monitor_once(
+        log,
+        0,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        pending_lookups=pending,
+    )
+    assert pending.get(5055662) == "run0-train_epoch0"
+    assert not (ad_dir / "5055662.run_id").exists()
+
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    monitor_once(
+        log,
+        offset,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        pending_lookups=pending,
+    )
+
+    run_id_file = ad_dir / "5055662.run_id"
+    assert run_id_file.exists(), ".run_id file should be written when pending resolves"
+    assert run_id_file.read_text().strip() == "run-abc"
+
+
+def test_monitor_once_run_id_file_written_on_inline_pending_resolution(tmp_path):
+    """When event triggers inline pending resolution, .run_id file is written."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    log = tmp_path / "metl.log"
+    _write_log(
+        log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
+        "...\n",
+    )
+    cache: dict = {}
+    pending: dict = {}
+    offset = monitor_once(
+        log,
+        0,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        pending_lookups=pending,
+    )
+
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    with open(log, "a") as f:
+        f.write(
+            "001 (5055662.000.000) 2026-04-29 10:05:00 Job executing on host: <10.0.0.1:1234>\n...\n"
+        )
+
+    monitor_once(
+        log,
+        offset,
+        log_dir=ad_dir,
+        provenance_log_dir=prov_dir,
+        run_id_cache=cache,
+        pending_lookups=pending,
+    )
+
+    run_id_file = ad_dir / "5055662.run_id"
+    assert (
+        run_id_file.exists()
+    ), ".run_id file should be written on inline pending resolution"
+    assert run_id_file.read_text().strip() == "run-abc"
