@@ -778,14 +778,14 @@ JOB run5-train_epoch18 ospool_pretrain.sub
 JOB run5-train_epoch19 ospool_pretrain.sub
 JOB run5-train_epoch20 ospool_pretrain.sub
 JOB run5-train_epoch21 ospool_pretrain.sub
-JOB run5-train_epoch22 aws_pretrain.sub
-JOB run5-train_epoch23 ospool_pretrain.sub
-JOB run5-train_epoch24 ospool_pretrain.sub
-JOB run5-train_epoch25 ospool_pretrain.sub
-JOB run5-train_epoch26 ospool_pretrain.sub
-JOB run5-train_epoch27 anvil_pretrain.sub
-JOB run5-train_epoch28 ospool_pretrain.sub
-JOB run5-train_epoch29 aws_pretrain.sub
+JOB run5-train_epoch22 expanse_pretrain.sub
+JOB run5-train_epoch23 expanse_pretrain.sub
+JOB run5-train_epoch24 expanse_pretrain.sub
+JOB run5-train_epoch25 expanse_pretrain.sub
+JOB run5-train_epoch26 expanse_pretrain.sub
+JOB run5-train_epoch27 expanse_pretrain.sub
+JOB run5-train_epoch28 expanse_pretrain.sub
+JOB run5-train_epoch29 expanse_pretrain.sub
 
 VARS run5-train_epoch0 epoch="1" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" 
 VARS run5-train_epoch1 epoch="2" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
@@ -809,14 +809,14 @@ VARS run5-train_epoch18 epoch="19" run_uuid="8e6a33ff" random_seed="352968" Reso
 VARS run5-train_epoch19 epoch="20" run_uuid="8e6a33ff" random_seed="352968" ResourceName="UA-LR-ITS-EP" continue_from_checkpoint="true"
 VARS run5-train_epoch20 epoch="21" run_uuid="8e6a33ff" random_seed="352968" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
 VARS run5-train_epoch21 epoch="22" run_uuid="8e6a33ff" random_seed="352968" ResourceName="CHTC" continue_from_checkpoint="true"
-VARS run5-train_epoch22 epoch="23" run_uuid="8e6a33ff" random_seed="352968" ResourceName="aws" continue_from_checkpoint="true"
-VARS run5-train_epoch23 epoch="24" run_uuid="8e6a33ff" random_seed="352968" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
-VARS run5-train_epoch24 epoch="25" run_uuid="8e6a33ff" random_seed="352968" ResourceName="GP-ARGO-ksu-backfill" continue_from_checkpoint="true"
-VARS run5-train_epoch25 epoch="26" run_uuid="8e6a33ff" random_seed="352968" ResourceName="UIUC-TGI-RAILS-CE1" continue_from_checkpoint="true"
-VARS run5-train_epoch26 epoch="27" run_uuid="8e6a33ff" random_seed="352968" ResourceName="SDSC-PRP-OSPool-Provisioner" continue_from_checkpoint="true"
-VARS run5-train_epoch27 epoch="28" run_uuid="8e6a33ff" random_seed="352968" ResourceName="anvil" continue_from_checkpoint="true"
-VARS run5-train_epoch28 epoch="29" run_uuid="8e6a33ff" random_seed="352968" ResourceName="CHTC" continue_from_checkpoint="true"
-VARS run5-train_epoch29 epoch="30" run_uuid="8e6a33ff" random_seed="352968" ResourceName="aws" continue_from_checkpoint="true"
+VARS run5-train_epoch22 epoch="23" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch23 epoch="24" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch24 epoch="25" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch25 epoch="26" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch26 epoch="27" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch27 epoch="28" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch28 epoch="29" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
+VARS run5-train_epoch29 epoch="30" run_uuid="8e6a33ff" random_seed="352968" ResourceName="expanse" continue_from_checkpoint="true"
 
 
 PARENT run5-train_epoch0 CHILD run5-train_epoch1
@@ -879,8 +879,8 @@ JOB run6-train_epoch18 ospool_pretrain.sub
 JOB run6-train_epoch19 ospool_pretrain.sub
 JOB run6-train_epoch20 ospool_pretrain.sub
 JOB run6-train_epoch21 ospool_pretrain.sub
-JOB run6-train_epoch22 anvil_pretrain.sub
-JOB run6-train_epoch23 aws_pretrain.sub
+JOB run6-train_epoch22 bridges2_pretrain.sub
+JOB run6-train_epoch23 bridges2_pretrain.sub
 JOB run6-train_epoch24 ospool_pretrain.sub
 JOB run6-train_epoch25 ospool_pretrain.sub
 JOB run6-train_epoch26 expanse_pretrain.sub
@@ -910,8 +910,8 @@ VARS run6-train_epoch18 epoch="19" run_uuid="5eebdaf5" random_seed="821704" Reso
 VARS run6-train_epoch19 epoch="20" run_uuid="5eebdaf5" random_seed="821704" ResourceName="AMNH-Mendel-CE1" continue_from_checkpoint="true"
 VARS run6-train_epoch20 epoch="21" run_uuid="5eebdaf5" random_seed="821704" ResourceName="ND_CAMLGPU" continue_from_checkpoint="true"
 VARS run6-train_epoch21 epoch="22" run_uuid="5eebdaf5" random_seed="821704" ResourceName="WSU-GRID-CE1" continue_from_checkpoint="true"
-VARS run6-train_epoch22 epoch="23" run_uuid="5eebdaf5" random_seed="821704" ResourceName="anvil" continue_from_checkpoint="true"
-VARS run6-train_epoch23 epoch="24" run_uuid="5eebdaf5" random_seed="821704" ResourceName="aws" continue_from_checkpoint="true"
+VARS run6-train_epoch22 epoch="23" run_uuid="5eebdaf5" random_seed="821704" ResourceName="bridges2" continue_from_checkpoint="true"
+VARS run6-train_epoch23 epoch="24" run_uuid="5eebdaf5" random_seed="821704" ResourceName="bridges2" continue_from_checkpoint="true"
 VARS run6-train_epoch24 epoch="25" run_uuid="5eebdaf5" random_seed="821704" ResourceName="CHTC-Spark-CE1" continue_from_checkpoint="true"
 VARS run6-train_epoch25 epoch="26" run_uuid="5eebdaf5" random_seed="821704" ResourceName="PDX-Coeus-CE1" continue_from_checkpoint="true"
 VARS run6-train_epoch26 epoch="27" run_uuid="5eebdaf5" random_seed="821704" ResourceName="expanse" continue_from_checkpoint="true"

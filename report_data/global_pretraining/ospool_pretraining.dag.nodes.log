@@ -3098,4 +3098,33 @@
 	(0) CPU times
 		Usr 1 04:05:01, Sys 0 04:57:16  -  Run Remote Usage
 		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
-	0  -  Run Bytes Sent By
+	0  -  Run Bytes Sent By009 (14736943.000.000) 2026-06-09 10:40:31 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14797323.000.000) 2026-06-10 22:17:14 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14797504.000.000) 2026-06-11 06:45:53 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14798906.000.000) 2026-06-12 04:04:09 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14795297.000.000) 2026-06-12 07:51:50 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14655617.000.000) 2026-06-12 12:46:45 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14808782.000.000) 2026-06-14 00:22:03 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14799300.000.000) 2026-06-14 11:38:02 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14799305.000.000) 2026-06-14 11:38:02 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
+009 (14808751.000.000) 2026-06-14 11:38:02 Job was aborted.
+	The system macro SYSTEM_PERIODIC_REMOVE expression '(FacilitatorOverride =!= true) && JobStatus == 5 && time() - EnteredCurrentStatus > 2592000' evaluated to TRUE
+...
