@@ -7,23 +7,33 @@ Library functions:
 CLI:
     mldag-query lineage <checkpoint>   -- print ancestry chain
     mldag-query events <run_id>        -- print all events for a run
+    mldag-query db build               -- build/refresh the SQLite database
 
-Both commands accept --json for machine-readable output and --log-dir to
-override the default NDJSON location.
+Both `lineage` and `events` accept --json for machine-readable output and
+--log-dir to override the default NDJSON location. See `mldag-query db
+build --help` and mldag/provenance/db.py for the database schema and
+example queries.
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from mldag.provenance.db import (
+    DEFAULT_CHECKPOINT_DIR,
+    DEFAULT_DB_PATH,
+    DEFAULT_EVENT_DIR,
+    build_database,
+)
 from mldag.provenance.events import _DEFAULT_LOG_DIR
 
 app = typer.Typer(no_args_is_help=True)
+db_app = typer.Typer(no_args_is_help=True, help="Build/refresh the local SQLite provenance database.")
+app.add_typer(db_app, name="db")
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +213,29 @@ def events(
     else:
         typer.echo(f"Events for run {run_id} ({len(run_events)} total):")
         typer.echo(_format_events(run_events))
+
+
+@db_app.command("build")
+def db_build(
+    db: Annotated[str, typer.Option(help="Path to the SQLite database file")] = DEFAULT_DB_PATH,
+    checkpoint_dir: Annotated[
+        list[str] | None,
+        typer.Option(help="Checkpoint sidecar directory to scan; repeatable"),
+    ] = None,
+    event_dir: Annotated[
+        list[str] | None,
+        typer.Option(help="NDJSON event directory to scan; repeatable"),
+    ] = None,
+    full_rescan: Annotated[
+        bool,
+        typer.Option("--full-rescan", help="Re-ingest everything, ignoring recorded mtimes/offsets"),
+    ] = False,
+) -> None:
+    """Build or refresh the SQLite database from checkpoint sidecars and NDJSON events."""
+    checkpoint_dirs = checkpoint_dir or [DEFAULT_CHECKPOINT_DIR]
+    event_dirs = event_dir or [DEFAULT_EVENT_DIR]
+    stats = build_database(db, checkpoint_dirs, event_dirs, full_rescan=full_rescan)
+    typer.echo(str(stats))
 
 
 def main() -> None:
