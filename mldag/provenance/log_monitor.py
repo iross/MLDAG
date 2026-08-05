@@ -101,23 +101,50 @@ def _parse_event_line(line: str) -> tuple[str, int, datetime] | None:
     return None
 
 
-def _job_name_to_run_id(job_name: str, provenance_log_dir: Path) -> str | None:
-    """Search NDJSON files for a job.submitted event matching job_name."""
+def _refresh_job_submitted_index(
+    provenance_log_dir: Path,
+    index: dict[str, str],
+    offsets: dict[str, int],
+) -> None:
+    """Incrementally update job_name -> run_id from job.submitted events.
+
+    Each file in provenance_log_dir is read only from the byte offset
+    recorded on the previous call, so repeated calls do not re-parse the
+    full provenance directory (unlike a plain `glob("*.ndjson")` + full-file
+    read, which becomes O(total historical event volume) per call and gets
+    slower as the directory grows). Pass the same `index`/`offsets` dicts on
+    every call.
+    """
     for ndjson_path in provenance_log_dir.glob("*.ndjson"):
+        key = str(ndjson_path)
         try:
-            for line in ndjson_path.read_text().splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                event = json.loads(line)
-                if (
-                    event.get("type") == "job.submitted"
-                    and event.get("job_name") == job_name
-                ):
-                    return event.get("run_id")
-        except (json.JSONDecodeError, OSError):
+            size = ndjson_path.stat().st_size
+        except OSError:
             continue
-    return None
+        offset = offsets.get(key, 0)
+        if size < offset:
+            offset = 0  # file was truncated or recreated since last scan
+        if size == offset:
+            continue
+        try:
+            with open(ndjson_path, "rb") as f:
+                f.seek(offset)
+                new_bytes = f.read()
+        except OSError:
+            continue
+        offsets[key] = offset + len(new_bytes)
+        for line in new_bytes.decode("utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            job_name = event.get("job_name")
+            run_id = event.get("run_id")
+            if event.get("type") == "job.submitted" and job_name and run_id:
+                index[job_name] = run_id
 
 
 def _resolve_run_id(
@@ -172,6 +199,8 @@ def monitor_once(
     run_id_cache: dict[int, str] | None = None,
     multiline_state: dict | None = None,
     pending_lookups: dict[int, str] | None = None,
+    job_submitted_index: dict[str, str] | None = None,
+    index_offsets: dict[str, int] | None = None,
 ) -> int:
     """Process any new lines in log_path, emit events, return new byte offset.
 
@@ -179,7 +208,9 @@ def monitor_once(
     event 000 blocks (the "DAG Node:" body line may arrive in a later poll).
     pending_lookups maps cluster_id → job_name for DAG Node entries whose
     NDJSON job.submitted record wasn't visible yet; retried on every call.
-    Pass the same dicts on every call from watch_log.
+    job_submitted_index/index_offsets back the job_name → run_id lookup;
+    pass the same dicts on every call from watch_log so the index is built
+    incrementally instead of rescanning the whole provenance directory here.
     """
     if run_id_cache is None:
         run_id_cache = {}
@@ -187,10 +218,16 @@ def monitor_once(
         multiline_state = {"cluster_id": None}
     if pending_lookups is None:
         pending_lookups = {}
+    if job_submitted_index is None:
+        job_submitted_index = {}
+    if index_offsets is None:
+        index_offsets = {}
+
+    _refresh_job_submitted_index(provenance_log_dir, job_submitted_index, index_offsets)
 
     # Retry any cluster_id → job_name mappings that weren't resolved last poll.
     for cluster_id, job_name in list(pending_lookups.items()):
-        run_id = _job_name_to_run_id(job_name, provenance_log_dir)
+        run_id = job_submitted_index.get(job_name)
         if run_id:
             run_id_cache[cluster_id] = run_id
             (log_dir / f"{cluster_id}.run_id").write_text(run_id)
@@ -222,7 +259,7 @@ def monitor_once(
             cluster_id = multiline_state["cluster_id"]
             if cluster_id not in run_id_cache:
                 job_name = dn_m.group(1)
-                run_id = _job_name_to_run_id(job_name, provenance_log_dir)
+                run_id = job_submitted_index.get(job_name)
                 if run_id:
                     run_id_cache[cluster_id] = run_id
                     (log_dir / f"{cluster_id}.run_id").write_text(run_id)
@@ -253,7 +290,7 @@ def monitor_once(
         run_id, resource = _resolve_run_id(cluster_id, log_dir, run_id_cache)
         if run_id.startswith("unknown:") and cluster_id in pending_lookups:
             job_name = pending_lookups[cluster_id]
-            resolved = _job_name_to_run_id(job_name, provenance_log_dir)
+            resolved = job_submitted_index.get(job_name)
             if resolved:
                 run_id = resolved
                 run_id_cache[cluster_id] = run_id
@@ -313,6 +350,24 @@ def _load_pending(pending_path: Path) -> dict[int, str]:
         return {}
 
 
+def _save_job_index(
+    index_path: Path, index: dict[str, str], offsets: dict[str, int]
+) -> None:
+    try:
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        index_path.write_text(json.dumps({"index": index, "offsets": offsets}))
+    except OSError:
+        pass
+
+
+def _load_job_index(index_path: Path) -> tuple[dict[str, str], dict[str, int]]:
+    try:
+        data = json.loads(index_path.read_text())
+        return dict(data.get("index", {})), dict(data.get("offsets", {}))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}, {}
+
+
 def _load_offset(offset_path: Path, log_path: Path) -> int:
     """Return the saved byte offset, or 0 if none or the log was recreated."""
     try:
@@ -348,10 +403,12 @@ def watch_log(
     offset_path = provenance_log_dir / ".log_monitor.offset"
     cache_path = provenance_log_dir / ".log_monitor.cache.json"
     pending_path = provenance_log_dir / ".log_monitor.pending.json"
+    index_path = provenance_log_dir / ".log_monitor.job_index.json"
     byte_offset = _load_offset(offset_path, log_path)
     run_id_cache = _load_cache(cache_path)
     multiline_state: dict = {"cluster_id": None}
     pending_lookups: dict[int, str] = _load_pending(pending_path)
+    job_submitted_index, index_offsets = _load_job_index(index_path)
 
     while True:
         byte_offset = monitor_once(
@@ -362,10 +419,13 @@ def watch_log(
             run_id_cache=run_id_cache,
             multiline_state=multiline_state,
             pending_lookups=pending_lookups,
+            job_submitted_index=job_submitted_index,
+            index_offsets=index_offsets,
         )
         _save_offset(offset_path, byte_offset)
         _save_cache(cache_path, run_id_cache)
         _save_pending(pending_path, pending_lookups)
+        _save_job_index(index_path, job_submitted_index, index_offsets)
         time.sleep(poll_interval)
 
 
@@ -383,10 +443,22 @@ def main() -> None:
         default="output/provenance",
         help="Directory containing per-cluster .ad files (job_ad_file output)",
     )
+    parser.add_argument(
+        "--event-dir",
+        default=None,
+        help="NDJSON event log directory to write to and search for job.submitted "
+             "records. Defaults to --classad-dir (not a separately-defaulted "
+             "value) so the two can never silently diverge; falls back to "
+             "PROVENANCE_LOG_DIR only when neither is given, for standalone use.",
+    )
     parser.add_argument("--poll-interval", type=float, default=5.0, metavar="S")
     args = parser.parse_args()
 
-    provenance_log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
+    provenance_log_dir = (
+        args.event_dir
+        or os.environ.get("PROVENANCE_LOG_DIR")
+        or args.classad_dir
+    )
     watch_log(
         args.log_file,
         log_dir=args.classad_dir,

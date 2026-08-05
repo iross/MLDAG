@@ -28,9 +28,15 @@ def main() -> None:
     parser.add_argument("epoch", type=int)
     parser.add_argument("--annex", default="", metavar="NAME",
                         help="Annex resource name; triggers pre_request_annex.sh")
+    parser.add_argument(
+        "--log-dir", default=None,
+        help="NDJSON event log directory; overrides PROVENANCE_LOG_DIR. "
+             "DAG generation should always pass this explicitly so it can "
+             "never drift from what log_monitor is configured to search.",
+    )
     args = parser.parse_args()
 
-    log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
+    log_dir = args.log_dir or os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
     emit_event(
         "job.submitted",
         args.run_uuid,

@@ -2,18 +2,19 @@ import json
 from pathlib import Path
 
 from mldag.provenance.log_monitor import (
-    _parse_event_line,
-    _job_name_to_run_id,
     _load_cache,
+    _load_job_index,
     _load_offset,
     _load_pending,
+    _parse_event_line,
+    _refresh_job_submitted_index,
     _resolve_run_id,
     _save_cache,
+    _save_job_index,
     _save_offset,
     _save_pending,
     monitor_once,
 )
-
 
 # --- helpers ---
 
@@ -129,21 +130,129 @@ def test_parse_event_line_non_event_returns_none():
     assert _parse_event_line("    some indented log line") is None
 
 
-# --- _job_name_to_run_id ---
+# --- _refresh_job_submitted_index ---
 
 
-def test_job_name_to_run_id_finds_match(tmp_path):
+def test_refresh_job_submitted_index_finds_match(tmp_path):
     _write_ndjson(tmp_path, "run-abc", "run0-train_epoch0")
-    assert _job_name_to_run_id("run0-train_epoch0", tmp_path) == "run-abc"
+    index: dict = {}
+    offsets: dict = {}
+    _refresh_job_submitted_index(tmp_path, index, offsets)
+    assert index.get("run0-train_epoch0") == "run-abc"
 
 
-def test_job_name_to_run_id_returns_none_for_unknown(tmp_path):
+def test_refresh_job_submitted_index_no_match_for_unknown_job(tmp_path):
     _write_ndjson(tmp_path, "run-abc", "run0-train_epoch0")
-    assert _job_name_to_run_id("run0-train_epoch99", tmp_path) is None
+    index: dict = {}
+    offsets: dict = {}
+    _refresh_job_submitted_index(tmp_path, index, offsets)
+    assert "run0-train_epoch99" not in index
 
 
-def test_job_name_to_run_id_empty_dir(tmp_path):
-    assert _job_name_to_run_id("run0-train_epoch0", tmp_path) is None
+def test_refresh_job_submitted_index_empty_dir(tmp_path):
+    index: dict = {}
+    offsets: dict = {}
+    _refresh_job_submitted_index(tmp_path, index, offsets)
+    assert index == {}
+
+
+def test_refresh_job_submitted_index_does_not_reread_unchanged_files(tmp_path):
+    """Repeated calls must not re-parse bytes already scanned (the O(n) rescan this replaces)."""
+    _write_ndjson(tmp_path, "run-abc", "run0-train_epoch0")
+    index: dict = {}
+    offsets: dict = {}
+    _refresh_job_submitted_index(tmp_path, index, offsets)
+    ndjson_path = tmp_path / "run-abc.ndjson"
+    recorded_offset = offsets[str(ndjson_path)]
+    assert recorded_offset == ndjson_path.stat().st_size
+
+    read_calls = []
+    real_open = open
+
+    def _tracking_open(path, *args, **kwargs):
+        read_calls.append(str(path))
+        return real_open(path, *args, **kwargs)
+
+    import builtins
+    from unittest.mock import patch
+
+    with patch.object(builtins, "open", _tracking_open):
+        _refresh_job_submitted_index(tmp_path, index, offsets)
+    assert str(ndjson_path) not in read_calls
+
+
+def test_refresh_job_submitted_index_picks_up_appended_events(tmp_path):
+    """A second job.submitted appended to the same file is indexed without rereading old bytes."""
+    prov_dir = tmp_path
+    _write_ndjson(prov_dir, "run-abc", "run0-train_epoch0")
+    index: dict = {}
+    offsets: dict = {}
+    _refresh_job_submitted_index(prov_dir, index, offsets)
+
+    with open(prov_dir / "run-abc.ndjson", "a") as f:
+        f.write(json.dumps({
+            "type": "job.submitted", "run_id": "run-abc", "job_name": "run0-train_epoch1",
+        }) + "\n")
+
+    _refresh_job_submitted_index(prov_dir, index, offsets)
+    assert index.get("run0-train_epoch0") == "run-abc"
+    assert index.get("run0-train_epoch1") == "run-abc"
+
+
+def test_save_and_load_job_index_roundtrip(tmp_path):
+    path = tmp_path / "index.json"
+    _save_job_index(path, {"job-a": "run-1"}, {"/tmp/a.ndjson": 42})
+    index, offsets = _load_job_index(path)
+    assert index == {"job-a": "run-1"}
+    assert offsets == {"/tmp/a.ndjson": 42}
+
+
+def test_load_job_index_returns_empty_when_missing(tmp_path):
+    index, offsets = _load_job_index(tmp_path / "missing.json")
+    assert index == {}
+    assert offsets == {}
+
+
+def test_load_job_index_returns_empty_on_corrupt(tmp_path):
+    path = tmp_path / "index.json"
+    path.write_text("not json")
+    index, offsets = _load_job_index(path)
+    assert index == {}
+    assert offsets == {}
+
+
+def test_monitor_once_job_submitted_in_wrong_dir_stays_pending_not_unknown(tmp_path):
+    """Regression test for task-22: if job.submitted lands in a directory log_monitor
+    isn't configured to search (e.g. pre.py and log_monitor disagreeing on
+    PROVENANCE_LOG_DIR), the cluster_id must stay in pending_lookups -- retryable
+    once pointed at the right directory -- rather than resolving from a place it
+    was never told to look.
+    """
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    wrong_prov_dir = tmp_path / "wrong_provenance"
+    right_prov_dir = tmp_path / "right_provenance"
+    _write_ndjson(right_prov_dir, "run-abc", "run0-train_epoch0")
+    log = tmp_path / "metl.log"
+    _write_log(
+        log,
+        "000 (5055662.000.000) 2026-04-29 10:00:00 Job submitted from host: <1.2.3.4:9618>\n"
+        '    [ DAGNodeName = "run0-train_epoch0"; JobBatchName = "run0-train_epoch0" ]\n'
+        "...\n",
+    )
+    pending: dict = {}
+    monitor_once(
+        log, 0, log_dir=ad_dir, provenance_log_dir=wrong_prov_dir, pending_lookups=pending
+    )
+    assert pending.get(5055662) == "run0-train_epoch0"
+
+    # Repointed at the directory job.submitted actually lives in: resolves on retry.
+    pending_after_fix: dict = dict(pending)
+    monitor_once(
+        log, 0, log_dir=ad_dir, provenance_log_dir=right_prov_dir,
+        pending_lookups=pending_after_fix,
+    )
+    assert 5055662 not in pending_after_fix
 
 
 # --- monitor_once: cache population from event 000 + DAG Node ---

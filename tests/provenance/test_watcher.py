@@ -1,8 +1,7 @@
 import json
 import time
 from pathlib import Path
-
-import pytest
+from unittest.mock import patch
 
 from mldag.provenance.watcher import (
     _load_site_info,
@@ -10,6 +9,7 @@ from mldag.provenance.watcher import (
     _parse_val_loss,
     _read_metrics_csv,
     _sorted_by_mtime,
+    main,
     scan_once,
     watch_and_emit,
 )
@@ -25,6 +25,27 @@ def _read_events(log_dir: Path, run_id: str) -> list[dict]:
     if not p.exists():
         return []
     return [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+
+
+# --- main(): --log-dir flag ---
+
+
+def test_main_log_dir_flag_overrides_env(tmp_path):
+    """--log-dir must win over PROVENANCE_LOG_DIR so DAG-generated invocations can't drift."""
+    watch_dir = tmp_path / "watch"
+    watch_dir.mkdir()
+    _make_ckpt(watch_dir / "epoch=0-step=1-val_loss=1.0.ckpt")
+    env_dir = tmp_path / "env_dir"
+    flag_dir = tmp_path / "flag_dir"
+    argv = [
+        "watcher", str(watch_dir), "run-abc", "--one-shot",
+        "--log-dir", str(flag_dir),
+    ]
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(env_dir)}):
+        with patch("sys.argv", argv):
+            main()
+    assert (flag_dir / "run-abc.ndjson").exists()
+    assert not env_dir.exists()
 
 
 # --- _load_site_info ---

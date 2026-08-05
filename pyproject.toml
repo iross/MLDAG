@@ -32,6 +32,7 @@ mldag-pre         = "mldag.provenance.pre:main"
 mldag-log-monitor = "mldag.provenance.log_monitor:main"
 mldag-post    = "mldag.provenance.post:main"
 mldag-query       = "mldag.provenance.query:main"
+mldag-repair      = "mldag.provenance.repair:main"
 mldag-dashboard   = "mldag.dashboard:main"
 
 [project.urls]
