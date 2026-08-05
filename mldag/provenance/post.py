@@ -115,6 +115,13 @@ def main() -> None:
              "the ClassAd file is unavailable (e.g. job_ad_file not supported).",
     )
     parser.add_argument(
+        "--log-dir", default=None,
+        help="NDJSON event log directory; overrides PROVENANCE_LOG_DIR. "
+             "DAG generation should always pass this explicitly so it can "
+             "never drift from what log_monitor is configured to search. "
+             "Must appear before --post-hook (which consumes the remainder).",
+    )
+    parser.add_argument(
         "--post-hook", nargs=argparse.REMAINDER, default=[],
         metavar="CMD [ARGS...]",
         help="Optional command + args to run after provenance is recorded. "
@@ -127,7 +134,7 @@ def main() -> None:
     # $JOBID expands to ClusterId.ProcId (e.g. "5555662.0"); job_ad_file uses
     # only ClusterId, so strip the proc part to match the filename.
     cluster_id = args.cluster_id.split(".")[0]
-    log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
+    log_dir = args.log_dir or os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
     emit_post_event(args.job_name, args.exit_code, cluster_id, log_dir=log_dir, run_id_hint=args.run_id)
     if args.post_hook:
         import subprocess

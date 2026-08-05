@@ -300,9 +300,15 @@ def main() -> None:
         "--extra-sidecar-json", default=None, metavar="FILE",
         help="JSON file whose contents are merged into each sidecar's 'extra' field",
     )
+    parser.add_argument(
+        "--log-dir", default=None,
+        help="NDJSON event log directory; overrides PROVENANCE_LOG_DIR. "
+             "DAG generation should always pass this explicitly so it can "
+             "never drift from what log_monitor is configured to search.",
+    )
     args = parser.parse_args()
 
-    log_dir = os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
+    log_dir = args.log_dir or os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
     extra_sidecar: dict = {}
     if args.extra_sidecar_json:
         try:

@@ -17,6 +17,14 @@ from mldag.models.experiment import Experiment, read_from_config
 
 EVAL=False
 
+# Single source of truth for the provenance NDJSON/state directory. Baked
+# explicitly into every generated SCRIPT PRE/POST/SERVICE command and into
+# the training job's own environment, rather than left for pre.py, post.py,
+# watcher.py, and log_monitor.py to each independently default an
+# environment variable that isn't guaranteed to be inherited the same way
+# by every process DAGMan launches (see task-22).
+PROVENANCE_DIR = "output/provenance"
+
 
 def _mldag_version() -> str:
     try:
@@ -96,13 +104,15 @@ def get_script(job: Job, resource: Resource, config: dict, post_hook: str = "") 
     # of PATH in the DAGMan environment.  VARS macros ($(run_uuid)) are not
     # available in SCRIPT args, so run_uuid and epoch are embedded here.
     python = sys.executable
-    pre_args = f'{job.run_uuid} {job.name} {job.epoch}'
+    # --log-dir is baked in here rather than left to PROVENANCE_LOG_DIR so
+    # pre.py can never resolve a different directory than log_monitor does.
+    pre_args = f'{job.run_uuid} {job.name} {job.epoch} --log-dir {PROVENANCE_DIR}'
     if resource.resource_type == ResourceType.ANNEX and resource.annex:
         # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
         # DAGMan allows only one SCRIPT PRE per node.
         pre_args += f' --annex {resource.name}'
-    # --run-id must come before --post-hook because --post-hook uses REMAINDER.
-    post_args = f'$JOB $RETURN $JOBID --run-id {job.run_uuid}'
+    # --run-id and --log-dir must come before --post-hook because --post-hook uses REMAINDER.
+    post_args = f'$JOB $RETURN $JOBID --run-id {job.run_uuid} --log-dir {PROVENANCE_DIR}'
     if post_hook:
         # post_hook is appended verbatim; DAGMan expands $MACRO tokens at runtime.
         # Available POST macros: $NODE $RETURN $JOBID $CLUSTERID $RETRY
@@ -113,11 +123,13 @@ def get_script(job: Job, resource: Resource, config: dict, post_hook: str = "") 
     return script_txt
 
 def get_service(python_exe: str = "python3") -> str:
+    # --classad-dir and --event-dir are both pinned to PROVENANCE_DIR so they
+    # can never diverge from each other or from what pre.py/post.py use.
     service_txt = textwrap.dedent(f"""\
     SUBMIT-DESCRIPTION provenance_monitor.sub {{
         universe = local
         executable = {python_exe}
-        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir output/provenance
+        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir {PROVENANCE_DIR} --event-dir {PROVENANCE_DIR}
         queue
     }}
     SERVICE provenance_monitor provenance_monitor.sub
@@ -139,11 +151,15 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
         inner_txt += f'TARGET.GLIDEIN_ResourceName == "{resource.name}"\n'
     elif resource.resource_type == ResourceType.ANNEX and resource.annex:
         inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex"\n'
-    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)", f"MLDAG_VERSION={mldag_version}"]
+    env_vars = [
+        "PROVENANCE_RUN_ID=$(run_uuid)",
+        f"MLDAG_VERSION={mldag_version}",
+        f"PROVENANCE_LOG_DIR={PROVENANCE_DIR}",
+    ]
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
-    inner_txt += 'job_ad_file = output/provenance/$(ClusterId).ad\n'
+    inner_txt += f'job_ad_file = {PROVENANCE_DIR}/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -164,11 +180,15 @@ def get_ospool_submit_description(config: dict, experiment: Experiment, mldag_ve
     # OSPool resources will use TARGET.GLIDEIN_ResourceName variable instead of hardcoding
     inner_txt += 'TARGET.GLIDEIN_ResourceName == "$(ResourceName)"\n'
 
-    env_vars = ["PROVENANCE_RUN_ID=$(run_uuid)", f"MLDAG_VERSION={mldag_version}"]
+    env_vars = [
+        "PROVENANCE_RUN_ID=$(run_uuid)",
+        f"MLDAG_VERSION={mldag_version}",
+        f"PROVENANCE_LOG_DIR={PROVENANCE_DIR}",
+    ]
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
-    inner_txt += 'job_ad_file = output/provenance/$(ClusterId).ad\n'
+    inner_txt += f'job_ad_file = {PROVENANCE_DIR}/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -201,7 +221,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
     dag_txt += textwrap.dedent(get_service(python_exe=sys.executable))
 
-    Path("output/provenance").mkdir(parents=True, exist_ok=True)
+    Path(PROVENANCE_DIR).mkdir(parents=True, exist_ok=True)
 
     # Grab the resources, if targeting is desired
     resources = []

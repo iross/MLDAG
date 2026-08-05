@@ -256,6 +256,23 @@ def test_main_propagates_exit_code(tmp_path):
     assert exc.value.code == 42
 
 
+def test_main_log_dir_flag_overrides_env(tmp_path):
+    """--log-dir must win over PROVENANCE_LOG_DIR so DAG-generated invocations can't drift."""
+    env_dir = tmp_path / "env_dir"
+    flag_dir = tmp_path / "flag_dir"
+    flag_dir.mkdir()
+    _write_ad(flag_dir, SAMPLE_AD)
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(env_dir)}):
+        argv = ["post", "run0-train_epoch0", "0", "12345", "--log-dir", str(flag_dir)]
+        with patch.object(sys, "argv", argv):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 0
+    events = _read_events(flag_dir, "run-abc123")
+    assert events[0]["type"] == "job.completed"
+    assert not env_dir.exists()
+
+
 def test_main_run_id_flag_used_when_ad_missing(tmp_path):
     """--run-id provides the run_uuid when job_ad_file is not written by the schedd."""
     with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
