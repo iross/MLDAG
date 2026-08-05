@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mldag"
-version = "0.1.0rc11"
+version = "0.1.0rc13"
 description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -41,6 +41,9 @@ Repository = "https://github.com/iross/MLDAG"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mldag"]
+
+[tool.ruff]
+target-version = "py39"
 
 [dependency-groups]
 dev = [
