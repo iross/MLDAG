@@ -1,10 +1,11 @@
 ---
 id: TASK-21
 title: Add SQLite database for querying checkpoint and provenance data
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-08-05 16:09'
-updated_date: '2026-08-05 16:10'
+updated_date: '2026-08-05 17:01'
 labels: []
 dependencies: []
 ---
@@ -17,13 +18,13 @@ Checkpoint lineage (checkpoint_prov/*.ckpt.provenance.json) and event history (p
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A build command loads checkpoint sidecar files into a SQLite database without modifying source files
-- [ ] #2 The database has one row per checkpoint sidecar with run_id/epoch/hashes/environment fields, and full training metrics are accessible
-- [ ] #3 A build command loads NDJSON event log files into the same database with run_id/type/timestamp and event-specific fields accessible
-- [ ] #4 Re-running the build command against unchanged source data does not create duplicate rows
-- [ ] #5 Malformed or unparseable source files, including known-bad unknown:<cluster_id>.ndjson files from task-20, are skipped with a warning rather than aborting the whole build
-- [ ] #6 Documented example queries answer at minimum: best val_loss per run, epoch counts per run, and checkpoint lineage/duration lookups
-- [ ] #7 Unit tests cover the loader against fixture sidecar/ndjson data, including malformed and duplicate-event cases
+- [x] #1 A build command loads checkpoint sidecar files into a SQLite database without modifying source files
+- [x] #2 The database has one row per checkpoint sidecar with run_id/epoch/hashes/environment fields, and full training metrics are accessible
+- [x] #3 A build command loads NDJSON event log files into the same database with run_id/type/timestamp and event-specific fields accessible
+- [x] #4 Re-running the build command against unchanged source data does not create duplicate rows
+- [x] #5 Malformed or unparseable source files, including known-bad unknown:<cluster_id>.ndjson files from task-20, are skipped with a warning rather than aborting the whole build
+- [x] #6 Documented example queries answer at minimum: best val_loss per run, epoch counts per run, and checkpoint lineage/duration lookups
+- [x] #7 Unit tests cover the loader against fixture sidecar/ndjson data, including malformed and duplicate-event cases
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -107,3 +108,68 @@ New module `mldag/provenance/db.py`:
 - Fixture sidecar and ndjson files under `tests/provenance/fixtures/` (small, hand-written, covering: normal checkpoint, checkpoint missing optional fields, duplicate epoch events with different hashes, a truncated/corrupt JSON line, an `unknown:<cluster_id>.ndjson` file).
 - Unit tests in `tests/provenance/test_db.py`: schema creation, checkpoint upsert + idempotent re-run, event append-only ingest + idempotent re-run, malformed-line handling (build succeeds, stats report the skip count), duplicate-epoch data preserved (not deduped).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+### Approach taken
+
+Implemented as planned, with one deliberate deviation: fixtures are built inline with small
+tmp_path-based helper functions in `tests/provenance/test_db.py` rather than a
+`tests/provenance/fixtures/` directory -- every other test file in this package
+(`test_pre.py`, `test_post.py`, `test_watcher.py`, `test_log_monitor.py`, `test_repair.py`)
+already uses that convention, and none of them use a fixtures directory, so this matches the
+codebase's actual established pattern rather than introducing a new one.
+
+Also, by the time this task started, `provenance/` (the second, stale provenance directory
+flagged in the original plan) no longer exists -- it was deleted as part of task-22's cleanup.
+`output/provenance/` is now the only event directory, so the "pick your source explicitly"
+concern the plan raised is now moot in practice, though `--event-dir` remains repeatable in case
+it's ever needed again.
+
+### What was implemented
+
+- `mldag/provenance/db.py`: `build_database(db_path, checkpoint_dirs, event_dirs, full_rescan=False) -> BuildStats`.
+  Schema matches the plan exactly (`checkpoints`, `events` tables + indexes), plus one addition
+  not in the original plan: an `event_file_state` table (source_file -> byte_offset, line_count)
+  so re-running the build reads NDJSON files incrementally from where it left off, the same
+  byte-offset pattern `log_monitor.py` and task-22's `mldag-repair` already use, rather than
+  re-parsing whole files on every build. Checkpoints are upserted keyed by checkpoint_path,
+  skipped when source_mtime is unchanged (bypassed entirely with `--full-rescan`). Events are
+  inserted keyed by (source_file, source_line) with `INSERT OR IGNORE`, so duplicates (including
+  task-20/22's duplicate epoch.started/completed pairs) are preserved as real rows, not deduped.
+- `mldag/provenance/query.py`: added a `db` sub-app with `mldag-query db build [--db PATH]
+  [--checkpoint-dir DIR ...] [--event-dir DIR ...] [--full-rescan]`. Defaults to
+  `checkpoint_prov` and `output/provenance`.
+- `tests/provenance/test_db.py`: 22 tests covering checkpoint ingestion (normal, sparse/missing
+  training metrics, missing optional fields, malformed JSON, missing run_id, nested directories),
+  idempotent re-run behavior for both checkpoints and events (including a test that asserts the
+  event reader does not reopen files with nothing new to read), full-rescan behavior, malformed
+  event lines/missing required fields, duplicate-epoch preservation, unknown:<cluster_id>.ndjson
+  files loading correctly (keyed by embedded run_id, not filename), and the three documented
+  example queries (best val_loss per run, epoch count per run, lineage by parent_hash) as smoke
+  tests against fixture data.
+
+### Verification against real data
+
+Ran `mldag-query db build` against the actual `checkpoint_prov/` (1651 sidecars) and
+`output/provenance/` (929 ndjson files, post task-22 cleanup):
+
+```
+checkpoints: 1651 ingested, 0 unchanged, 0 malformed | events: 13094 ingested, 0 malformed
+```
+
+Re-running immediately: `checkpoints: 0 ingested, 1651 unchanged, 0 malformed | events: 0
+ingested, 0 malformed` -- fully idempotent, confirming AC #4 against real data, not just
+fixtures. Ran the three example queries against the resulting database; the duplicate-epoch
+query correctly surfaced real instances (e.g. run `087903e0` epoch 29 has 3 `epoch.started` and
+3 `epoch.completed` events), confirming the loader preserves that signal instead of hiding it.
+
+### Modified/added files
+
+- `mldag/provenance/db.py` (new)
+- `mldag/provenance/query.py` (added `db build` subcommand)
+- `tests/provenance/test_db.py` (new, 22 tests)
+
+Full `tests/provenance/` suite: 233 passed. `ruff check` clean on all new/modified files.
+<!-- SECTION:NOTES:END -->
