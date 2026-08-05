@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 
@@ -218,12 +218,16 @@ def events(
 @db_app.command("build")
 def db_build(
     db: Annotated[str, typer.Option(help="Path to the SQLite database file")] = DEFAULT_DB_PATH,
+    # ruff's UP045 assumes `from __future__ import annotations` makes `X | None`
+    # runtime-safe on Python 3.9, but Typer evaluates these annotations at CLI
+    # registration time to build the parser, so `list[str] | None` still raises
+    # TypeError on 3.9 (types.GenericAlias.__or__ was only added in 3.10).
     checkpoint_dir: Annotated[
-        list[str] | None,
+        Optional[list[str]],  # noqa: UP045
         typer.Option(help="Checkpoint sidecar directory to scan; repeatable"),
     ] = None,
     event_dir: Annotated[
-        list[str] | None,
+        Optional[list[str]],  # noqa: UP045
         typer.Option(help="NDJSON event directory to scan; repeatable"),
     ] = None,
     full_rescan: Annotated[
