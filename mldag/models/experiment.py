@@ -5,7 +5,7 @@ import yaml
 from mldag.models.training_run import TrainingRun
 from mldag.models.resource import Resource
 
-def read_from_config(config: str = "Experiment.yaml") -> None:
+def read_from_config(config: str = "Experiment.yaml") -> "Experiment":
     """
     Read the config yaml file and set the attributes of the TrainingRun instance.
     """
@@ -32,6 +32,7 @@ class Experiment(BaseModel):
     submit_template: str
     vars: dict
     post_script: Optional[str] = None
+    classad_fields_file: Optional[str] = None
     
     def __init__(self, **data) -> None:
       super().__init__(**data)
