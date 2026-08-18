@@ -25,6 +25,38 @@ pretrain_local.sh   # training script, calls mldag entry points to bracket train
 justfile            # experiment-specific recipes (refresh, csv, report paths)
 ```
 
+### Configuring which ClassAd fields land in provenance
+
+`mldag-post` captures a curated subset of each job's HTCondor ClassAd (from
+`job_ad_file`) into the `job.completed`/`job.failed` provenance events. The
+default mapping (used when no file is configured, or the configured file
+doesn't exist) is:
+
+| ClassAd attribute | Provenance field |
+|---|---|
+| `RemoteWallClockTime` | `wall_time_s` |
+| `CPUsUsage` | `cpu_usage` |
+| `MemoryUsage` | `peak_memory_mb` |
+| `GPUsUsage` | `gpu_usage` |
+| `GLIDEIN_ResourceName` | `resource_name` |
+| `Arguments` | `arguments` |
+
+To capture different or additional fields, add a `classad_fields_file` entry
+to `Experiment.yaml` pointing at a YAML file (conventionally
+`provenance_fields.yaml`) listing the attributes to extract:
+
+```yaml
+fields:
+  RequestCpus: num_cpus_requested   # explicit rename
+  Cmd                                # bare entry -> auto snake_case ("cmd")
+```
+
+The path is baked into the generated DAG at `mldag-gen` time (like
+`--log-dir`), so it can't drift between runs — but you can edit the file's
+*contents* at any time without regenerating the DAG. Some ClassAd attributes
+(currently just `Environment`, which can carry secrets like a W&B API key)
+are blocked outright; requesting one raises an error when the file is loaded.
+
 ### Entry points after install
 
 | Command | Purpose |

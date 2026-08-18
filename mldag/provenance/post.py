@@ -12,7 +12,68 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
+from mldag.constants import DEFAULT_CLASSAD_FIELDS_FILE
 from mldag.provenance.events import _DEFAULT_LOG_DIR, emit_event
+
+# ClassAd attributes that must never be captured into provenance, even if an
+# experiment's provenance_fields.yaml requests them — e.g. Environment carries
+# secrets such as WANDB_API_KEY (see daggen.py's env_vars construction).
+_SENSITIVE_AD_KEYS = {"Environment"}
+
+# Used when no field-mapping file is configured or the configured file
+# doesn't exist, so existing deployments keep working with zero config.
+_DEFAULT_FIELD_MAPPING = {
+    "RemoteWallClockTime": "wall_time_s",
+    "CPUsUsage": "cpu_usage",
+    "MemoryUsage": "peak_memory_mb",
+    "GPUsUsage": "gpu_usage",
+    "GLIDEIN_ResourceName": "resource_name",
+    "Arguments": "arguments",
+}
+
+
+def _snake_case(name: str) -> str:
+    """Derive a schema key from a bare ClassAd attribute name, e.g. "RequestCpus" -> "request_cpus"."""
+    s = re.sub(r"(?<!^)(?=[A-Z])", "_", name)
+    return s.lower()
+
+
+def load_classad_field_mapping(path: Path | str | None) -> dict[str, str]:
+    """Load the ad_key -> schema_key mapping used to extract fields from a job ClassAd.
+
+    Falls back to _DEFAULT_FIELD_MAPPING when path is None or the file doesn't
+    exist, so an experiment repo only needs provenance_fields.yaml once it
+    wants to deviate from the defaults. A bare list entry (as opposed to a
+    "AdKey: schema_key" mapping entry) has its schema key derived via
+    _snake_case.
+
+    Raises:
+        ValueError: if a requested field is in _SENSITIVE_AD_KEYS.
+    """
+    if path is None:
+        return dict(_DEFAULT_FIELD_MAPPING)
+    path = Path(path)
+    if not path.exists():
+        return dict(_DEFAULT_FIELD_MAPPING)
+
+    data = yaml.safe_load(path.read_text()) or {}
+    raw_fields = data.get("fields", [])
+    mapping: dict[str, str] = {}
+    if isinstance(raw_fields, dict):
+        entries = raw_fields.items()
+    else:
+        entries = ((ad_key, None) for ad_key in raw_fields)
+    for ad_key, schema_key in entries:
+        if ad_key in _SENSITIVE_AD_KEYS:
+            raise ValueError(
+                f"Refusing to capture ClassAd attribute {ad_key!r} into provenance: "
+                f"it is on the sensitive-key blocklist ({sorted(_SENSITIVE_AD_KEYS)}) "
+                f"and may carry secrets. Remove it from {path}."
+            )
+        mapping[ad_key] = schema_key or _snake_case(ad_key)
+    return mapping
 
 
 def parse_classad(path: Path | str) -> dict:
@@ -49,15 +110,15 @@ def run_id_from_classad(ad: dict) -> str:
     return m.group(1) if m else "unknown"
 
 
-def resource_fields_from_classad(ad: dict) -> dict:
-    """Return the subset of ClassAd fields that map to the provenance schema."""
-    mapping = {
-        "RemoteWallClockTime": "wall_time_s",
-        "CPUsUsage": "cpu_usage",
-        "MemoryUsage": "peak_memory_mb",
-        "GPUsUsage": "gpu_usage",
-        "GLIDEIN_ResourceName": "resource_name",
-    }
+def resource_fields_from_classad(ad: dict, mapping: dict[str, str] | None = None) -> dict:
+    """Return the subset of ClassAd fields that map to the provenance schema.
+
+    Args:
+        mapping: ad_key -> schema_key, as returned by load_classad_field_mapping().
+            Defaults to _DEFAULT_FIELD_MAPPING when not supplied.
+    """
+    if mapping is None:
+        mapping = _DEFAULT_FIELD_MAPPING
     return {schema_key: ad[ad_key] for ad_key, schema_key in mapping.items() if ad_key in ad}
 
 
@@ -68,6 +129,7 @@ def emit_post_event(
     *,
     log_dir: str | Path = _DEFAULT_LOG_DIR,
     run_id_hint: str | None = None,
+    fields_file: str | Path | None = None,
 ) -> None:
     """Emit job.completed or job.failed using data from the HTCondor ClassAd.
 
@@ -75,6 +137,9 @@ def emit_post_event(
         run_id_hint: run_id to use when ClassAd and .run_id marker both fail.
             Pass the run_uuid from DAG generation so the event is always
             attributed even when job_ad_file is not supported by the schedd.
+        fields_file: path to a provenance_fields.yaml mapping; see
+            load_classad_field_mapping(). Defaults to the built-in mapping
+            when None or the file doesn't exist.
     """
     log_dir = Path(log_dir)
     ad = parse_classad(log_dir / f"{cluster_id}.ad")
@@ -85,7 +150,8 @@ def emit_post_event(
             run_id = marker.read_text().strip()
     if run_id == "unknown" and run_id_hint:
         run_id = run_id_hint
-    resource = resource_fields_from_classad(ad)
+    mapping = load_classad_field_mapping(fields_file)
+    resource = resource_fields_from_classad(ad, mapping)
 
     if exit_code == 0:
         emit_event(
@@ -122,6 +188,14 @@ def main() -> None:
              "Must appear before --post-hook (which consumes the remainder).",
     )
     parser.add_argument(
+        "--fields-file", default=None, dest="fields_file",
+        help=f"YAML file mapping ClassAd attributes to provenance schema keys "
+             f"(see load_classad_field_mapping). Falls back to the built-in "
+             f"default mapping when unset or the file doesn't exist. DAG "
+             f"generation bakes this in explicitly (default filename: "
+             f"{DEFAULT_CLASSAD_FIELDS_FILE}) so it can't drift.",
+    )
+    parser.add_argument(
         "--post-hook", nargs=argparse.REMAINDER, default=[],
         metavar="CMD [ARGS...]",
         help="Optional command + args to run after provenance is recorded. "
@@ -135,7 +209,10 @@ def main() -> None:
     # only ClusterId, so strip the proc part to match the filename.
     cluster_id = args.cluster_id.split(".")[0]
     log_dir = args.log_dir or os.environ.get("PROVENANCE_LOG_DIR", _DEFAULT_LOG_DIR)
-    emit_post_event(args.job_name, args.exit_code, cluster_id, log_dir=log_dir, run_id_hint=args.run_id)
+    emit_post_event(
+        args.job_name, args.exit_code, cluster_id,
+        log_dir=log_dir, run_id_hint=args.run_id, fields_file=args.fields_file,
+    )
     if args.post_hook:
         import subprocess
         result = subprocess.run(args.post_hook)

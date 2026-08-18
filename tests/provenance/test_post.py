@@ -6,7 +6,9 @@ from unittest.mock import patch
 import pytest
 
 from mldag.provenance.post import (
+    _DEFAULT_FIELD_MAPPING,
     emit_post_event,
+    load_classad_field_mapping,
     main,
     parse_classad,
     resource_fields_from_classad,
@@ -117,6 +119,56 @@ def test_resource_fields_no_glidein(tmp_path):
 
 def test_resource_fields_empty_ad():
     assert resource_fields_from_classad({}) == {}
+
+
+# --- load_classad_field_mapping ---
+
+
+def test_load_classad_field_mapping_none_path_returns_defaults():
+    mapping = load_classad_field_mapping(None)
+    assert mapping == _DEFAULT_FIELD_MAPPING
+    assert mapping["Arguments"] == "arguments"
+
+
+def test_load_classad_field_mapping_missing_file_returns_defaults(tmp_path):
+    mapping = load_classad_field_mapping(tmp_path / "does_not_exist.yaml")
+    assert mapping == _DEFAULT_FIELD_MAPPING
+
+
+def test_load_classad_field_mapping_custom_dict_mapping(tmp_path):
+    path = tmp_path / "provenance_fields.yaml"
+    path.write_text("fields:\n  RequestCpus: num_cpus_requested\n  Cmd: cmd\n")
+    mapping = load_classad_field_mapping(path)
+    assert mapping == {"RequestCpus": "num_cpus_requested", "Cmd": "cmd"}
+
+
+def test_load_classad_field_mapping_bare_list_auto_snake_case(tmp_path):
+    path = tmp_path / "provenance_fields.yaml"
+    path.write_text("fields:\n  - RequestCpus\n  - Cmd\n")
+    mapping = load_classad_field_mapping(path)
+    assert mapping == {"RequestCpus": "request_cpus", "Cmd": "cmd"}
+
+
+def test_load_classad_field_mapping_rejects_sensitive_key(tmp_path):
+    path = tmp_path / "provenance_fields.yaml"
+    path.write_text("fields:\n  Environment: env\n")
+    with pytest.raises(ValueError, match="Environment"):
+        load_classad_field_mapping(path)
+
+
+def test_load_classad_field_mapping_rejects_sensitive_key_in_bare_list(tmp_path):
+    path = tmp_path / "provenance_fields.yaml"
+    path.write_text("fields:\n  - Environment\n")
+    with pytest.raises(ValueError, match="Environment"):
+        load_classad_field_mapping(path)
+
+
+def test_resource_fields_with_custom_mapping_includes_arguments(tmp_path):
+    ad = {**SAMPLE_AD, "Arguments": "pretrain.sh --lr 0.001"}
+    _write_ad(tmp_path, ad)
+    parsed = parse_classad(tmp_path / "12345.ad")
+    fields = resource_fields_from_classad(parsed, load_classad_field_mapping(None))
+    assert fields["arguments"] == "pretrain.sh --lr 0.001"
 
 
 # --- emit_post_event ---
@@ -271,6 +323,23 @@ def test_main_log_dir_flag_overrides_env(tmp_path):
     events = _read_events(flag_dir, "run-abc123")
     assert events[0]["type"] == "job.completed"
     assert not env_dir.exists()
+
+
+def test_main_fields_file_flag_used_for_custom_mapping(tmp_path):
+    """--fields-file lets a custom mapping override the built-in defaults."""
+    ad = {**SAMPLE_AD, "Arguments": "pretrain.sh --lr 0.001"}
+    _write_ad(tmp_path, ad)
+    fields_file = tmp_path / "provenance_fields.yaml"
+    fields_file.write_text("fields:\n  Arguments: arguments\n")
+    with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
+        argv = ["post", "run0-train_epoch0", "0", "12345", "--fields-file", str(fields_file)]
+        with patch.object(sys, "argv", argv):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 0
+    events = _read_events(tmp_path, "run-abc123")
+    assert events[0]["arguments"] == "pretrain.sh --lr 0.001"
+    assert "wall_time_s" not in events[0]
 
 
 def test_main_run_id_flag_used_when_ad_missing(tmp_path):

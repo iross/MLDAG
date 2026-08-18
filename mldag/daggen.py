@@ -11,6 +11,7 @@ import htcondor2 as htcondor
 import random
 from pydantic import BaseModel
 import yaml
+from mldag.constants import DEFAULT_CLASSAD_FIELDS_FILE
 from mldag.models.resource import Resource, ResourceType, get_resources_from_yaml
 from mldag.models.training_run import TrainingRun
 from mldag.models.experiment import Experiment, read_from_config
@@ -99,7 +100,13 @@ def get_vars(job: Job, resource: Resource, training_run: TrainingRun) -> str:
         """)
     return vars_txt
 
-def get_script(job: Job, resource: Resource, config: dict, post_hook: str = "") -> str:
+def get_script(
+    job: Job,
+    resource: Resource,
+    config: dict,
+    post_hook: str = "",
+    classad_fields_file: str = DEFAULT_CLASSAD_FIELDS_FILE,
+) -> str:
     # Use the exact Python that ran mldag-gen so the script works regardless
     # of PATH in the DAGMan environment.  VARS macros ($(run_uuid)) are not
     # available in SCRIPT args, so run_uuid and epoch are embedded here.
@@ -111,8 +118,14 @@ def get_script(job: Job, resource: Resource, config: dict, post_hook: str = "") 
         # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
         # DAGMan allows only one SCRIPT PRE per node.
         pre_args += f' --annex {resource.name}'
-    # --run-id and --log-dir must come before --post-hook because --post-hook uses REMAINDER.
-    post_args = f'$JOB $RETURN $JOBID --run-id {job.run_uuid} --log-dir {PROVENANCE_DIR}'
+    # --run-id, --log-dir, and --fields-file must come before --post-hook
+    # because --post-hook uses REMAINDER. --fields-file is baked in here for
+    # the same reason --log-dir is: post.py should never have to guess which
+    # field-mapping file was intended.
+    post_args = (
+        f'$JOB $RETURN $JOBID --run-id {job.run_uuid} --log-dir {PROVENANCE_DIR} '
+        f'--fields-file {classad_fields_file}'
+    )
     if post_hook:
         # post_hook is appended verbatim; DAGMan expands $MACRO tokens at runtime.
         # Available POST macros: $NODE $RETURN $JOBID $CLUSTERID $RETRY
@@ -275,7 +288,11 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
                     {'JOB {job.eval_name} {job.eval_submit}' if EVAL else ''}''')
             vars_txt += get_vars(job, resource, tr)
 
-            script_txt += get_script(job, resource, config, post_hook=experiment.post_script or "")
+            script_txt += get_script(
+                job, resource, config,
+                post_hook=experiment.post_script or "",
+                classad_fields_file=experiment.classad_fields_file or DEFAULT_CLASSAD_FIELDS_FILE,
+            )
 
             # includes pre and post scripts for early stopping mechanism
             # TODO: why is earlystopdetector.py being called in both a pre and post?
