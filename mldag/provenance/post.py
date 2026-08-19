@@ -1,8 +1,14 @@
 """POST-script logic for DAGMan job lifecycle provenance.
 
-Called by DAGMan after each training job exits.  Reads the HTCondor ClassAd
-written by job_ad_file, extracts resource usage and the run ID, then appends
-a job.completed or job.failed event to the per-run NDJSON log.
+Called by DAGMan after each training job exits. Extracts the run ID from a
+ClassAd (see parse_classad/run_id_from_classad) and appends a job.completed
+or job.failed event to the per-run NDJSON log.
+
+The ClassAd-reading helpers here (parse_classad, resource_fields_from_classad,
+load_classad_field_mapping) are also reused by mldag.provenance.jobad, which
+reads $_CONDOR_JOB_AD from *within* a running job -- job_ad_file, a submit
+command that would have let this module read a ClassAd file written on job
+exit, is not real (condor_submit silently ignores it); see task-25.
 """
 
 from __future__ import annotations
@@ -31,6 +37,9 @@ _DEFAULT_FIELD_MAPPING = {
     "GPUsUsage": "gpu_usage",
     "GLIDEIN_ResourceName": "resource_name",
     "Arguments": "arguments",
+    "RequestCpus": "request_cpus",
+    "RequestMemory": "request_memory",
+    "RequestGpus": "request_gpus",
 }
 
 
