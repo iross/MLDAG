@@ -5,6 +5,7 @@ for job lifecycle transitions the SCRIPT PRE/POST pair cannot see:
 
   001  Executing                  → job.executing
   004  Evicted                    → job.migrated
+  005  Terminated                 → job.resource_usage (see below)
   009  Aborted                    → job.aborted
   012  Held                       → job.held
   013  Released                   → job.released
@@ -13,6 +14,16 @@ for job lifecycle transitions the SCRIPT PRE/POST pair cannot see:
        → transfer.input.started / transfer.input.completed
        → transfer.output.started / transfer.output.completed
        (HTCondor uses code 040 for all four; direction is parsed from the description)
+
+Event 005's body is a multi-line resource-usage banner (Partitionable
+Resources table + a TimeExecute line), not a single-line event -- it's
+accumulated across lines from the "005" header until the "..." event
+terminator, then emitted as one job.resource_usage event with wall_time_s/
+cpu_usage/peak_memory_mb/gpu_usage/gpu_ids pulled out of the banner. This
+is the actual source of truth for job resource usage: an earlier design
+assumed HTCondor's (nonexistent) `job_ad_file` submit command would write
+a queryable ClassAd for post.py to read; it doesn't exist and condor_submit
+silently ignores it, so that path has never produced any data.
 
 Run this as a DAGMan SERVICE so it stays alive for the life of the DAG:
 
@@ -25,7 +36,12 @@ The ClusterId → run_id mapping is resolved in order:
      files where the PRE script wrote a job.submitted event with both
      job_name and run_id.
   2. <cluster_id>.run_id marker written by the job at start (requires shared FS)
-  3. <cluster_id>.ad ClassAd written by HTCondor on job exit
+  3. <cluster_id>.ad ClassAd, if one exists -- in practice this tier is currently
+     dead: it depended on HTCondor's `job_ad_file` submit command, which isn't
+     real (condor_submit silently ignores it), so no <cluster_id>.ad file is
+     ever produced. Kept as a resolution tier in case a real ClassAd source
+     (e.g. condor_history, or a within-job capture of $_CONDOR_JOB_AD) is wired
+     up later; until then this always falls through to tier 4.
   4. "unknown:<cluster_id>" fallback
 """
 
@@ -54,7 +70,7 @@ _ANY_HEADER_RE = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\)")
 _DAGNODE_RE = re.compile(r'DAGNodeName\s*=\s*"([^"]+)"')
 
 # Codes that emit provenance events
-_CODES = {"001", "004", "009", "012", "013", "023", "040"}
+_CODES = {"001", "004", "005", "009", "012", "013", "023", "040"}
 
 _CODE_TO_EVENT = {
     "001": "job.executing",
@@ -64,6 +80,8 @@ _CODE_TO_EVENT = {
     "013": "job.released",
     "023": "job.reconnected",
     # 040 covers all file transfer events; event type is determined from description text
+    # 005 is handled separately (see _accumulate_usage_field) since its data spans
+    # multiple lines and isn't emitted until the "..." event terminator.
 }
 
 # HTCondor uses code 040 for all file transfer events; direction and phase are in the description
@@ -76,6 +94,40 @@ _TRANSFER_EVENT_MAP = {
     ("started", "output"): "transfer.output.started",
     ("finished", "output"): "transfer.output.completed",
 }
+
+# Rows from the "005 Job terminated" event's Partitionable Resources table
+# (and its TimeExecute line). The Usage column can be blank for a resource
+# HTCondor didn't measure (observed for GPUs on some jobs) -- \S* makes that
+# column optional per-row while still requiring the Request/Allocated columns,
+# which are always present.
+_CPU_ROW_RE = re.compile(r"^\s*Cpus\s*:\s*(\S*)\s+(\d+)\s+(\d+)")
+_MEMORY_ROW_RE = re.compile(r"^\s*Memory \(MB\)\s*:\s*(\S*)\s+(\d+)\s+(\d+)")
+_GPU_ROW_RE = re.compile(r'^\s*GPUs\s*:\s*(\S*)\s+(\d+)\s+(\d+)(?:\s+"([^"]*)")?')
+_TIME_EXECUTE_RE = re.compile(r"^\s*TimeExecute \(s\)\s*:\s*(\d+)")
+
+
+def _accumulate_usage_field(line: str, fields: dict) -> None:
+    """Update fields in place from one line of a 005 event's resource-usage banner."""
+    m = _CPU_ROW_RE.match(line)
+    if m:
+        if m.group(1):
+            fields["cpu_usage"] = float(m.group(1))
+        return
+    m = _MEMORY_ROW_RE.match(line)
+    if m:
+        if m.group(1):
+            fields["peak_memory_mb"] = float(m.group(1))
+        return
+    m = _GPU_ROW_RE.match(line)
+    if m:
+        if m.group(1):
+            fields["gpu_usage"] = float(m.group(1))
+        if m.group(4):
+            fields["gpu_ids"] = m.group(4)
+        return
+    m = _TIME_EXECUTE_RE.match(line)
+    if m:
+        fields["wall_time_s"] = float(m.group(1))
 
 
 def _parse_event_line(line: str) -> tuple[str, int, datetime] | None:
@@ -275,11 +327,36 @@ def monitor_once(
                     pending_lookups[cluster_id] = job_name
             multiline_state["cluster_id"] = None
 
+        # Accumulate a 005 event's resource-usage banner across lines, and emit
+        # once the "..." event terminator confirms the banner is complete.
+        if multiline_state.get("usage_cluster_id") is not None:
+            if stripped == "...":
+                usage_cluster_id = multiline_state["usage_cluster_id"]
+                usage_fields = multiline_state["usage_fields"]
+                if usage_fields:
+                    run_id, _ = _resolve_run_id(usage_cluster_id, log_dir, run_id_cache)
+                    emit_event(
+                        "job.resource_usage",
+                        run_id,
+                        log_dir=provenance_log_dir,
+                        cluster_id=usage_cluster_id,
+                        source="htcondor_event_log",
+                        **usage_fields,
+                    )
+                multiline_state["usage_cluster_id"] = None
+                multiline_state["usage_fields"] = None
+            else:
+                _accumulate_usage_field(stripped, multiline_state["usage_fields"])
+
         # Emit provenance events for tracked codes
         parsed = _parse_event_line(stripped)
         if parsed is None:
             continue
         code, cluster_id, ts = parsed
+        if code == "005":
+            multiline_state["usage_cluster_id"] = cluster_id
+            multiline_state["usage_fields"] = {}
+            continue
         if code == "040":
             tm = _TRANSFER_RE.search(stripped)
             if tm is None:

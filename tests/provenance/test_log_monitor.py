@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from mldag.provenance.log_monitor import (
+    _accumulate_usage_field,
     _load_cache,
     _load_job_index,
     _load_offset,
@@ -917,3 +918,155 @@ def test_monitor_once_run_id_file_written_on_inline_pending_resolution(tmp_path)
         run_id_file.exists()
     ), ".run_id file should be written on inline pending resolution"
     assert run_id_file.read_text().strip() == "run-abc"
+
+
+# --- 005 (Job terminated) resource-usage banner parsing ---
+#
+# job_ad_file is not a real HTCondor submit command -- condor_submit silently
+# ignores it, confirmed against a live pool. Resource usage instead comes from
+# parsing the 005 event's Partitionable Resources banner, verified against real
+# entries pulled from a live metl.log.
+
+
+def test_accumulate_usage_field_parses_full_banner():
+    fields: dict = {}
+    for line in [
+        "   Cpus                 :        4.05        4         4 ",
+        '   GPUs                 :        0.95        1         1 "GPU-e3b28da1"',
+        "   Memory (MB)          :    47022       65536     65536 ",
+        "   TimeExecute (s)      :    39645                       ",
+    ]:
+        _accumulate_usage_field(line.strip(), fields)
+
+    assert fields == {
+        "cpu_usage": 4.05,
+        "gpu_usage": 0.95,
+        "gpu_ids": "GPU-e3b28da1",
+        "peak_memory_mb": 47022.0,
+        "wall_time_s": 39645.0,
+    }
+
+
+def test_accumulate_usage_field_blank_gpu_usage_still_captures_ids():
+    """Observed on a real 4-GPU job: the Usage column can be blank while
+    Request/Allocated are still populated."""
+    fields: dict = {}
+    _accumulate_usage_field(
+        'GPUs                 :                     4         4 "GPU-a,GPU-b"', fields
+    )
+    assert "gpu_usage" not in fields
+    assert fields["gpu_ids"] == "GPU-a,GPU-b"
+
+
+def test_accumulate_usage_field_ignores_unrelated_lines():
+    fields: dict = {}
+    _accumulate_usage_field("Disk (KB)            : 56826224    80485760  80489102", fields)
+    _accumulate_usage_field("Partitionable Resources :       Usage  Request Allocated", fields)
+    assert fields == {}
+
+
+def test_monitor_once_005_emits_job_resource_usage(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    (ad_dir / "12651505.run_id").write_text("run-usage")
+    log = tmp_path / "metl.log"
+    _write_log(
+        log,
+        "005 (12651505.000.000) 2025-08-21 13:57:06 Job terminated.\n"
+        "\t(1) Normal termination (return value 0)\n"
+        "\t\tUsr 0 23:23:00, Sys 0 00:58:48  -  Run Remote Usage\n"
+        "\tPartitionable Resources :       Usage  Request Allocated Assigned\n"
+        "\t   Cpus                 :        4.05        4         4 \n"
+        '\t   GPUs                 :        0.95        1         1 "GPU-e3b28da1"\n'
+        "\t   Memory (MB)          :    47022       65536     65536 \n"
+        "\t   TimeExecute (s)      :    39645                       \n"
+        "...\n",
+    )
+
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    events = _read_events(prov_dir, "run-usage")
+    assert len(events) == 1
+    e = events[0]
+    assert e["type"] == "job.resource_usage"
+    assert e["wall_time_s"] == 39645.0
+    assert e["cpu_usage"] == 4.05
+    assert e["peak_memory_mb"] == 47022.0
+    assert e["gpu_usage"] == 0.95
+    assert e["gpu_ids"] == "GPU-e3b28da1"
+    assert e["source"] == "htcondor_event_log"
+
+
+def test_monitor_once_005_blank_gpu_usage_omits_field(tmp_path):
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    (ad_dir / "1.run_id").write_text("run-multi-gpu")
+    log = tmp_path / "metl.log"
+    _write_log(
+        log,
+        "005 (1.000.000) 2025-08-26 16:21:25 Job terminated.\n"
+        "\tPartitionable Resources :       Usage   Request Allocated Assigned\n"
+        '\t   GPUs                 :                     4         4 "GPU-a,GPU-b,GPU-c,GPU-d"\n'
+        "\t   TimeExecute (s)      :    28437                        \n"
+        "...\n",
+    )
+
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    events = _read_events(prov_dir, "run-multi-gpu")
+    assert len(events) == 1
+    assert "gpu_usage" not in events[0]
+    assert events[0]["gpu_ids"] == "GPU-a,GPU-b,GPU-c,GPU-d"
+    assert events[0]["wall_time_s"] == 28437.0
+
+
+def test_monitor_once_005_no_matching_rows_emits_nothing(tmp_path):
+    """A banner that never matches any known row (malformed/unexpected format)
+    must not produce an empty job.resource_usage event."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    (ad_dir / "99.run_id").write_text("run-empty")
+    log = tmp_path / "metl.log"
+    _write_log(log, "005 (99.000.000) 2026-04-01 10:00:00 Job terminated.\n...\n")
+
+    monitor_once(log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir)
+
+    assert _read_events(prov_dir, "run-empty") == []
+
+
+def test_monitor_once_005_banner_split_across_polls(tmp_path):
+    """HTCondor writes the whole banner atomically in practice, but state must
+    still persist correctly if a poll boundary lands in the middle of it."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    prov_dir = tmp_path / "provenance"
+    (ad_dir / "55.run_id").write_text("run-split")
+    log = tmp_path / "metl.log"
+    state: dict = {"cluster_id": None}
+
+    first_half = (
+        "005 (55.000.000) 2026-04-01 10:00:00 Job terminated.\n"
+        "\tPartitionable Resources :       Usage  Request Allocated Assigned\n"
+        "\t   Cpus                 :        2.00        4         4 \n"
+    )
+    _write_log(log, first_half)
+    offset = monitor_once(
+        log, 0, log_dir=ad_dir, provenance_log_dir=prov_dir, multiline_state=state
+    )
+    assert _read_events(prov_dir, "run-split") == []  # banner not terminated yet
+    assert state["usage_cluster_id"] == 55
+
+    with open(log, "a") as f:
+        f.write("\t   TimeExecute (s)      :    100                       \n...\n")
+    monitor_once(
+        log, offset, log_dir=ad_dir, provenance_log_dir=prov_dir, multiline_state=state
+    )
+
+    events = _read_events(prov_dir, "run-split")
+    assert len(events) == 1
+    assert events[0]["cpu_usage"] == 2.0
+    assert events[0]["wall_time_s"] == 100.0
+    assert state["usage_cluster_id"] is None

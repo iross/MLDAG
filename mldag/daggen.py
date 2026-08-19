@@ -172,15 +172,6 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
-    # job_ad_file's target directory must exist in the sandbox *before* the
-    # starter writes it (which happens near job start, well before the
-    # training script's own log_dir.mkdir() call) -- otherwise the write
-    # fails silently and post.py never finds a ClassAd to read. Transferring
-    # this marker (self-referencing transfer_input_files so the template's
-    # own list isn't clobbered) materializes the directory ahead of time;
-    # preserve_relative_paths keeps it at the same nested path in the sandbox.
-    inner_txt += f'transfer_input_files = $(transfer_input_files), {PROVENANCE_DIR}/.keep\n'
-    inner_txt += f'job_ad_file = {PROVENANCE_DIR}/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -209,15 +200,6 @@ def get_ospool_submit_description(config: dict, experiment: Experiment, mldag_ve
     if "wandb" in config:
         env_vars.append(f"WANDB_API_KEY={config['wandb']['api_key']}")
     inner_txt += f'environment = "{" ".join(env_vars)}"\n'
-    # job_ad_file's target directory must exist in the sandbox *before* the
-    # starter writes it (which happens near job start, well before the
-    # training script's own log_dir.mkdir() call) -- otherwise the write
-    # fails silently and post.py never finds a ClassAd to read. Transferring
-    # this marker (self-referencing transfer_input_files so the template's
-    # own list isn't clobbered) materializes the directory ahead of time;
-    # preserve_relative_paths keeps it at the same nested path in the sandbox.
-    inner_txt += f'transfer_input_files = $(transfer_input_files), {PROVENANCE_DIR}/.keep\n'
-    inner_txt += f'job_ad_file = {PROVENANCE_DIR}/$(ClusterId).ad\n'
     inner_txt += 'queue\n'
 
     inner_txt = textwrap.indent(inner_txt, "\t")
@@ -251,9 +233,6 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     dag_txt += textwrap.dedent(get_service(python_exe=sys.executable))
 
     Path(PROVENANCE_DIR).mkdir(parents=True, exist_ok=True)
-    # Transferred as an input file so PROVENANCE_DIR exists in the job sandbox
-    # before job_ad_file is written; see get_submit_description().
-    (Path(PROVENANCE_DIR) / ".keep").touch()
 
     # Grab the resources, if targeting is desired
     resources = []
