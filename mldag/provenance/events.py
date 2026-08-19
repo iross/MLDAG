@@ -36,6 +36,7 @@ VALID_EVENT_TYPES: frozenset[str] = frozenset({
     "job.released",
     "job.failed",
     "job.completed",
+    "job.resource_usage",
 })
 
 _DEFAULT_LOG_DIR = "output/provenance"
