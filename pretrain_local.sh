@@ -25,6 +25,7 @@ import glob, json, os, re, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 import torch
+from mldag.provenance.jobad import capture_job_ad_fields
 
 def run(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -60,8 +61,15 @@ env_info = {
     "code_commit": commit,
     "mldag_version": mldag_version,
 }
+# Static submit-time attributes (Arguments, Request*, GLIDEIN_ResourceName)
+# from HTCondor's own per-job ClassAd snapshot -- best-effort, {} if
+# $_CONDOR_JOB_AD isn't set. See mldag.provenance.jobad's docstring for why
+# this must happen from within the job rather than in post.py.
+job_ad_fields = capture_job_ad_fields()
 
-Path("site_info.json").write_text(json.dumps({**site_info, **env_info}, indent=2))
+Path("site_info.json").write_text(
+    json.dumps({**site_info, **env_info, **job_ad_fields}, indent=2)
+)
 
 log_dir.mkdir(parents=True, exist_ok=True)
 event = {
@@ -73,6 +81,7 @@ event = {
     "site_info_source": "torch_cuda",
     **site_info,
     **env_info,
+    **job_ad_fields,
 }
 log_path = log_dir / f"{run_id}.ndjson"
 with open(log_path, "a") as f:
