@@ -244,6 +244,14 @@ def scan(
         str,
         typer.Option(help="NDJSON provenance directory to opportunistically resolve run_id from job_name; fine if it doesn't exist"),
     ] = _DEFAULT_LOG_DIR,
+    cluster_id: Annotated[
+        Optional[list[int]],  # noqa: UP045 -- see db_build's Optional[list[str]] for why
+        typer.Option(help="Only include this cluster_id; repeatable to filter to a specific set"),
+    ] = None,
+    db: Annotated[
+        Optional[str],  # noqa: UP045
+        typer.Option(help="Write results into this provenance.db's condor_history table (source='event_log')"),
+    ] = None,
     json_out: Annotated[bool, typer.Option("--json", help="Emit JSON")] = False,
 ) -> None:
     """Summarize every job in a raw HTCondor event log: duration, site, resource usage.
@@ -252,12 +260,20 @@ def scan(
     DAGMan PRE/POST provenance pipeline -- run_id/job_name enrichment only
     happens when log_dir/provenance_log_dir actually have matching data.
     """
-    records = scan_event_log(log_file, log_dir=log_dir, provenance_log_dir=provenance_log_dir)
+    records = scan_event_log(
+        log_file, log_dir=log_dir, provenance_log_dir=provenance_log_dir, cluster_ids=cluster_id
+    )
     if json_out:
         typer.echo(json.dumps(records, indent=2))
     else:
         typer.echo(f"{len(records)} job(s) in {log_file}:")
         typer.echo(_format_scan(records))
+
+    if db:
+        from mldag.provenance.history_enrich import write_scan_records
+
+        written = write_scan_records(db, records)
+        typer.echo(f"Wrote {written} row(s) to {db} (condor_history, source=event_log)")
 
 
 @db_app.command("build")
@@ -314,6 +330,23 @@ def db_enrich_history(
         db, schedd_name=schedd, pool=pool, full_rescan=full_rescan
     )
     typer.echo(str(stats))
+
+
+@db_app.command("enrich-jobad")
+def db_enrich_jobad(
+    db: Annotated[str, typer.Option(help="Path to the SQLite database file")] = DEFAULT_DB_PATH,
+) -> None:
+    """Mirror job.assigned events (jobad.py's in-job $_CONDOR_JOB_AD capture) into condor_history.
+
+    Reads from provenance.db's `events` table (run `db build` first), so no
+    HTCondor connection is needed -- it's the same data jobad.py already
+    wrote at job start, just also stored where it can be joined against
+    condor_history/scan data for the same job.
+    """
+    from mldag.provenance.history_enrich import enrich_from_jobad_events
+
+    written = enrich_from_jobad_events(db)
+    typer.echo(f"Wrote {written} row(s) to {db} (condor_history, source=jobad)")
 
 
 def main() -> None:

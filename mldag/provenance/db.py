@@ -97,11 +97,29 @@ CREATE TABLE IF NOT EXISTS event_file_state (
     line_count  INTEGER NOT NULL
 );
 
+-- Per-job summary data, from condor_history (history_enrich.py), a raw
+-- event-log scan (event_log_scan.py), or an in-job $_CONDOR_JOB_AD capture
+-- mirrored from the `events` table (jobad.py, via history_enrich.py's
+-- enrich_from_jobad_events) -- `source` names which have contributed to a
+-- row (comma-joined when more than one has). Keyed by (cluster_id,
+-- proc_id): a single cluster_id can hold many procs (`queue N` job arrays),
+-- so cluster_id alone is not unique (see task-29 -- event_log_scan.py hit
+-- the identical bug). A write from one source merges into an existing row
+-- column-by-column (COALESCE, new value wins only where the new write
+-- actually has one) rather than replacing it outright, so writing from
+-- multiple sources for the same job accumulates data instead of one
+-- clobbering another's fields with NULL. The jobad source deliberately
+-- never contributes remote_wall_clock_s/cpus_usage/memory_usage_mb/
+-- gpus_usage: it captures the job ad at submission, before the job has run,
+-- so those fields would be near-zero placeholders, not real usage.
 CREATE TABLE IF NOT EXISTS condor_history (
-    cluster_id        INTEGER PRIMARY KEY,
+    cluster_id        INTEGER NOT NULL,
+    proc_id           INTEGER NOT NULL DEFAULT 0,
     run_id            TEXT,
+    job_name          TEXT,
     owner             TEXT,
     cmd               TEXT,
+    arguments         TEXT,
     job_status        INTEGER,
     exit_code         INTEGER,
     remote_host       TEXT,
@@ -113,13 +131,20 @@ CREATE TABLE IF NOT EXISTS condor_history (
     cpus_usage        REAL,
     memory_usage_mb   REAL,
     gpus_usage        REAL,
+    gpu_ids           TEXT,
     resource_name     TEXT,
+    site              TEXT,
+    status            TEXT,
     hold_reason       TEXT,
     qdate             TEXT,
     job_start_date    TEXT,
     completion_date   TEXT,
-    classad_json      TEXT NOT NULL,
-    queried_at        TEXT NOT NULL
+    source            TEXT NOT NULL,
+    condor_history_json TEXT,
+    event_log_json    TEXT,
+    jobad_json        TEXT,
+    queried_at        TEXT NOT NULL,
+    PRIMARY KEY (cluster_id, proc_id)
 );
 """
 

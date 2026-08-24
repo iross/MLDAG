@@ -283,3 +283,48 @@ def test_scan_run_id_enrichment_shared_across_procs_but_job_id_stays_unique(tmp_
     assert len(records) == 2
     assert all(r["run_id"] == "run-array" for r in records)
     assert {r["proc_id"] for r in records} == {0, 1}
+
+
+# --- scan_event_log: cluster_ids filter ---
+
+
+def test_scan_cluster_ids_filter_includes_only_matching_clusters(tmp_path):
+    log = tmp_path / "batch.log"
+    _write(
+        log,
+        "012 (100.000.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (200.000.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (300.000.000) 2026-06-01 08:00:00 Job was held.\n...\n",
+    )
+
+    records = scan_event_log(log, cluster_ids=[100, 300])
+
+    assert {r["cluster_id"] for r in records} == {100, 300}
+
+
+def test_scan_cluster_ids_filter_keeps_every_proc_of_a_matched_cluster(tmp_path):
+    log = tmp_path / "batch.log"
+    _write(
+        log,
+        "012 (100.000.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (100.001.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (200.000.000) 2026-06-01 08:00:00 Job was held.\n...\n",
+    )
+
+    records = scan_event_log(log, cluster_ids=[100])
+
+    assert len(records) == 2
+    assert {r["proc_id"] for r in records} == {0, 1}
+
+
+def test_scan_cluster_ids_none_scans_everything(tmp_path):
+    log = tmp_path / "batch.log"
+    _write(
+        log,
+        "012 (100.000.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (200.000.000) 2026-06-01 08:00:00 Job was held.\n...\n",
+    )
+
+    records = scan_event_log(log, cluster_ids=None)
+
+    assert {r["cluster_id"] for r in records} == {100, 200}

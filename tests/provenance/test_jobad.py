@@ -48,8 +48,26 @@ def test_capture_job_ad_fields_returns_default_mapping_fields(tmp_path):
     assert fields["request_memory"] == 65536
     assert fields["request_gpus"] == 1
     assert fields["resource_name"] == "CHTC-Spark-CE1"
-    # ClusterId isn't in the default mapping, so it must not leak through
-    assert "ClusterId" not in fields
+    # cluster_id/proc_id are structural identifiers, always included
+    # regardless of the configured mapping -- not "leaked" past a blocklist.
+    assert fields["cluster_id"] == 12345
+
+
+def test_capture_job_ad_fields_proc_id_included_when_present(tmp_path):
+    job_ad = tmp_path / ".job.ad"
+    _write_job_ad(job_ad, {**SAMPLE_JOB_AD, "ProcId": 3})
+    with patch.dict("os.environ", {"_CONDOR_JOB_AD": str(job_ad)}):
+        fields = capture_job_ad_fields()
+
+    assert fields["proc_id"] == 3
+
+
+def test_capture_job_ad_fields_no_cluster_id_when_absent_from_ad(tmp_path):
+    job_ad = tmp_path / ".job.ad"
+    _write_job_ad(job_ad, {k: v for k, v in SAMPLE_JOB_AD.items() if k != "ClusterId"})
+    with patch.dict("os.environ", {"_CONDOR_JOB_AD": str(job_ad)}):
+        fields = capture_job_ad_fields()
+
     assert "cluster_id" not in fields
 
 
@@ -62,7 +80,9 @@ def test_capture_job_ad_fields_custom_fields_file(tmp_path):
     with patch.dict("os.environ", {"_CONDOR_JOB_AD": str(job_ad)}):
         fields = capture_job_ad_fields(fields_file)
 
-    assert fields == {"request_cpus": 4}
+    # cluster_id is always included even when the configured mapping is
+    # narrowed down to just RequestCpus.
+    assert fields == {"request_cpus": 4, "cluster_id": 12345}
 
 
 def test_capture_job_ad_fields_still_enforces_sensitive_key_blocklist(tmp_path):

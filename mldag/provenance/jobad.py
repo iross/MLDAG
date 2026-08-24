@@ -27,10 +27,15 @@ from mldag.provenance.post import (
 
 
 def capture_job_ad_fields(fields_file: str | Path | None = None) -> dict:
-    """Return the configured subset of $_CONDOR_JOB_AD's fields.
+    """Return the configured subset of $_CONDOR_JOB_AD's fields, plus cluster_id/proc_id.
 
     Reuses the same field-mapping file, default mapping, and sensitive-key
     blocklist as post.py's ClassAd handling (see load_classad_field_mapping).
+    cluster_id/proc_id are always included when present in the ad -- unlike
+    the configurable fields, they're structural identifiers rather than
+    provenance content, so callers that want to key data by job (e.g.
+    mirroring this into provenance.db's condor_history table) always have
+    them without needing to add them to a fields_file.
 
     Returns {} if $_CONDOR_JOB_AD isn't set or unreadable (e.g. running
     outside HTCondor, or an HTCondor version that doesn't set it) -- this is
@@ -43,7 +48,12 @@ def capture_job_ad_fields(fields_file: str | Path | None = None) -> dict:
     if not ad:
         return {}
     mapping = load_classad_field_mapping(fields_file)
-    return resource_fields_from_classad(ad, mapping)
+    fields = resource_fields_from_classad(ad, mapping)
+    if "ClusterId" in ad:
+        fields["cluster_id"] = ad["ClusterId"]
+    if "ProcId" in ad:
+        fields["proc_id"] = ad["ProcId"]
+    return fields
 
 
 def main() -> None:
