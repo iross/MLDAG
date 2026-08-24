@@ -75,7 +75,7 @@ _PROJECTION = list(dict.fromkeys(["ClusterId", "Environment", *_FIELD_MAPPING]))
 # which applies to a given row.
 _HISTORY_COLUMNS = [
     *_FIELD_MAPPING.values(), "run_id", "job_name", "site", "gpu_ids", "status",
-    "source", "classad_json", "queried_at",
+    "source", "condor_history_json", "event_log_json", "queried_at",
 ]
 
 # HTCondor's numeric JobStatus ClassAd attribute -> a human-readable status
@@ -155,7 +155,7 @@ def _row_from_ad(ad: dict) -> dict:
     row["status"] = _JOB_STATUS_TO_STATUS.get(row.get("job_status"))
     row["source"] = "condor_history"
     sanitized = {k: v for k, v in ad.items() if k not in _SENSITIVE_AD_KEYS}
-    row["classad_json"] = json.dumps(sanitized, default=str)
+    row["condor_history_json"] = json.dumps(sanitized, default=str)
     return row
 
 
@@ -163,7 +163,7 @@ def _row_from_scan_record(rec: dict, now: str) -> dict:
     """Map an event_log_scan.py record to a condor_history row (source='event_log')."""
     row = {column: rec[key] for key, column in _SCAN_FIELD_MAPPING.items() if key in rec}
     row["source"] = "event_log"
-    row["classad_json"] = json.dumps(rec, default=str)
+    row["event_log_json"] = json.dumps(rec, default=str)
     row["queried_at"] = now
     return row
 
@@ -190,12 +190,46 @@ def write_scan_records(db_path: str | Path, records: list[dict]) -> int:
     return len(records)
 
 
+_MERGE_COLUMNS = [
+    c for c in _HISTORY_COLUMNS if c not in ("cluster_id", "proc_id", "source", "queried_at")
+]
+
+
 def _upsert_history_row(conn: sqlite3.Connection, row: dict) -> None:
+    """Insert row, or merge it into an existing (cluster_id, proc_id) row.
+
+    A merge is column-by-column COALESCE(new, existing): a column this write
+    doesn't know about keeps whatever value was already there, rather than
+    being blanked to NULL. Without this, writing from condor_history and then
+    from an event-log scan (or vice versa) for the same job would silently
+    erase whichever columns only the first write populated -- see db.py's
+    condor_history docstring.
+    """
     row = {**dict.fromkeys(_HISTORY_COLUMNS), **row}
+    new_source = row["source"]
+    assert isinstance(new_source, str), "_row_from_ad/_row_from_scan_record always set source"
+
+    existing = conn.execute(
+        "SELECT source FROM condor_history WHERE cluster_id = ? AND proc_id = ?",
+        (row["cluster_id"], row["proc_id"]),
+    ).fetchone()
+    if existing and existing[0]:
+        row["source"] = ",".join(sorted({*existing[0].split(","), new_source}))
+
     columns = ", ".join(_HISTORY_COLUMNS)
     placeholders = ", ".join(f":{c}" for c in _HISTORY_COLUMNS)
+    merge_clause = ", ".join(
+        f"{c} = COALESCE(excluded.{c}, condor_history.{c})" for c in _MERGE_COLUMNS
+    )
     conn.execute(
-        f"INSERT OR REPLACE INTO condor_history ({columns}) VALUES ({placeholders})", row
+        f"""
+        INSERT INTO condor_history ({columns}) VALUES ({placeholders})
+        ON CONFLICT (cluster_id, proc_id) DO UPDATE SET
+            {merge_clause},
+            source = excluded.source,
+            queried_at = excluded.queried_at
+        """,
+        row,
     )
 
 
@@ -246,8 +280,16 @@ def enrich_from_condor_history(
         if full_rescan:
             target_ids = sorted(all_ids)
         else:
+            # Scoped to source='condor_history' (not "any row exists"): a
+            # cluster_id touched only by scan --db (source='event_log') was
+            # never actually condor_history-queried, so it isn't "already
+            # enriched" from this function's point of view.
             existing = {
-                row[0] for row in conn.execute("SELECT DISTINCT cluster_id FROM condor_history")
+                row[0]
+                for row in conn.execute(
+                    "SELECT DISTINCT cluster_id FROM condor_history "
+                    "WHERE ',' || source || ',' LIKE '%,condor_history,%'"
+                )
             }
             target_ids = sorted(all_ids - existing)
             stats.already_enriched = len(all_ids) - len(target_ids)

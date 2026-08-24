@@ -98,10 +98,15 @@ CREATE TABLE IF NOT EXISTS event_file_state (
 );
 
 -- Per-job summary data, from either condor_history (via history_enrich.py)
--- or a raw event-log scan (via event_log_scan.py) -- `source` distinguishes
--- which. Keyed by (cluster_id, proc_id): a single cluster_id can hold many
--- procs (`queue N` job arrays), so cluster_id alone is not unique (see
--- task-29 -- event_log_scan.py hit the identical bug).
+-- or a raw event-log scan (via event_log_scan.py) -- `source` names which
+-- have contributed to a row (comma-joined when both have). Keyed by
+-- (cluster_id, proc_id): a single cluster_id can hold many procs (`queue N`
+-- job arrays), so cluster_id alone is not unique (see task-29 --
+-- event_log_scan.py hit the identical bug). A write from one source merges
+-- into an existing row column-by-column (COALESCE, new value wins only
+-- where the new write actually has one) rather than replacing it outright,
+-- so writing from both sources for the same job accumulates data instead of
+-- one clobbering the other's fields with NULL.
 CREATE TABLE IF NOT EXISTS condor_history (
     cluster_id        INTEGER NOT NULL,
     proc_id           INTEGER NOT NULL DEFAULT 0,
@@ -129,7 +134,8 @@ CREATE TABLE IF NOT EXISTS condor_history (
     job_start_date    TEXT,
     completion_date   TEXT,
     source            TEXT NOT NULL,
-    classad_json      TEXT NOT NULL,
+    condor_history_json TEXT,
+    event_log_json    TEXT,
     queried_at        TEXT NOT NULL,
     PRIMARY KEY (cluster_id, proc_id)
 );

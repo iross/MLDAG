@@ -132,7 +132,9 @@ def test_environment_never_persisted_run_id_extracted(tmp_path, monkeypatch):
 
     enrich_from_condor_history(db_path)
 
-    (classad_json,) = _query(db_path, "SELECT classad_json FROM condor_history WHERE cluster_id = 100")[0]
+    (classad_json,) = _query(
+        db_path, "SELECT condor_history_json FROM condor_history WHERE cluster_id = 100"
+    )[0]
     assert "WANDB_API_KEY" not in classad_json
     assert "Environment" not in json.loads(classad_json)
     (run_id,) = _query(db_path, "SELECT run_id FROM condor_history WHERE cluster_id = 100")[0]
@@ -301,3 +303,80 @@ def test_write_scan_records_coexists_with_condor_history_rows_for_other_procs(tm
         db_path, "SELECT proc_id, source FROM condor_history WHERE cluster_id = 600 ORDER BY proc_id"
     )
     assert rows == [(0, "condor_history"), (1, "event_log")]
+
+
+# --- merge semantics: writing from both sources for the SAME (cluster_id, proc_id)
+# accumulates fields rather than one write clobbering the other's columns with NULL.
+
+
+def test_event_log_write_does_not_erase_condor_history_only_fields(tmp_path, monkeypatch):
+    db_path = _seed_db(tmp_path, [700])
+    schedd = _FakeSchedd({700: _ad(700, Owner="iross", ExitCode=0, RequestCpus=4)})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    enrich_from_condor_history(db_path)
+
+    write_scan_records(
+        db_path, [{"cluster_id": 700, "proc_id": 0, "site": "gpu01.example.edu", "status": "completed"}]
+    )
+
+    row = _query(
+        db_path,
+        "SELECT owner, exit_code, request_cpus, site, status, source "
+        "FROM condor_history WHERE cluster_id = 700 AND proc_id = 0",
+    )[0]
+    assert row == ("iross", 0, 4, "gpu01.example.edu", "completed", "condor_history,event_log")
+
+
+def test_condor_history_write_does_not_erase_event_log_only_fields(tmp_path, monkeypatch):
+    """Same as above, opposite write order."""
+    db_path = _seed_db(tmp_path, [701])
+    write_scan_records(
+        db_path, [{"cluster_id": 701, "proc_id": 0, "site": "gpu02.example.edu", "job_name": "run0-epoch0"}]
+    )
+
+    schedd = _FakeSchedd({701: _ad(701, Owner="iross")})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    enrich_from_condor_history(db_path)
+
+    row = _query(
+        db_path,
+        "SELECT owner, site, job_name, source FROM condor_history WHERE cluster_id = 701 AND proc_id = 0",
+    )[0]
+    assert row == ("iross", "gpu02.example.edu", "run0-epoch0", "condor_history,event_log")
+
+
+def test_second_condor_history_write_updates_changed_fields(tmp_path, monkeypatch):
+    """A later condor_history write (e.g. job finished) updates fields it has new data for."""
+    db_path = _seed_db(tmp_path, [702])
+    schedd = _FakeSchedd({702: _ad(702, JobStatus=2)})  # running
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    enrich_from_condor_history(db_path)
+
+    enrich_from_condor_history(db_path, full_rescan=True)  # same schedd; still JobStatus=2
+    schedd.ads_by_cluster[702] = [_ad(702, JobStatus=4)]  # now completed
+    enrich_from_condor_history(db_path, full_rescan=True)
+
+    (status,) = _query(db_path, "SELECT status FROM condor_history WHERE cluster_id = 702")[0]
+    assert status == "completed"
+
+
+def test_event_log_only_cluster_is_not_already_enriched_for_condor_history(tmp_path, monkeypatch):
+    """A cluster touched only by scan --db was never condor_history-queried."""
+    db_path = _seed_db(tmp_path, [703])
+    write_scan_records(db_path, [{"cluster_id": 703, "proc_id": 0, "status": "held"}])
+
+    schedd = _FakeSchedd({703: _ad(703)})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    stats = enrich_from_condor_history(db_path)
+
+    assert stats.already_enriched == 0
+    assert stats.enriched == 1
+    assert len(schedd.history_calls) == 1

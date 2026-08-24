@@ -89,7 +89,11 @@ Jobs are keyed by `(cluster_id, proc_id)`, not `cluster_id` alone, since a
 `condor_history` holds rows from either source — `db enrich-history` (queried
 from HTCondor) or `scan --db` (parsed from a raw event log) — distinguished by
 its `source` column, since the two can disagree and neither is definitively
-more current than the other.
+more current than the other. Writing from both for the same `(cluster_id,
+proc_id)` never produces duplicate rows or a clobber: a write merges
+column-by-column into any existing row (a column the new write doesn't know
+about keeps its previous value), and `source` becomes `condor_history,event_log`
+once both have contributed.
 
 `db enrich-history` queries `condor_history` via the HTCondor Python bindings
 (not the CLI) for every cluster_id already in `provenance.db`'s `events`
