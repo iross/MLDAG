@@ -177,7 +177,35 @@ class BuildStats:
         )
 
 
+def _drop_stale_condor_history(conn: sqlite3.Connection) -> None:
+    """Drop condor_history if it predates the current schema (composite PK, source column).
+
+    Earlier releases (through v0.1.0rc20) created condor_history with a bare
+    cluster_id PRIMARY KEY and no source/proc_id/job_name/site columns.
+    CREATE TABLE IF NOT EXISTS never touches an existing table, so every
+    provenance.db built under those releases hits `OperationalError: no such
+    column: source` the moment enrich-history/enrich-jobad/scan --db runs
+    against it under a newer release.
+
+    Unlike checkpoints/events, condor_history has no incremental ingestion
+    state (no byte offsets or mtimes to preserve) -- every row is fully
+    re-derivable by rerunning db enrich-history/enrich-jobad or scan --db.
+    Dropping and recreating it here is therefore safe, and -- unlike telling
+    someone to delete the whole provenance.db -- doesn't force a full
+    rebuild of checkpoints/events too.
+    """
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(condor_history)")}
+    if columns and "source" not in columns:
+        logger.warning(
+            "condor_history predates the current schema (missing 'source' column); "
+            "dropping and recreating it -- rerun db enrich-history/enrich-jobad or "
+            "scan --db to repopulate it."
+        )
+        conn.execute("DROP TABLE condor_history")
+
+
 def _init_schema(conn: sqlite3.Connection) -> None:
+    _drop_stale_condor_history(conn)
     conn.executescript(_SCHEMA)
 
 

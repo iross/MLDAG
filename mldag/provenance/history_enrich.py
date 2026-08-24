@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -138,7 +139,12 @@ _JOBAD_FIELD_MAPPING = {
     "request_gpus": "request_gpus",
 }
 
-_DEFAULT_BATCH_SIZE = 50
+# Schedd.history() scans its backing store (history file(s)) sequentially
+# per call regardless of constraint complexity -- more, smaller batches
+# means more full scans, not less total scanning work. Batch size is a
+# safety valve against a constraint expression becoming unreasonably long,
+# not a real cost-control knob, so default it high.
+_DEFAULT_BATCH_SIZE = 500
 
 
 @dataclass
@@ -389,6 +395,7 @@ def enrich_from_condor_history(
         schedd = _get_schedd(schedd_name, pool)
         for batch_num, batch in enumerate(batches, start=1):
             constraint = " || ".join(f"ClusterId == {cid}" for cid in batch)
+            batch_started = time.monotonic()
             try:
                 ads = schedd.history(constraint=constraint, projection=_PROJECTION, match=len(batch))
                 ads = list(ads)
@@ -404,6 +411,7 @@ def enrich_from_condor_history(
                 stats.query_errors += len(batch)
                 on_progress(f"Batch {batch_num}/{len(batches)}: query failed ({exc})")
                 continue
+            batch_elapsed = time.monotonic() - batch_started
 
             found: set[int] = set()
             for ad in ads:
@@ -420,7 +428,8 @@ def enrich_from_condor_history(
             stats.not_found += len(set(batch) - found)
             on_progress(
                 f"Batch {batch_num}/{len(batches)}: {len(found)} enriched, "
-                f"{len(batch) - len(found)} not found "
+                f"{len(batch) - len(found)} not found, "
+                f"took {batch_elapsed:.1f}s "
                 f"({stats.enriched} enriched so far)"
             )
         conn.commit()

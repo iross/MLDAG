@@ -31,6 +31,7 @@ from mldag.provenance.db import (
 )
 from mldag.provenance.events import _DEFAULT_LOG_DIR
 from mldag.provenance.event_log_scan import scan_event_log
+from mldag.provenance.history_enrich import _DEFAULT_BATCH_SIZE
 
 app = typer.Typer(no_args_is_help=True)
 db_app = typer.Typer(no_args_is_help=True, help="Build/refresh the local SQLite provenance database.")
@@ -318,6 +319,16 @@ def db_enrich_history(
         bool,
         typer.Option("--full-rescan", help="Re-query every cluster_id, ignoring already-enriched ones"),
     ] = False,
+    batch_size: Annotated[
+        int,
+        typer.Option(
+            help="cluster_ids per condor_history query. Schedd.history() scans its "
+                 "backing store sequentially per call regardless of constraint "
+                 "complexity, so fewer/larger batches means less total scanning, "
+                 "not more -- this is a safety valve against an unreasonably long "
+                 "constraint expression, not a cost-control knob"
+        ),
+    ] = _DEFAULT_BATCH_SIZE,
 ) -> None:
     """Backfill the condor_history table from HTCondor job history via the Python bindings.
 
@@ -327,7 +338,12 @@ def db_enrich_history(
     from mldag.provenance.history_enrich import enrich_from_condor_history
 
     stats = enrich_from_condor_history(
-        db, schedd_name=schedd, pool=pool, full_rescan=full_rescan, on_progress=typer.echo
+        db,
+        schedd_name=schedd,
+        pool=pool,
+        full_rescan=full_rescan,
+        batch_size=batch_size,
+        on_progress=typer.echo,
     )
     typer.echo(str(stats))
 
