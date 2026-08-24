@@ -1020,7 +1020,11 @@ class SimpleCSVGenerator:
                 attempt['gpu_pci_bus_id'] = first_gpu.get('DevicePciBusId', '')
 
     def extract_job_name_from_metl(self, cluster_id: int) -> Optional[str]:
-        """Try to extract job name from DAG Node info in metl.log submission events."""
+        """Try to extract job name from DAG Node info in metl.log submission events.
+
+        The "DAG Node: <name>" annotation appears on the line following the
+        "000 (cluster_id...)" submission event, not on the same line.
+        """
         # Search through all metl.log files
         for metl_log_path in self.metl_logs:
             metl_log_path = Path(metl_log_path)
@@ -1028,9 +1032,14 @@ class SimpleCSVGenerator:
                 continue
 
             with open(metl_log_path, 'r') as f:
-                for line in f:
-                    if f'000 ({cluster_id}.' in line and 'DAG Node:' in line:
-                        dag_match = re.search(r'DAG Node: (\S+)', line)
+                lines = f.readlines()
+
+            for i, line in enumerate(lines):
+                if f'000 ({cluster_id}.' in line:
+                    for next_line in lines[i + 1:i + 5]:
+                        if re.match(r'^\d{3} \(', next_line.strip()):
+                            break
+                        dag_match = re.search(r'DAG Node: (\S+)', next_line)
                         if dag_match:
                             return dag_match.group(1)
 
