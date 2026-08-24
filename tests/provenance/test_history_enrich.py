@@ -510,6 +510,25 @@ def test_enrich_from_jobad_events_merges_with_condor_history_row(tmp_path, monke
     assert row == ("iross", 0, "CHTC-Spark-CE1", 4, "condor_history,jobad")
 
 
+def test_enrich_discovers_cluster_ids_from_scan_only_db_with_no_events_table(tmp_path, monkeypatch):
+    """Regression test: a db populated purely via `scan --db` (an ad hoc batch
+    with no DAGMan/NDJSON instrumentation at all, so an empty events table)
+    must still be discoverable by enrich-history, not just events-table jobs."""
+    db_path = tmp_path / "provenance.db"
+    write_scan_records(db_path, [{"cluster_id": 900, "proc_id": 0, "status": "completed"}])
+    assert _query(db_path, "SELECT COUNT(*) FROM events") == [(0,)]
+
+    schedd = _FakeSchedd({900: _ad(900)})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    stats = enrich_from_condor_history(db_path)
+
+    assert stats.enriched == 1
+    row = _query(db_path, "SELECT owner, source FROM condor_history WHERE cluster_id = 900")[0]
+    assert row == ("iross", "condor_history,event_log")
+
+
 def test_event_log_only_cluster_is_not_already_enriched_for_condor_history(tmp_path, monkeypatch):
     """A cluster touched only by scan --db was never condor_history-queried."""
     db_path = _seed_db(tmp_path, [703])
