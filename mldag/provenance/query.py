@@ -163,10 +163,17 @@ def _format_lineage(chain: list[dict]) -> str:
 def _format_scan(records: list[dict]) -> str:
     lines = []
     for r in records:
-        label = r.get("run_id") or r.get("job_name") or f"cluster:{r['cluster_id']}"
+        # job_id (cluster.proc) is always unique; run_id/job_name is often
+        # shared by every proc in a cluster (job-array batches, or a DAGMan
+        # run_id resolved at cluster granularity), so it's shown alongside
+        # job_id rather than instead of it.
+        job_id = f"{r['cluster_id']}.{r['proc_id']}"
+        label = r.get("run_id") or r.get("job_name") or "-"
         site = r.get("site") or r.get("resource_name") or "?"
         wall_time = f"{r['wall_time_s']:.0f}s" if "wall_time_s" in r else "?"
-        lines.append(f"  {label:<24} {r['status']:<10} site={site:<30} wall_time={wall_time}")
+        lines.append(
+            f"  {job_id:<14} {label:<24} {r['status']:<10} site={site:<30} wall_time={wall_time}"
+        )
     return "\n".join(lines)
 
 
