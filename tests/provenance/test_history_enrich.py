@@ -117,6 +117,49 @@ def test_enrich_inserts_rows_for_new_cluster_ids(tmp_path, monkeypatch):
     assert rows == [(100, "run-abc", "iross", 0), (200, "run-abc", "iross", 0)]
 
 
+def test_enrich_on_progress_reports_batches(tmp_path, monkeypatch):
+    db_path = _seed_db(tmp_path, [100, 200])
+    schedd = _FakeSchedd({100: _ad(100), 200: _ad(200)})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    messages = []
+
+    enrich_from_condor_history(db_path, batch_size=1, on_progress=messages.append)
+
+    assert any("2 cluster_id" in m and "2 batch" in m for m in messages)
+    assert sum("Batch 1/2" in m for m in messages) == 1
+    assert sum("Batch 2/2" in m for m in messages) == 1
+
+
+def test_enrich_on_progress_reports_nothing_to_do(tmp_path, monkeypatch):
+    db_path = tmp_path / "provenance.db"
+    build_database(db_path, [], [])
+    schedd = _FakeSchedd({})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    messages = []
+
+    enrich_from_condor_history(db_path, on_progress=messages.append)
+
+    assert messages == ["No new cluster_ids to enrich."]
+    assert schedd.history_calls == []
+
+
+def test_enrich_without_on_progress_does_not_error(tmp_path, monkeypatch):
+    """on_progress is optional -- omitting it must not raise."""
+    db_path = _seed_db(tmp_path, [100])
+    schedd = _FakeSchedd({100: _ad(100)})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+
+    stats = enrich_from_condor_history(db_path)
+
+    assert stats.enriched == 1
+
+
 def test_enrich_no_cluster_ids_in_events_is_a_noop(tmp_path, monkeypatch):
     db_path = tmp_path / "provenance.db"
     build_database(db_path, [], [])

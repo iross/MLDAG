@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -313,6 +314,10 @@ def _get_schedd(schedd_name: str | None, pool: str | None):
     return htcondor.Schedd()
 
 
+def _noop_progress(_msg: str) -> None:
+    pass
+
+
 def enrich_from_condor_history(
     db_path: str | Path,
     *,
@@ -320,6 +325,7 @@ def enrich_from_condor_history(
     pool: str | None = None,
     batch_size: int = _DEFAULT_BATCH_SIZE,
     full_rescan: bool = False,
+    on_progress: Callable[[str], None] | None = None,
 ) -> EnrichStats:
     """Backfill db_path's condor_history table for cluster_ids seen in its events table.
 
@@ -333,6 +339,11 @@ def enrich_from_condor_history(
             constraint query.
         full_rescan: Re-query every cluster_id in the events table, including
             ones already in condor_history, ignoring recorded results.
+        on_progress: Optional callback invoked with a one-line status message
+            before the first query and after each batch completes -- a batch
+            of condor_history queries against a large events table can take a
+            while, and this function otherwise gives no sign of life until it
+            returns. No-op when omitted.
 
     Returns:
         EnrichStats with counts of what was enriched/not-found/skipped.
@@ -340,6 +351,8 @@ def enrich_from_condor_history(
     Raises:
         ImportError: if htcondor2 (a Linux-only dependency) is not installed.
     """
+    on_progress = on_progress or _noop_progress
+
     now = datetime.now(timezone.utc).isoformat()
     stats = EnrichStats()
     conn = sqlite3.connect(db_path)
@@ -364,10 +377,17 @@ def enrich_from_condor_history(
             stats.already_enriched = len(all_ids) - len(target_ids)
 
         if not target_ids:
+            on_progress("No new cluster_ids to enrich.")
             return stats
 
+        batches = list(_chunks(target_ids, batch_size))
+        on_progress(
+            f"Querying condor_history for {len(target_ids)} cluster_id(s) "
+            f"in {len(batches)} batch(es) of up to {batch_size}..."
+        )
+
         schedd = _get_schedd(schedd_name, pool)
-        for batch in _chunks(target_ids, batch_size):
+        for batch_num, batch in enumerate(batches, start=1):
             constraint = " || ".join(f"ClusterId == {cid}" for cid in batch)
             try:
                 ads = schedd.history(constraint=constraint, projection=_PROJECTION, match=len(batch))
@@ -382,6 +402,7 @@ def enrich_from_condor_history(
                     "condor_history query failed for %d cluster_id(s): %s", len(batch), exc
                 )
                 stats.query_errors += len(batch)
+                on_progress(f"Batch {batch_num}/{len(batches)}: query failed ({exc})")
                 continue
 
             found: set[int] = set()
@@ -397,6 +418,11 @@ def enrich_from_condor_history(
                 _upsert_history_row(conn, row)
                 stats.enriched += 1
             stats.not_found += len(set(batch) - found)
+            on_progress(
+                f"Batch {batch_num}/{len(batches)}: {len(found)} enriched, "
+                f"{len(batch) - len(found)} not found "
+                f"({stats.enriched} enriched so far)"
+            )
         conn.commit()
     finally:
         conn.close()

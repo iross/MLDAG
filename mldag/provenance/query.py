@@ -327,7 +327,7 @@ def db_enrich_history(
     from mldag.provenance.history_enrich import enrich_from_condor_history
 
     stats = enrich_from_condor_history(
-        db, schedd_name=schedd, pool=pool, full_rescan=full_rescan
+        db, schedd_name=schedd, pool=pool, full_rescan=full_rescan, on_progress=typer.echo
     )
     typer.echo(str(stats))
 
