@@ -30,6 +30,7 @@ from mldag.provenance.db import (
     build_database,
 )
 from mldag.provenance.events import _DEFAULT_LOG_DIR
+from mldag.provenance.event_log_scan import scan_event_log
 
 app = typer.Typer(no_args_is_help=True)
 db_app = typer.Typer(no_args_is_help=True, help="Build/refresh the local SQLite provenance database.")
@@ -159,6 +160,16 @@ def _format_lineage(chain: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _format_scan(records: list[dict]) -> str:
+    lines = []
+    for r in records:
+        label = r.get("run_id") or r.get("job_name") or f"cluster:{r['cluster_id']}"
+        site = r.get("site") or r.get("resource_name") or "?"
+        wall_time = f"{r['wall_time_s']:.0f}s" if "wall_time_s" in r else "?"
+        lines.append(f"  {label:<24} {r['status']:<10} site={site:<30} wall_time={wall_time}")
+    return "\n".join(lines)
+
+
 def _format_events(events: list[dict]) -> str:
     lines = []
     for e in events:
@@ -215,6 +226,33 @@ def events(
         typer.echo(_format_events(run_events))
 
 
+@app.command()
+def scan(
+    log_file: Annotated[str, typer.Argument(help="HTCondor event log to scan (e.g. metl.log)")],
+    log_dir: Annotated[
+        str,
+        typer.Option(help="Classad/.run_id marker directory to opportunistically resolve run_id from; fine if it doesn't exist"),
+    ] = _DEFAULT_LOG_DIR,
+    provenance_log_dir: Annotated[
+        str,
+        typer.Option(help="NDJSON provenance directory to opportunistically resolve run_id from job_name; fine if it doesn't exist"),
+    ] = _DEFAULT_LOG_DIR,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit JSON")] = False,
+) -> None:
+    """Summarize every job in a raw HTCondor event log: duration, site, resource usage.
+
+    Works on any event log, including one from a batch of jobs run without the
+    DAGMan PRE/POST provenance pipeline -- run_id/job_name enrichment only
+    happens when log_dir/provenance_log_dir actually have matching data.
+    """
+    records = scan_event_log(log_file, log_dir=log_dir, provenance_log_dir=provenance_log_dir)
+    if json_out:
+        typer.echo(json.dumps(records, indent=2))
+    else:
+        typer.echo(f"{len(records)} job(s) in {log_file}:")
+        typer.echo(_format_scan(records))
+
+
 @db_app.command("build")
 def db_build(
     db: Annotated[str, typer.Option(help="Path to the SQLite database file")] = DEFAULT_DB_PATH,
@@ -239,6 +277,35 @@ def db_build(
     checkpoint_dirs = checkpoint_dir or [DEFAULT_CHECKPOINT_DIR]
     event_dirs = event_dir or [DEFAULT_EVENT_DIR]
     stats = build_database(db, checkpoint_dirs, event_dirs, full_rescan=full_rescan)
+    typer.echo(str(stats))
+
+
+@db_app.command("enrich-history")
+def db_enrich_history(
+    db: Annotated[str, typer.Option(help="Path to the SQLite database file")] = DEFAULT_DB_PATH,
+    schedd: Annotated[
+        Optional[str],  # noqa: UP045 -- see db_build's Optional[list[str]] for why
+        typer.Option(help="Schedd name to query; defaults to the local schedd"),
+    ] = None,
+    pool: Annotated[
+        Optional[str],  # noqa: UP045
+        typer.Option(help="Collector address to resolve --schedd against; defaults to the local pool"),
+    ] = None,
+    full_rescan: Annotated[
+        bool,
+        typer.Option("--full-rescan", help="Re-query every cluster_id, ignoring already-enriched ones"),
+    ] = False,
+) -> None:
+    """Backfill the condor_history table from HTCondor job history via the Python bindings.
+
+    Requires htcondor2 (a Linux-only dependency); imported here rather than at
+    module load time so the rest of this CLI keeps working without it.
+    """
+    from mldag.provenance.history_enrich import enrich_from_condor_history
+
+    stats = enrich_from_condor_history(
+        db, schedd_name=schedd, pool=pool, full_rescan=full_rescan
+    )
     typer.echo(str(stats))
 
 

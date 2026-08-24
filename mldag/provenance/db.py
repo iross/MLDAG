@@ -96,6 +96,31 @@ CREATE TABLE IF NOT EXISTS event_file_state (
     byte_offset INTEGER NOT NULL,
     line_count  INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS condor_history (
+    cluster_id        INTEGER PRIMARY KEY,
+    run_id            TEXT,
+    owner             TEXT,
+    cmd               TEXT,
+    job_status        INTEGER,
+    exit_code         INTEGER,
+    remote_host       TEXT,
+    last_remote_host  TEXT,
+    request_cpus      INTEGER,
+    request_memory    INTEGER,
+    request_gpus      INTEGER,
+    remote_wall_clock_s REAL,
+    cpus_usage        REAL,
+    memory_usage_mb   REAL,
+    gpus_usage        REAL,
+    resource_name     TEXT,
+    hold_reason       TEXT,
+    qdate             TEXT,
+    job_start_date    TEXT,
+    completion_date   TEXT,
+    classad_json      TEXT NOT NULL,
+    queried_at        TEXT NOT NULL
+);
 """
 
 _CHECKPOINT_COLUMNS = [
