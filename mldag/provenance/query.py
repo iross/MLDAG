@@ -280,6 +280,35 @@ def db_build(
     typer.echo(str(stats))
 
 
+@db_app.command("enrich-history")
+def db_enrich_history(
+    db: Annotated[str, typer.Option(help="Path to the SQLite database file")] = DEFAULT_DB_PATH,
+    schedd: Annotated[
+        Optional[str],  # noqa: UP045 -- see db_build's Optional[list[str]] for why
+        typer.Option(help="Schedd name to query; defaults to the local schedd"),
+    ] = None,
+    pool: Annotated[
+        Optional[str],  # noqa: UP045
+        typer.Option(help="Collector address to resolve --schedd against; defaults to the local pool"),
+    ] = None,
+    full_rescan: Annotated[
+        bool,
+        typer.Option("--full-rescan", help="Re-query every cluster_id, ignoring already-enriched ones"),
+    ] = False,
+) -> None:
+    """Backfill the condor_history table from HTCondor job history via the Python bindings.
+
+    Requires htcondor2 (a Linux-only dependency); imported here rather than at
+    module load time so the rest of this CLI keeps working without it.
+    """
+    from mldag.provenance.history_enrich import enrich_from_condor_history
+
+    stats = enrich_from_condor_history(
+        db, schedd_name=schedd, pool=pool, full_rescan=full_rescan
+    )
+    typer.echo(str(stats))
+
+
 def main() -> None:
     app()
 
