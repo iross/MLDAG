@@ -57,6 +57,31 @@ The path is baked into the generated DAG at `mldag-gen` time (like
 (currently just `Environment`, which can carry secrets like a W&B API key)
 are blocked outright; requesting one raises an error when the file is loaded.
 
+### Inspecting jobs without the full provenance pipeline
+
+Two commands work on jobs that were never instrumented with the PRE/POST
+provenance scripts (a one-off batch, a hand-submitted `.dag`) — no run_id or
+NDJSON events required. Both enrich opportunistically when related data is
+available and silently fall back to bare cluster_id/no-op when it isn't:
+
+```bash
+# Duration, execute host/site, and resource usage straight from an event log
+mldag-query scan metl.log
+
+# Backfill provenance.db's condor_history table from HTCondor job history
+# (final host, exit code, hold reasons, requested vs. used resources)
+mldag-query db enrich-history --schedd <name>
+```
+
+`scan` parses any HTCondor event log directly; if `--log-dir`/
+`--provenance-log-dir` happen to point at a DAGMan provenance run's classad or
+NDJSON directories, matching jobs are enriched with `run_id`/`job_name` too.
+
+`db enrich-history` queries `condor_history` via the HTCondor Python bindings
+(not the CLI) for every cluster_id already in `provenance.db`'s `events`
+table, and is safe to re-run — already-enriched cluster_ids are skipped
+unless `--full-rescan` is passed. Requires `htcondor2` (Linux only).
+
 ### Entry points after install
 
 | Command | Purpose |
@@ -66,7 +91,7 @@ are blocked outright; requesting one raises an error when the file is loaded.
 | `mldag-report` | Generate experiment report from CSV |
 | `mldag-monitor` | HTCondor job monitor |
 | `mldag-dashboard` | Generate interactive HTML dashboard |
-| `mldag-query` | Query provenance records |
+| `mldag-query` | Query provenance records, scan raw event logs, build/enrich the SQLite db |
 | `mldag-pre` / `mldag-post` | DAGMan pre/post scripts (provenance capture) |
 | `mldag-log-monitor` | Provenance log monitor |
 
