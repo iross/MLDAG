@@ -209,3 +209,77 @@ def test_scan_missing_terminator_still_flushes_last_block(tmp_path):
     records = scan_event_log(log)
     assert len(records) == 1
     assert records[0]["status"] == "held"
+
+
+# --- scan_event_log: job arrays (many procs under one cluster) ---
+#
+# Regression coverage for a real production log (11 clusters, 275
+# cluster.proc pairs via `queue N`) where every proc in a cluster was
+# silently collapsed into a single record.
+
+
+def test_scan_multiple_procs_in_one_cluster_are_separate_records(tmp_path):
+    log = tmp_path / "batch.log"
+    _write(
+        log,
+        "000 (7000.000.000) 2026-06-01 08:00:00 Job submitted from host: <1.2.3.4:9618>\n...\n"
+        "000 (7000.001.000) 2026-06-01 08:00:01 Job submitted from host: <1.2.3.4:9618>\n...\n"
+        "000 (7000.002.000) 2026-06-01 08:00:02 Job submitted from host: <1.2.3.4:9618>\n...\n"
+        "001 (7000.000.000) 2026-06-01 08:05:00 Job executing on host: <10.0.0.1:1>\n"
+        "\tSlotName: slot1_1@nodeA.example.edu\n...\n"
+        "001 (7000.001.000) 2026-06-01 08:05:01 Job executing on host: <10.0.0.2:1>\n"
+        "\tSlotName: slot1_1@nodeB.example.edu\n...\n"
+        "005 (7000.000.000) 2026-06-01 09:00:00 Job terminated.\n"
+        "\tPartitionable Resources :       Usage  Request Allocated\n"
+        "\t   TimeExecute (s)      :    3300                       \n...\n"
+        "012 (7000.002.000) 2026-06-01 08:10:00 Job was held.\n...\n",
+    )
+
+    records = scan_event_log(log)
+
+    assert len(records) == 3
+    by_proc = {r["proc_id"]: r for r in records}
+    assert set(by_proc) == {0, 1, 2}
+    assert all(r["cluster_id"] == 7000 for r in records)
+
+    assert by_proc[0]["site"] == "nodeA.example.edu"
+    assert by_proc[0]["wall_time_s"] == 3300.0
+    assert by_proc[0]["status"] == "completed"
+
+    assert by_proc[1]["site"] == "nodeB.example.edu"
+    assert by_proc[1]["status"] == "executing"
+
+    assert by_proc[2]["status"] == "held"
+    assert "site" not in by_proc[2]
+
+
+def test_scan_sorted_by_cluster_then_proc(tmp_path):
+    log = tmp_path / "batch.log"
+    _write(
+        log,
+        "012 (100.002.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (100.000.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (100.001.000) 2026-06-01 08:00:00 Job was held.\n...\n",
+    )
+    records = scan_event_log(log)
+    assert [r["proc_id"] for r in records] == [0, 1, 2]
+    assert all(r["cluster_id"] == 100 for r in records)
+
+
+def test_scan_run_id_enrichment_shared_across_procs_but_job_id_stays_unique(tmp_path):
+    """A cluster-level .run_id marker applies to every proc, but proc_id keeps rows distinct."""
+    ad_dir = tmp_path / "ads"
+    ad_dir.mkdir()
+    (ad_dir / "8000.run_id").write_text("run-array")
+    log = tmp_path / "batch.log"
+    _write(
+        log,
+        "012 (8000.000.000) 2026-06-01 08:00:00 Job was held.\n...\n"
+        "012 (8000.001.000) 2026-06-01 08:00:00 Job was held.\n...\n",
+    )
+
+    records = scan_event_log(log, log_dir=ad_dir)
+
+    assert len(records) == 2
+    assert all(r["run_id"] == "run-array" for r in records)
+    assert {r["proc_id"] for r in records} == {0, 1}
