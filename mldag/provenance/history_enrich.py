@@ -170,13 +170,24 @@ def _chunks(seq: list, size: int):
         yield seq[i : i + size]
 
 
-def _all_cluster_ids_from_events(conn: sqlite3.Connection) -> set[int]:
-    """Return every cluster_id any event in the `events` table carries."""
-    rows = conn.execute(
+def _all_known_cluster_ids(conn: sqlite3.Connection) -> set[int]:
+    """Return every cluster_id known to db_path, from either the `events`
+    table (built by `db build` from NDJSON -- the DAGMan-instrumented path)
+    or condor_history itself (rows already written by scan --db/enrich-jobad
+    for jobs that never went through NDJSON at all).
+
+    Without the condor_history half of this, a provenance.db populated
+    purely via `scan --db` (a batch of jobs with no DAGMan instrumentation,
+    so an empty or nonexistent `events` table) would give enrich-history
+    nothing to discover, even though those exact jobs are sitting right
+    there in condor_history waiting to be enriched further.
+    """
+    from_events = conn.execute(
         "SELECT DISTINCT CAST(json_extract(payload_json, '$.cluster_id') AS INTEGER) "
         "FROM events WHERE json_extract(payload_json, '$.cluster_id') IS NOT NULL"
     )
-    return {row[0] for row in rows}
+    from_condor_history = conn.execute("SELECT DISTINCT cluster_id FROM condor_history")
+    return {row[0] for row in from_events} | {row[0] for row in from_condor_history}
 
 
 def _row_from_ad(ad: dict) -> dict:
@@ -333,7 +344,9 @@ def enrich_from_condor_history(
     full_rescan: bool = False,
     on_progress: Callable[[str], None] | None = None,
 ) -> EnrichStats:
-    """Backfill db_path's condor_history table for cluster_ids seen in its events table.
+    """Backfill db_path's condor_history table for every cluster_id known to it,
+    whether from its events table (NDJSON) or condor_history itself (rows
+    already written by scan --db/enrich-jobad).
 
     Args:
         db_path: Path to the provenance SQLite database (see mldag.provenance.db).
@@ -364,7 +377,7 @@ def enrich_from_condor_history(
     conn = sqlite3.connect(db_path)
     try:
         _init_schema(conn)
-        all_ids = _all_cluster_ids_from_events(conn)
+        all_ids = _all_known_cluster_ids(conn)
         if full_rescan:
             target_ids = sorted(all_ids)
         else:
