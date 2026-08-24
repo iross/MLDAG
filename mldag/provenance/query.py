@@ -30,6 +30,7 @@ from mldag.provenance.db import (
     build_database,
 )
 from mldag.provenance.events import _DEFAULT_LOG_DIR
+from mldag.provenance.event_log_scan import scan_event_log
 
 app = typer.Typer(no_args_is_help=True)
 db_app = typer.Typer(no_args_is_help=True, help="Build/refresh the local SQLite provenance database.")
@@ -159,6 +160,16 @@ def _format_lineage(chain: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _format_scan(records: list[dict]) -> str:
+    lines = []
+    for r in records:
+        label = r.get("run_id") or r.get("job_name") or f"cluster:{r['cluster_id']}"
+        site = r.get("site") or r.get("resource_name") or "?"
+        wall_time = f"{r['wall_time_s']:.0f}s" if "wall_time_s" in r else "?"
+        lines.append(f"  {label:<24} {r['status']:<10} site={site:<30} wall_time={wall_time}")
+    return "\n".join(lines)
+
+
 def _format_events(events: list[dict]) -> str:
     lines = []
     for e in events:
@@ -213,6 +224,33 @@ def events(
     else:
         typer.echo(f"Events for run {run_id} ({len(run_events)} total):")
         typer.echo(_format_events(run_events))
+
+
+@app.command()
+def scan(
+    log_file: Annotated[str, typer.Argument(help="HTCondor event log to scan (e.g. metl.log)")],
+    log_dir: Annotated[
+        str,
+        typer.Option(help="Classad/.run_id marker directory to opportunistically resolve run_id from; fine if it doesn't exist"),
+    ] = _DEFAULT_LOG_DIR,
+    provenance_log_dir: Annotated[
+        str,
+        typer.Option(help="NDJSON provenance directory to opportunistically resolve run_id from job_name; fine if it doesn't exist"),
+    ] = _DEFAULT_LOG_DIR,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit JSON")] = False,
+) -> None:
+    """Summarize every job in a raw HTCondor event log: duration, site, resource usage.
+
+    Works on any event log, including one from a batch of jobs run without the
+    DAGMan PRE/POST provenance pipeline -- run_id/job_name enrichment only
+    happens when log_dir/provenance_log_dir actually have matching data.
+    """
+    records = scan_event_log(log_file, log_dir=log_dir, provenance_log_dir=provenance_log_dir)
+    if json_out:
+        typer.echo(json.dumps(records, indent=2))
+    else:
+        typer.echo(f"{len(records)} job(s) in {log_file}:")
+        typer.echo(_format_scan(records))
 
 
 @db_app.command("build")

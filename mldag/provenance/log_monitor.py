@@ -68,6 +68,22 @@ _TS_NEW = re.compile(
 _TS_OLD = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\) (\d{2}/\d{2}) (\d{2}:\d{2}:\d{2})")
 _ANY_HEADER_RE = re.compile(r"^(\d{3}) \((\d+)\.\d+\.\d+\)")
 _DAGNODE_RE = re.compile(r'DAGNodeName\s*=\s*"([^"]+)"')
+# Body line of a 001 (Executing) block, e.g.:
+#   SlotName: slot1_9@glidein_2498702_695587462@spark-agpu225.chtc.wisc.edu
+# Never parsed today -- job.executing events carry no host/site field, and the
+# only other candidate source (GLIDEIN_ResourceName via job_ad_file) is dead
+# (see module docstring / task-25). event_log_scan.py's standalone scanner uses this.
+_SLOTNAME_RE = re.compile(r"^\s*SlotName:\s*(\S+)")
+
+
+def site_from_slotname(slotname: str) -> str:
+    """Return the execute-host portion of a SlotName value.
+
+    A SlotName is "<slot>@<host>" normally, or "<slot>@<glidein_id>@<host>"
+    under a glidein (OSPool); either way the real host is the part after the
+    last "@".
+    """
+    return slotname.rsplit("@", 1)[-1]
 
 # Codes that emit provenance events
 _CODES = {"001", "004", "005", "009", "012", "013", "023", "040"}
