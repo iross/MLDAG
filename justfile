@@ -17,6 +17,11 @@ _refresh-ospool:
     scp ap40:"/home/ian.ross/MLDAG_fixed_global/ospool_pretraining.dag*" .
     scp ap40:/home/ian.ross/MLDAG_fixed_global/metl.log .
 
+_refresh-ospool-grand-total:
+    scp ap40:/ospool/ap40/data/ian.ross/MLDAG/global_pretraining_with_ospool.dag global_pretraining_with_ospool_misconfigured.dag
+    scp ap40:/ospool/ap40/data/ian.ross/MLDAG/global_pretraining_with_ospool_w_anvil.dag global_pretraining_with_ospool_w_anvil_misconfigured.dag
+    scp ap40:/ospool/ap40/data/ian.ross/MLDAG/metl.log metl_misconfigured.log
+
 _refresh-chtc:
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/nairr_config_in_chtc/metl.log" metl_control.log
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/nairr_config_in_chtc/trainingrun*.dag*" .
@@ -29,6 +34,15 @@ _csv-ospool:
                     ospool_pretraining.dag \
         --metl-logs metl.log \
         --output full_ospool.csv
+
+_csv-ospool-grand-total:
+    uv run mldag-csv \
+        --dag-files bigger_global_pretraining.dag global_pretraining.dag \
+                    ospool_pretraining.dag \
+                    global_pretraining_with_ospool_misconfigured.dag \
+                    global_pretraining_with_ospool_w_anvil_misconfigured.dag \
+        --metl-logs metl.log metl_misconfigured.log \
+        --output full_ospool-grand-total.csv
 
 _csv-chtc:
     uv run mldag-csv \
