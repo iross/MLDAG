@@ -332,6 +332,23 @@ def db_enrich_history(
     typer.echo(str(stats))
 
 
+@db_app.command("enrich-jobad")
+def db_enrich_jobad(
+    db: Annotated[str, typer.Option(help="Path to the SQLite database file")] = DEFAULT_DB_PATH,
+) -> None:
+    """Mirror job.assigned events (jobad.py's in-job $_CONDOR_JOB_AD capture) into condor_history.
+
+    Reads from provenance.db's `events` table (run `db build` first), so no
+    HTCondor connection is needed -- it's the same data jobad.py already
+    wrote at job start, just also stored where it can be joined against
+    condor_history/scan data for the same job.
+    """
+    from mldag.provenance.history_enrich import enrich_from_jobad_events
+
+    written = enrich_from_jobad_events(db)
+    typer.echo(f"Wrote {written} row(s) to {db} (condor_history, source=jobad)")
+
+
 def main() -> None:
     app()
 

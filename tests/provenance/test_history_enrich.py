@@ -12,6 +12,7 @@ from mldag.provenance.db import build_database
 from mldag.provenance.history_enrich import (
     EnrichStats,
     enrich_from_condor_history,
+    enrich_from_jobad_events,
     write_scan_records,
 )
 
@@ -21,6 +22,16 @@ def _write_event(prov_dir: Path, filename: str, events: list[dict]) -> Path:
     path = prov_dir / filename
     path.write_text("\n".join(json.dumps(e) for e in events) + "\n")
     return path
+
+
+def _seed_jobad_event(tmp_path: Path, run_id: str, filename: str, **fields) -> Path:
+    """Write a job.assigned event (as jobad.py/pretrain_local.sh would) and build it into a db."""
+    prov_dir = tmp_path / "provenance"
+    event = {"type": "job.assigned", "run_id": run_id, "ts": "2026-06-01T00:00:00Z", **fields}
+    _write_event(prov_dir, filename, [event])
+    db_path = tmp_path / "provenance.db"
+    build_database(db_path, [], [prov_dir])
+    return db_path
 
 
 def _seed_db(tmp_path: Path, cluster_ids: list[int]) -> Path:
@@ -364,6 +375,96 @@ def test_second_condor_history_write_updates_changed_fields(tmp_path, monkeypatc
 
     (status,) = _query(db_path, "SELECT status FROM condor_history WHERE cluster_id = 702")[0]
     assert status == "completed"
+
+
+# --- enrich_from_jobad_events: mirroring job.assigned events into condor_history ---
+
+
+def test_enrich_from_jobad_events_writes_condor_history_row(tmp_path):
+    db_path = _seed_jobad_event(
+        tmp_path,
+        "run-jobad",
+        "run-jobad.ndjson",
+        cluster_id=800,
+        proc_id=0,
+        resource_name="CHTC-Spark-CE1",
+        arguments="pretrain_local.sh 30 run-jobad 42",
+        request_cpus=4,
+        request_memory=65536,
+        request_gpus=1,
+    )
+
+    written = enrich_from_jobad_events(db_path)
+
+    assert written == 1
+    row = _query(
+        db_path,
+        "SELECT run_id, resource_name, arguments, request_cpus, request_memory, "
+        "request_gpus, source FROM condor_history WHERE cluster_id = 800",
+    )[0]
+    assert row == ("run-jobad", "CHTC-Spark-CE1", "pretrain_local.sh 30 run-jobad 42", 4, 65536, 1, "jobad")
+
+
+def test_enrich_from_jobad_events_never_writes_usage_fields(tmp_path):
+    """Even if the event happens to carry wall_time_s etc (capture_job_ad_fields'
+    default mapping technically includes them), they must not land in
+    condor_history -- they're meaningless at submit time."""
+    db_path = _seed_jobad_event(
+        tmp_path,
+        "run-jobad",
+        "run-jobad.ndjson",
+        cluster_id=801,
+        proc_id=0,
+        wall_time_s=0.0,
+        cpu_usage=0.0,
+        peak_memory_mb=0.0,
+        gpu_usage=0.0,
+    )
+
+    enrich_from_jobad_events(db_path)
+
+    row = _query(
+        db_path,
+        "SELECT remote_wall_clock_s, cpus_usage, memory_usage_mb, gpus_usage "
+        "FROM condor_history WHERE cluster_id = 801",
+    )[0]
+    assert row == (None, None, None, None)
+
+
+def test_enrich_from_jobad_events_ignores_events_without_cluster_id(tmp_path):
+    db_path = _seed_jobad_event(tmp_path, "run-no-cluster", "run-no-cluster.ndjson", resource_name="X")
+
+    written = enrich_from_jobad_events(db_path)
+
+    assert written == 0
+    assert _query(db_path, "SELECT COUNT(*) FROM condor_history")[0] == (0,)
+
+
+def test_enrich_from_jobad_events_merges_with_condor_history_row(tmp_path, monkeypatch):
+    """jobad-only fields and condor_history-only fields both survive; source becomes a set."""
+    db_path = _seed_jobad_event(
+        tmp_path,
+        "run-jobad",
+        "run-jobad.ndjson",
+        cluster_id=802,
+        proc_id=0,
+        resource_name="CHTC-Spark-CE1",
+        request_cpus=4,
+    )
+    enrich_from_jobad_events(db_path)
+
+    schedd = _FakeSchedd({802: _ad(802, Owner="iross", ExitCode=0)})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    enrich_from_condor_history(db_path)
+
+    row = _query(
+        db_path,
+        "SELECT owner, exit_code, resource_name, request_cpus, source "
+        "FROM condor_history WHERE cluster_id = 802",
+    )[0]
+    assert row == ("iross", 0, "CHTC-Spark-CE1", 4, "condor_history,jobad")
 
 
 def test_event_log_only_cluster_is_not_already_enriched_for_condor_history(tmp_path, monkeypatch):

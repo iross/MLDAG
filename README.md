@@ -78,6 +78,10 @@ mldag-query scan metl.log --db provenance.db
 # Backfill provenance.db's condor_history table from HTCondor job history
 # (final host, exit code, hold reasons, requested vs. used resources)
 mldag-query db enrich-history --schedd <name>
+
+# Mirror job.assigned events (jobad.py's in-job $_CONDOR_JOB_AD capture,
+# emitted immediately at job start) into condor_history too
+mldag-query db enrich-jobad
 ```
 
 `scan` parses any HTCondor event log directly; if `--log-dir`/
@@ -86,14 +90,19 @@ NDJSON directories, matching jobs are enriched with `run_id`/`job_name` too.
 Jobs are keyed by `(cluster_id, proc_id)`, not `cluster_id` alone, since a
 `queue N` job array puts many procs under one cluster.
 
-`condor_history` holds rows from either source — `db enrich-history` (queried
-from HTCondor) or `scan --db` (parsed from a raw event log) — distinguished by
-its `source` column, since the two can disagree and neither is definitively
-more current than the other. Writing from both for the same `(cluster_id,
-proc_id)` never produces duplicate rows or a clobber: a write merges
-column-by-column into any existing row (a column the new write doesn't know
-about keeps its previous value), and `source` becomes `condor_history,event_log`
-once both have contributed.
+`condor_history` holds rows from any of three sources — `db enrich-history`
+(queried from HTCondor), `scan --db` (parsed from a raw event log), or
+`db enrich-jobad` (mirrored from `job.assigned` events already in the `events`
+table) — distinguished by its `source` column, since they can disagree and
+none is definitively more current than the others. Writing from more than one
+for the same `(cluster_id, proc_id)` never produces duplicate rows or a
+clobber: a write merges column-by-column into any existing row (a column the
+new write doesn't know about keeps its previous value), and `source` becomes
+e.g. `condor_history,jobad` once both have contributed. `enrich-jobad`
+deliberately never writes `remote_wall_clock_s`/`cpus_usage`/`memory_usage_mb`/
+`gpus_usage`: the job ad is captured at submission, before the job has run,
+so those fields would be near-zero placeholders rather than real usage — use
+`enrich-history` or `scan` for those.
 
 `db enrich-history` queries `condor_history` via the HTCondor Python bindings
 (not the CLI) for every cluster_id already in `provenance.db`'s `events`
