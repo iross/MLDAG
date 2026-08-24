@@ -4,6 +4,35 @@ from pathlib import Path
 
 from mldag.provenance.db import BuildStats, build_database
 
+# The condor_history schema as shipped through v0.1.0rc20: bare cluster_id
+# PRIMARY KEY, no source/proc_id/job_name/site/gpu_ids/status columns.
+_OLD_CONDOR_HISTORY_SCHEMA = """
+CREATE TABLE condor_history (
+    cluster_id        INTEGER PRIMARY KEY,
+    run_id            TEXT,
+    owner             TEXT,
+    cmd               TEXT,
+    job_status        INTEGER,
+    exit_code         INTEGER,
+    remote_host       TEXT,
+    last_remote_host  TEXT,
+    request_cpus      INTEGER,
+    request_memory    INTEGER,
+    request_gpus      INTEGER,
+    remote_wall_clock_s REAL,
+    cpus_usage        REAL,
+    memory_usage_mb   REAL,
+    gpus_usage        REAL,
+    resource_name     TEXT,
+    hold_reason       TEXT,
+    qdate             TEXT,
+    job_start_date    TEXT,
+    completion_date   TEXT,
+    classad_json      TEXT NOT NULL,
+    queried_at        TEXT NOT NULL
+);
+"""
+
 
 def _write_sidecar(ckpt_dir: Path, name: str, **overrides) -> Path:
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -358,6 +387,50 @@ def test_example_query_lineage_by_parent_hash(tmp_path):
         ("run-1",),
     )
     assert rows == [(0, "sha256:aaa", None), (1, "sha256:bbb", "sha256:aaa")]
+
+
+# --- self-healing a stale (pre-v0.1.0rc21) condor_history schema ---
+
+
+def test_build_database_recreates_stale_condor_history_schema(tmp_path):
+    """Regression test: upgrading from <=v0.1.0rc20 must not crash with
+    'OperationalError: no such column: source' against an already-built
+    provenance.db whose condor_history table predates the current schema."""
+    db_path = tmp_path / "provenance.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_OLD_CONDOR_HISTORY_SCHEMA)
+    conn.execute(
+        "INSERT INTO condor_history (cluster_id, owner, classad_json, queried_at) "
+        "VALUES (123, 'iross', '{}', '2026-01-01T00:00:00Z')"
+    )
+    conn.commit()
+    conn.close()
+
+    stats = build_database(db_path, [], [])  # must not raise
+
+    assert stats.events_ingested == 0
+    conn = sqlite3.connect(db_path)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(condor_history)")}
+    conn.close()
+    assert "source" in columns
+    assert "proc_id" in columns
+    # The stale row is gone -- it's fully re-derivable by rerunning
+    # enrich-history/enrich-jobad/scan --db, which the old row's shape
+    # couldn't safely be migrated into anyway (e.g. no proc_id).
+    assert _query(db_path, "SELECT COUNT(*) FROM condor_history") == [(0,)]
+
+
+def test_build_database_leaves_current_condor_history_schema_alone(tmp_path):
+    """A condor_history table already on the current schema is left untouched."""
+    from mldag.provenance.history_enrich import write_scan_records
+
+    db_path = tmp_path / "provenance.db"
+    build_database(db_path, [], [])
+    write_scan_records(db_path, [{"cluster_id": 500, "proc_id": 0, "status": "held"}])
+
+    build_database(db_path, [], [])  # a second build must not wipe it out
+
+    assert _query(db_path, "SELECT cluster_id, proc_id FROM condor_history") == [(500, 0)]
 
 
 def test_build_stats_str_reports_all_counts():
