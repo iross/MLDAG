@@ -29,6 +29,11 @@ _refresh-chtc:
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/nairr_config_in_chtc/trainingrun*.dag*" .
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/path_supplement_march_runs/metl.log" metl_experiment_devices.log
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/path_supplement_march_runs/experiment_devices.dag*" .
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_gpu_device_constrained/metl.log" metl_single_protein_models_gpu_device_constrained.log
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_gpu_device_constrained/many_protein_pretraining_with_ospool_device_constrained_runs.dag*" .
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_with_ospool/metl.log" metl_single_protein_models_with_ospool.log
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_with_ospool/many_protein_pretraining_with_ospool.dag*" .
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_with_ospool/many_protein_pretraining_with_ospool_run2.dag*" .
 
 _csv-ospool:
     uv run mldag-csv \
@@ -48,8 +53,9 @@ _csv-ospool-grand-total:
 
 _csv-chtc:
     uv run mldag-csv \
-        --dag-files experiment_devices.dag* trainingrun*.dag* \
-        --metl-logs metl_control.log metl_experiment_devices.log \
+        --dag-files experiment_devices.dag* trainingrun*.dag* many_protein_pretraining_with_ospool.dag* many_protein_pretraining_with_ospool_device_constrained_runs.dag* many_protein_pretraining_with_ospool_run2.dag* \
+        --metl-logs metl_control.log metl_experiment_devices.log metl_single_protein_models_gpu_device_constrained.log \
+            metl_single_protein_models_with_ospool.log \
         --output full_chtc.csv
 
 # Refresh data from remote (pool=ospool or pool=chtc)
