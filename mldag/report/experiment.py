@@ -258,6 +258,41 @@ class ExperimentAnalyzer:
 
         return pd.DataFrame(summary_stats)
 
+    def extract_ospool_site_stats(self) -> pd.DataFrame:
+        """Extract per-site epoch completion statistics for OSPool jobs.
+
+        Breaks out OSPool's aggregate numbers by GLIDEIN Resource Name (the
+        actual site an OSPool job landed on), using the same longest-execution-
+        per-job selection as extract_epoch_stats().
+        """
+        epoch_data = self.df[
+            (self.df['Is Successful']) &
+            (self.df['Execution Duration (seconds)'] > 0) &
+            (self.df['Targeted Resource'] == 'ospool')
+        ].copy()
+
+        if epoch_data.empty:
+            return pd.DataFrame()
+
+        glidein = epoch_data['GLIDEIN Resource Name']
+        epoch_data['Site'] = glidein.where(glidein.notna() & (glidein != ''), 'Unknown')
+
+        longest_executions = epoch_data.loc[
+            epoch_data.groupby(['DAG Source', 'Job Name'])['Execution Duration (seconds)'].idxmax()
+        ].copy()
+
+        summary_stats = []
+        for site in longest_executions['Site'].unique():
+            site_data = longest_executions[longest_executions['Site'] == site]
+            total_time = site_data['Execution Duration (seconds)'].sum()
+            summary_stats.append({
+                'Site': site,
+                'Successful Jobs': len(site_data),
+                'Total Time (hours)': total_time / 3600,
+            })
+
+        return pd.DataFrame(summary_stats).sort_values('Total Time (hours)', ascending=False)
+
     def analyze_gpu_utilization(self) -> Dict:
         """Analyze GPU utilization patterns using longest execution per job."""
         gpu_data = self.df[
@@ -1943,14 +1978,28 @@ class ExperimentAnalyzer:
             report_lines.append("  (no successful jobs in this period)")
             report_lines.append("")
         else:
+            is_ospool = epoch_stats['Resource'].str.lower() == 'ospool'
+            epoch_stats = pd.concat([epoch_stats[~is_ospool], epoch_stats[is_ospool]])
+
             for _, row in epoch_stats.iterrows():
                 report_lines.extend([
                     f"{row['Resource'].upper()}:",
                     f"  • Successful Jobs: {row['Successful Jobs']:,} ({row['Success Rate']:.1%})",
                     f"  • Computation Time: {row['Total Time (hours)']:,.1f} hours",
                     f"  • Time Efficiency: {row['Time Efficiency']:.1%}",
-                    ""
                 ])
+
+                if row['Resource'].lower() == 'ospool':
+                    site_stats = self.extract_ospool_site_stats()
+                    if not site_stats.empty:
+                        report_lines.append("  Sites:")
+                        for _, site_row in site_stats.iterrows():
+                            report_lines.append(
+                                f"    • {site_row['Site']}: {site_row['Successful Jobs']:,} jobs, "
+                                f"{site_row['Total Time (hours)']:,.1f} hours"
+                            )
+
+                report_lines.append("")
 
         if has_completions:
             total_jobs = epoch_stats['Total Jobs'].sum()
