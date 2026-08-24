@@ -68,6 +68,13 @@ available and silently fall back to bare cluster_id/no-op when it isn't:
 # Duration, execute host/site, and resource usage straight from an event log
 mldag-query scan metl.log
 
+# Filter to specific clusters (repeatable; every proc of a matched cluster is kept)
+mldag-query scan metl.log --cluster-id 12345 --cluster-id 12399
+
+# Dump results into provenance.db's condor_history table (source='event_log')
+# instead of/alongside printing them
+mldag-query scan metl.log --db provenance.db
+
 # Backfill provenance.db's condor_history table from HTCondor job history
 # (final host, exit code, hold reasons, requested vs. used resources)
 mldag-query db enrich-history --schedd <name>
@@ -76,6 +83,13 @@ mldag-query db enrich-history --schedd <name>
 `scan` parses any HTCondor event log directly; if `--log-dir`/
 `--provenance-log-dir` happen to point at a DAGMan provenance run's classad or
 NDJSON directories, matching jobs are enriched with `run_id`/`job_name` too.
+Jobs are keyed by `(cluster_id, proc_id)`, not `cluster_id` alone, since a
+`queue N` job array puts many procs under one cluster.
+
+`condor_history` holds rows from either source — `db enrich-history` (queried
+from HTCondor) or `scan --db` (parsed from a raw event log) — distinguished by
+its `source` column, since the two can disagree and neither is definitively
+more current than the other.
 
 `db enrich-history` queries `condor_history` via the HTCondor Python bindings
 (not the CLI) for every cluster_id already in `provenance.db`'s `events`

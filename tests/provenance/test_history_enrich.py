@@ -9,7 +9,11 @@ pytest.importorskip(
 )
 
 from mldag.provenance.db import build_database
-from mldag.provenance.history_enrich import EnrichStats, enrich_from_condor_history
+from mldag.provenance.history_enrich import (
+    EnrichStats,
+    enrich_from_condor_history,
+    write_scan_records,
+)
 
 
 def _write_event(prov_dir: Path, filename: str, events: list[dict]) -> Path:
@@ -41,28 +45,37 @@ def _query(db_path: Path, sql: str, params: tuple = ()) -> list[tuple]:
 
 
 class _FakeSchedd:
-    """Stand-in for htcondor2.Schedd; .history() returns pre-canned ClassAd-like dicts."""
+    """Stand-in for htcondor2.Schedd; .history() returns pre-canned ClassAd-like dicts.
 
-    def __init__(self, ads_by_cluster: dict[int, dict], raise_for: set[int] | None = None):
-        self.ads_by_cluster = ads_by_cluster
+    A cluster_id maps to a single ad or a list of ads (multiple procs under
+    one cluster, e.g. a `queue N` job array).
+    """
+
+    def __init__(
+        self, ads_by_cluster: dict[int, dict | list[dict]], raise_for: set[int] | None = None
+    ):
+        self.ads_by_cluster = {
+            cid: (ads if isinstance(ads, list) else [ads]) for cid, ads in ads_by_cluster.items()
+        }
         self.raise_for = raise_for or set()
         self.history_calls: list[str] = []
 
     def history(self, constraint: str, projection: list[str], match: int):
         self.history_calls.append(constraint)
         for cid in self.raise_for:
-            if str(cid) in constraint:
+            if f"ClusterId == {cid}" in constraint:
                 raise RuntimeError(f"schedd unreachable (simulated) for {cid}")
-        return [
-            ad
-            for cid, ad in self.ads_by_cluster.items()
-            if f"ClusterId == {cid}" in constraint
-        ]
+        result = []
+        for cid, ads in self.ads_by_cluster.items():
+            if f"ClusterId == {cid}" in constraint:
+                result.extend(ads)
+        return result
 
 
-def _ad(cluster_id: int, run_id: str = "run-abc", **overrides) -> dict:
+def _ad(cluster_id: int, run_id: str = "run-abc", proc_id: int = 0, **overrides) -> dict:
     ad = {
         "ClusterId": cluster_id,
+        "ProcId": proc_id,
         "Owner": "iross",
         "JobStatus": 4,
         "ExitCode": 0,
@@ -190,3 +203,101 @@ def test_full_rescan_requeries_already_enriched_cluster_ids(tmp_path, monkeypatc
 
     assert stats.enriched == 1
     assert len(schedd.history_calls) == 2
+
+
+# --- job arrays: many procs under one cluster_id ---
+
+
+def test_job_array_stores_one_row_per_proc(tmp_path, monkeypatch):
+    db_path = _seed_db(tmp_path, [100])
+    schedd = _FakeSchedd({100: [_ad(100, proc_id=0), _ad(100, proc_id=1), _ad(100, proc_id=2)]})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+
+    stats = enrich_from_condor_history(db_path)
+
+    assert stats.enriched == 3
+    rows = _query(
+        db_path, "SELECT cluster_id, proc_id FROM condor_history ORDER BY proc_id"
+    )
+    assert rows == [(100, 0), (100, 1), (100, 2)]
+
+
+def test_second_run_skips_whole_cluster_once_any_proc_is_enriched(tmp_path, monkeypatch):
+    """already_enriched is tracked per cluster_id, so a job array isn't re-queried
+    proc-by-proc -- one condor_history query for a cluster returns every proc."""
+    db_path = _seed_db(tmp_path, [100])
+    schedd = _FakeSchedd({100: [_ad(100, proc_id=0), _ad(100, proc_id=1)]})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    enrich_from_condor_history(db_path)
+
+    stats = enrich_from_condor_history(db_path)
+
+    assert stats.already_enriched == 1
+    assert len(schedd.history_calls) == 1
+
+
+# --- source/status tagging ---
+
+
+def test_condor_history_rows_tagged_source_and_status(tmp_path, monkeypatch):
+    db_path = _seed_db(tmp_path, [100])
+    schedd = _FakeSchedd({100: _ad(100, JobStatus=5)})  # 5 = Held
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+
+    enrich_from_condor_history(db_path)
+
+    rows = _query(db_path, "SELECT source, status FROM condor_history WHERE cluster_id = 100")
+    assert rows == [("condor_history", "held")]
+
+
+# --- write_scan_records: event_log_scan.py output into the same table ---
+
+
+def test_write_scan_records_inserts_with_event_log_source(tmp_path):
+    db_path = tmp_path / "provenance.db"
+    build_database(db_path, [], [])
+    scan_records = [
+        {
+            "cluster_id": 500,
+            "proc_id": 0,
+            "run_id": "run-scan",
+            "site": "gpu01.example.edu",
+            "execute_host": "slot1_1@gpu01.example.edu",
+            "wall_time_s": 1200.0,
+            "cpu_usage": 2.0,
+            "status": "completed",
+        }
+    ]
+
+    written = write_scan_records(db_path, scan_records)
+
+    assert written == 1
+    rows = _query(
+        db_path,
+        "SELECT cluster_id, proc_id, run_id, site, remote_host, remote_wall_clock_s, "
+        "cpus_usage, status, source FROM condor_history WHERE cluster_id = 500",
+    )
+    assert rows == [(500, 0, "run-scan", "gpu01.example.edu", "slot1_1@gpu01.example.edu", 1200.0, 2.0, "completed", "event_log")]
+
+
+def test_write_scan_records_coexists_with_condor_history_rows_for_other_procs(tmp_path, monkeypatch):
+    """event_log and condor_history rows for different procs of the same cluster don't collide."""
+    db_path = _seed_db(tmp_path, [600])
+    schedd = _FakeSchedd({600: _ad(600, proc_id=0)})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+    enrich_from_condor_history(db_path)
+
+    write_scan_records(db_path, [{"cluster_id": 600, "proc_id": 1, "status": "held"}])
+
+    rows = _query(
+        db_path, "SELECT proc_id, source FROM condor_history WHERE cluster_id = 600 ORDER BY proc_id"
+    )
+    assert rows == [(0, "condor_history"), (1, "event_log")]

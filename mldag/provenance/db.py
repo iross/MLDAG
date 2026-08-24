@@ -97,9 +97,16 @@ CREATE TABLE IF NOT EXISTS event_file_state (
     line_count  INTEGER NOT NULL
 );
 
+-- Per-job summary data, from either condor_history (via history_enrich.py)
+-- or a raw event-log scan (via event_log_scan.py) -- `source` distinguishes
+-- which. Keyed by (cluster_id, proc_id): a single cluster_id can hold many
+-- procs (`queue N` job arrays), so cluster_id alone is not unique (see
+-- task-29 -- event_log_scan.py hit the identical bug).
 CREATE TABLE IF NOT EXISTS condor_history (
-    cluster_id        INTEGER PRIMARY KEY,
+    cluster_id        INTEGER NOT NULL,
+    proc_id           INTEGER NOT NULL DEFAULT 0,
     run_id            TEXT,
+    job_name          TEXT,
     owner             TEXT,
     cmd               TEXT,
     job_status        INTEGER,
@@ -113,13 +120,18 @@ CREATE TABLE IF NOT EXISTS condor_history (
     cpus_usage        REAL,
     memory_usage_mb   REAL,
     gpus_usage        REAL,
+    gpu_ids           TEXT,
     resource_name     TEXT,
+    site              TEXT,
+    status            TEXT,
     hold_reason       TEXT,
     qdate             TEXT,
     job_start_date    TEXT,
     completion_date   TEXT,
+    source            TEXT NOT NULL,
     classad_json      TEXT NOT NULL,
-    queried_at        TEXT NOT NULL
+    queried_at        TEXT NOT NULL,
+    PRIMARY KEY (cluster_id, proc_id)
 );
 """
 

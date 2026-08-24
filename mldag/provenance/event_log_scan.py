@@ -134,6 +134,7 @@ def scan_event_log(
     *,
     log_dir: str | Path | None = None,
     provenance_log_dir: str | Path | None = None,
+    cluster_ids: list[int] | None = None,
 ) -> list[dict]:
     """Summarize every job in log_path: duration, execute host/site, resource usage.
 
@@ -152,6 +153,10 @@ def scan_event_log(
             job_name recovered from this log's own DAGNodeName lines is
             looked up against `job.submitted` records there to resolve a
             run_id. Silently skipped when unavailable or unmatched.
+        cluster_ids: Optional allowlist of cluster_ids to include; every
+            proc of a matching cluster_id is kept. All others are skipped
+            without being parsed into a record at all. None (the default)
+            scans every cluster_id in the log.
 
     Returns:
         One dict per (cluster_id, proc_id) seen, sorted by cluster_id then
@@ -163,6 +168,7 @@ def scan_event_log(
     """
     log_path = Path(log_path)
     records: dict[tuple[int, int], dict] = {}
+    wanted = set(cluster_ids) if cluster_ids is not None else None
 
     block_code: str | None = None
     block_cluster_id: int | None = None
@@ -173,7 +179,8 @@ def scan_event_log(
     def flush() -> None:
         nonlocal block_code, block_cluster_id, block_proc_id, block_ts, block_lines
         if block_code is not None and block_cluster_id is not None and block_proc_id is not None:
-            _flush_block(records, block_code, block_cluster_id, block_proc_id, block_ts, block_lines)
+            if wanted is None or block_cluster_id in wanted:
+                _flush_block(records, block_code, block_cluster_id, block_proc_id, block_ts, block_lines)
         block_code, block_cluster_id, block_proc_id, block_ts, block_lines = None, None, None, None, []
 
     for raw_line in log_path.read_text(errors="replace").splitlines():
