@@ -474,8 +474,53 @@ def test_enrich_from_jobad_events_never_writes_usage_fields(tmp_path):
     assert row == (None, None, None, None)
 
 
-def test_enrich_from_jobad_events_ignores_events_without_cluster_id(tmp_path):
+def test_enrich_from_jobad_events_skips_when_no_backfill_source_available(tmp_path):
+    """No cluster_id on the event itself, and no other event shares its run_id
+    to backfill from -- must be skipped, not crash."""
     db_path = _seed_jobad_event(tmp_path, "run-no-cluster", "run-no-cluster.ndjson", resource_name="X")
+
+    written = enrich_from_jobad_events(db_path)
+
+    assert written == 0
+    assert _query(db_path, "SELECT COUNT(*) FROM condor_history")[0] == (0,)
+
+
+def test_enrich_from_jobad_events_backfills_cluster_id_via_shared_run_id(tmp_path):
+    """Regression test: a job.assigned event written before capture_job_ad_fields()
+    included cluster_id (pre-v0.1.0rc21) is backfilled from any other event
+    sharing its run_id."""
+    prov_dir = tmp_path / "provenance"
+    _write_event(
+        prov_dir, "run-old.ndjson",
+        [
+            {"type": "job.assigned", "run_id": "run-old", "ts": "2026-06-01T00:00:00Z", "resource_name": "X"},
+            {"type": "job.executing", "run_id": "run-old", "ts": "2026-06-01T00:01:00Z", "cluster_id": 1000},
+        ],
+    )
+    db_path = tmp_path / "provenance.db"
+    build_database(db_path, [], [prov_dir])
+
+    written = enrich_from_jobad_events(db_path)
+
+    assert written == 1
+    row = _query(
+        db_path, "SELECT cluster_id, proc_id, resource_name FROM condor_history WHERE run_id = 'run-old'"
+    )
+    assert row == [(1000, 0, "X")]
+
+
+def test_enrich_from_jobad_events_backfill_ignores_unrelated_run_ids(tmp_path):
+    """A cluster_id-bearing event for a DIFFERENT run_id must not leak in."""
+    prov_dir = tmp_path / "provenance"
+    _write_event(
+        prov_dir, "events.ndjson",
+        [
+            {"type": "job.assigned", "run_id": "run-a", "ts": "2026-06-01T00:00:00Z"},
+            {"type": "job.executing", "run_id": "run-b", "ts": "2026-06-01T00:01:00Z", "cluster_id": 2000},
+        ],
+    )
+    db_path = tmp_path / "provenance.db"
+    build_database(db_path, [], [prov_dir])
 
     written = enrich_from_jobad_events(db_path)
 
