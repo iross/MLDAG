@@ -53,25 +53,34 @@ from mldag.provenance.post import _SENSITIVE_AD_KEYS, run_id_from_classad
 
 logger = logging.getLogger(__name__)
 
-# ClassAd attribute -> condor_history column name.
+# ClassAd attribute -> condor_history column name. Args (not Arguments),
+# RequestGPUs (not RequestGpus), and JOBGLIDEIN_ResourceName/
+# MachineAttrGLIDEIN_ResourceName0/MachineAttrMachine0 (not
+# GLIDEIN_ResourceName) are HTCondor's actual attribute names for this
+# repo's submit descriptions -- confirmed against a live job's
+# $_CONDOR_JOB_AD, not stylistic choices. See post.py's
+# _DEFAULT_FIELD_MAPPING, which this mirrors (including the
+# resource_name/glidein_resource_name split documented there).
 _FIELD_MAPPING = {
     "ClusterId": "cluster_id",
     "ProcId": "proc_id",
     "Owner": "owner",
     "Cmd": "cmd",
-    "Arguments": "arguments",
+    "Args": "arguments",
     "JobStatus": "job_status",
     "ExitCode": "exit_code",
     "RemoteHost": "remote_host",
     "LastRemoteHost": "last_remote_host",
     "RequestCpus": "request_cpus",
     "RequestMemory": "request_memory",
-    "RequestGpus": "request_gpus",
+    "RequestGPUs": "request_gpus",
     "RemoteWallClockTime": "remote_wall_clock_s",
     "CPUsUsage": "cpus_usage",
     "MemoryUsage": "memory_usage_mb",
     "GPUsUsage": "gpus_usage",
-    "GLIDEIN_ResourceName": "resource_name",
+    "JOBGLIDEIN_ResourceName": "resource_name",
+    "MachineAttrGLIDEIN_ResourceName0": "glidein_resource_name",
+    "MachineAttrMachine0": "machine",
     "HoldReason": "hold_reason",
     "QDate": "qdate",
     "JobStartDate": "job_start_date",
@@ -133,6 +142,8 @@ _JOBAD_FIELD_MAPPING = {
     "proc_id": "proc_id",
     "run_id": "run_id",
     "resource_name": "resource_name",
+    "glidein_resource_name": "glidein_resource_name",
+    "machine": "machine",
     "arguments": "arguments",
     "request_cpus": "request_cpus",
     "request_memory": "request_memory",
@@ -252,6 +263,17 @@ def enrich_from_jobad_events(db_path: str | Path) -> int:
     mldag.provenance.db.build_database -- this reads it from there rather
     than re-scanning NDJSON directly, so it only ever needs provenance.db.
 
+    capture_job_ad_fields() only started including cluster_id/proc_id as of
+    v0.1.0rc21 -- a job.assigned event written by an older mldag version has
+    neither. For those, cluster_id is backfilled by cross-referencing any
+    other event carrying the same run_id (job.executing/job.queued/etc, from
+    log_monitor.py, always carry both run_id and cluster_id together); a
+    job.assigned with no cluster_id of its own and no cluster_id-bearing
+    event sharing its run_id is skipped, not counted. proc_id defaults to 0
+    when backfilled this way (matching every other DAGMan-submitted job --
+    see event_log_scan.py's job-array handling for the one case where that
+    assumption doesn't hold).
+
     Args:
         db_path: Path to the provenance SQLite database (see mldag.provenance.db).
 
@@ -262,19 +284,33 @@ def enrich_from_jobad_events(db_path: str | Path) -> int:
     conn = sqlite3.connect(db_path)
     try:
         _init_schema(conn)
+        run_id_to_cluster_id = {
+            run_id: cluster_id
+            for run_id, cluster_id in conn.execute(
+                "SELECT run_id, CAST(json_extract(payload_json, '$.cluster_id') AS INTEGER) "
+                "FROM events WHERE json_extract(payload_json, '$.cluster_id') IS NOT NULL"
+            )
+        }
         rows = conn.execute(
-            "SELECT payload_json FROM events WHERE type = 'job.assigned' "
-            "AND json_extract(payload_json, '$.cluster_id') IS NOT NULL"
+            "SELECT run_id, payload_json FROM events WHERE type = 'job.assigned'"
         ).fetchall()
-        for (payload_json,) in rows:
+        count = 0
+        for run_id, payload_json in rows:
             event = json.loads(payload_json)
+            if "cluster_id" not in event:
+                cluster_id = run_id_to_cluster_id.get(run_id)
+                if cluster_id is None:
+                    continue
+                event["cluster_id"] = cluster_id
+            event.setdefault("proc_id", 0)
             row = _row_from_jobad_event(event)
             row["queried_at"] = now
             _upsert_history_row(conn, row)
+            count += 1
         conn.commit()
     finally:
         conn.close()
-    return len(rows)
+    return count
 
 
 _MERGE_COLUMNS = [

@@ -30,16 +30,33 @@ _SENSITIVE_AD_KEYS = {"Environment"}
 
 # Used when no field-mapping file is configured or the configured file
 # doesn't exist, so existing deployments keep working with zero config.
+#
+# Args (not Arguments): every submit description in this repo uses unquoted
+# old-syntax `arguments = ...`, which HTCondor stores as the ClassAd
+# attribute Args, not Arguments (that name is only used for quoted
+# new-syntax arguments). RequestGPUs and MachineAttr* casing/naming below
+# are likewise HTCondor's actual attribute names, confirmed against a live
+# job's $_CONDOR_JOB_AD -- not stylistic choices.
+#
+# resource_name comes from JOBGLIDEIN_ResourceName rather than
+# MachineAttrGLIDEIN_ResourceName0: the latter is only populated for actual
+# OSPool glidein matches and is `undefined` for CHTC's own direct resources,
+# where JOBGLIDEIN_ResourceName instead reads "Local Job" -- always
+# populated either way. glidein_resource_name keeps the raw MachineAttr
+# value too (null for CHTC-direct jobs), for callers that specifically want
+# to distinguish an actual glidein match from a local one.
 _DEFAULT_FIELD_MAPPING = {
     "RemoteWallClockTime": "wall_time_s",
     "CPUsUsage": "cpu_usage",
     "MemoryUsage": "peak_memory_mb",
     "GPUsUsage": "gpu_usage",
-    "GLIDEIN_ResourceName": "resource_name",
-    "Arguments": "arguments",
+    "JOBGLIDEIN_ResourceName": "resource_name",
+    "MachineAttrGLIDEIN_ResourceName0": "glidein_resource_name",
+    "MachineAttrMachine0": "machine",
+    "Args": "arguments",
     "RequestCpus": "request_cpus",
     "RequestMemory": "request_memory",
-    "RequestGpus": "request_gpus",
+    "RequestGPUs": "request_gpus",
 }
 
 
@@ -98,6 +115,12 @@ def parse_classad(path: Path | str) -> dict:
             if not m:
                 continue
             key, raw = m.group(1), m.group(2).strip()
+            if raw.lower() == "undefined":
+                # ClassAd's undefined literal means "not defined" -- the closest
+                # equivalent is omitting the key entirely, so `ad_key in ad`
+                # checks downstream treat it the same as a genuinely absent
+                # attribute rather than capturing the string "undefined".
+                continue
             if raw.startswith('"') and raw.endswith('"'):
                 attrs[key] = raw[1:-1]
             else:

@@ -33,7 +33,9 @@ SAMPLE_AD = {
     "CPUsUsage": 0.98,
     "MemoryUsage": 4096,
     "GPUsUsage": 0.87,
-    "GLIDEIN_ResourceName": "CHTC-Spark-CE1",
+    "JOBGLIDEIN_ResourceName": "CHTC-Spark-CE1",
+    "MachineAttrGLIDEIN_ResourceName0": "CHTC-Spark-CE1",
+    "MachineAttrMachine0": "gpu08.chtc.wisc.edu",
     "Environment": "PROVENANCE_RUN_ID=run-abc123 OTHER=val",
 }
 
@@ -71,6 +73,17 @@ def test_parse_classad_skips_blank_lines(tmp_path):
     assert ad["MemoryUsage"] == 512
 
 
+def test_parse_classad_undefined_literal_omitted(tmp_path):
+    """ClassAd's bare `undefined` (not a quoted string) means "not defined" --
+    confirmed against a real job ad (MachineAttrGLIDEIN_ResourceName0 = undefined
+    on a CHTC-direct, non-glidein resource). Must not become the string
+    "undefined"."""
+    (tmp_path / "12345.ad").write_text("MachineAttrGLIDEIN_ResourceName0 = undefined\nMemoryUsage = 512\n")
+    ad = parse_classad(tmp_path / "12345.ad")
+    assert "MachineAttrGLIDEIN_ResourceName0" not in ad
+    assert ad["MemoryUsage"] == 512
+
+
 # --- run_id_from_classad ---
 
 
@@ -100,6 +113,8 @@ def test_resource_fields_all_present(tmp_path):
     assert fields["peak_memory_mb"] == 4096
     assert abs(fields["gpu_usage"] - 0.87) < 1e-9
     assert fields["resource_name"] == "CHTC-Spark-CE1"
+    assert fields["glidein_resource_name"] == "CHTC-Spark-CE1"
+    assert fields["machine"] == "gpu08.chtc.wisc.edu"
 
 
 def test_resource_fields_no_gpu(tmp_path):
@@ -111,10 +126,25 @@ def test_resource_fields_no_gpu(tmp_path):
 
 
 def test_resource_fields_no_glidein(tmp_path):
-    ad = {k: v for k, v in SAMPLE_AD.items() if k != "GLIDEIN_ResourceName"}
+    ad = {
+        k: v for k, v in SAMPLE_AD.items()
+        if k not in ("JOBGLIDEIN_ResourceName", "MachineAttrGLIDEIN_ResourceName0")
+    }
     _write_ad(tmp_path, ad)
     fields = resource_fields_from_classad(parse_classad(tmp_path / "12345.ad"))
     assert "resource_name" not in fields
+    assert "glidein_resource_name" not in fields
+
+
+def test_resource_fields_chtc_direct_job_glidein_attrs_undefined(tmp_path):
+    """On CHTC's own (non-glidein) resources, MachineAttrGLIDEIN_ResourceName0
+    is the ClassAd literal `undefined`, but JOBGLIDEIN_ResourceName is always
+    populated ("Local Job" in this case) -- confirmed against a live job."""
+    p = tmp_path / "12345.ad"
+    p.write_text('JOBGLIDEIN_ResourceName = "Local Job"\nMachineAttrGLIDEIN_ResourceName0 = undefined\n')
+    fields = resource_fields_from_classad(parse_classad(p))
+    assert fields["resource_name"] == "Local Job"
+    assert "glidein_resource_name" not in fields
 
 
 def test_resource_fields_empty_ad():
@@ -127,7 +157,7 @@ def test_resource_fields_empty_ad():
 def test_load_classad_field_mapping_none_path_returns_defaults():
     mapping = load_classad_field_mapping(None)
     assert mapping == _DEFAULT_FIELD_MAPPING
-    assert mapping["Arguments"] == "arguments"
+    assert mapping["Args"] == "arguments"
 
 
 def test_load_classad_field_mapping_missing_file_returns_defaults(tmp_path):
@@ -164,7 +194,7 @@ def test_load_classad_field_mapping_rejects_sensitive_key_in_bare_list(tmp_path)
 
 
 def test_resource_fields_with_custom_mapping_includes_arguments(tmp_path):
-    ad = {**SAMPLE_AD, "Arguments": "pretrain.sh --lr 0.001"}
+    ad = {**SAMPLE_AD, "Args": "pretrain.sh --lr 0.001"}
     _write_ad(tmp_path, ad)
     parsed = parse_classad(tmp_path / "12345.ad")
     fields = resource_fields_from_classad(parsed, load_classad_field_mapping(None))

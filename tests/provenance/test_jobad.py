@@ -17,11 +17,13 @@ def _write_job_ad(path: Path, attrs: dict) -> None:
 
 
 SAMPLE_JOB_AD = {
-    "Arguments": "pretrain_local.sh 30 run-abc123 42",
+    "Args": "pretrain_local.sh 30 run-abc123 42",
     "RequestCpus": 4,
     "RequestMemory": 65536,
-    "RequestGpus": 1,
-    "GLIDEIN_ResourceName": "CHTC-Spark-CE1",
+    "RequestGPUs": 1,
+    "JOBGLIDEIN_ResourceName": "CHTC-Spark-CE1",
+    "MachineAttrGLIDEIN_ResourceName0": "CHTC-Spark-CE1",
+    "MachineAttrMachine0": "gpu08.chtc.wisc.edu",
     "ClusterId": 12345,
 }
 
@@ -48,6 +50,8 @@ def test_capture_job_ad_fields_returns_default_mapping_fields(tmp_path):
     assert fields["request_memory"] == 65536
     assert fields["request_gpus"] == 1
     assert fields["resource_name"] == "CHTC-Spark-CE1"
+    assert fields["glidein_resource_name"] == "CHTC-Spark-CE1"
+    assert fields["machine"] == "gpu08.chtc.wisc.edu"
     # cluster_id/proc_id are structural identifiers, always included
     # regardless of the configured mapping -- not "leaked" past a blocklist.
     assert fields["cluster_id"] == 12345

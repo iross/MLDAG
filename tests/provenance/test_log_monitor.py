@@ -28,7 +28,7 @@ def _write_ad(ad_dir: Path, cluster_id: int, run_id: str) -> None:
     ad_dir.mkdir(parents=True, exist_ok=True)
     (ad_dir / f"{cluster_id}.ad").write_text(
         f'Environment = "PROVENANCE_RUN_ID={run_id} OTHER=val"\n'
-        f'GLIDEIN_ResourceName = "Expanse"\n'
+        f'JOBGLIDEIN_ResourceName = "Expanse"\n'
         f"RemoteWallClockTime = 3600\n"
     )
 
