@@ -140,7 +140,7 @@ def test_scan_enriches_resource_name_from_classad(tmp_path):
     ad_dir.mkdir()
     (ad_dir / "42.ad").write_text(
         'Environment = "PROVENANCE_RUN_ID=run-from-ad OTHER=val"\n'
-        'GLIDEIN_ResourceName = "Expanse"\n'
+        'JOBGLIDEIN_ResourceName = "Expanse"\n'
     )
     log = tmp_path / "metl.log"
     _write(log, "012 (42.000.000) 2026-06-01 08:00:00 Job was held.\n...\n")

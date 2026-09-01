@@ -430,7 +430,9 @@ def test_enrich_from_jobad_events_writes_condor_history_row(tmp_path):
         "run-jobad.ndjson",
         cluster_id=800,
         proc_id=0,
-        resource_name="CHTC-Spark-CE1",
+        resource_name="Local Job",
+        glidein_resource_name="CHTC-Spark-CE1",
+        machine="gpu08.chtc.wisc.edu",
         arguments="pretrain_local.sh 30 run-jobad 42",
         request_cpus=4,
         request_memory=65536,
@@ -442,10 +444,14 @@ def test_enrich_from_jobad_events_writes_condor_history_row(tmp_path):
     assert written == 1
     row = _query(
         db_path,
-        "SELECT run_id, resource_name, arguments, request_cpus, request_memory, "
-        "request_gpus, source FROM condor_history WHERE cluster_id = 800",
+        "SELECT run_id, resource_name, glidein_resource_name, machine, arguments, "
+        "request_cpus, request_memory, request_gpus, source "
+        "FROM condor_history WHERE cluster_id = 800",
     )[0]
-    assert row == ("run-jobad", "CHTC-Spark-CE1", "pretrain_local.sh 30 run-jobad 42", 4, 65536, 1, "jobad")
+    assert row == (
+        "run-jobad", "Local Job", "CHTC-Spark-CE1", "gpu08.chtc.wisc.edu",
+        "pretrain_local.sh 30 run-jobad 42", 4, 65536, 1, "jobad",
+    )
 
 
 def test_enrich_from_jobad_events_never_writes_usage_fields(tmp_path):

@@ -133,6 +133,8 @@ CREATE TABLE IF NOT EXISTS condor_history (
     gpus_usage        REAL,
     gpu_ids           TEXT,
     resource_name     TEXT,
+    glidein_resource_name TEXT,
+    machine           TEXT,
     site              TEXT,
     status            TEXT,
     hold_reason       TEXT,
@@ -185,7 +187,8 @@ def _drop_stale_condor_history(conn: sqlite3.Connection) -> None:
     CREATE TABLE IF NOT EXISTS never touches an existing table, so every
     provenance.db built under those releases hits `OperationalError: no such
     column: source` the moment enrich-history/enrich-jobad/scan --db runs
-    against it under a newer release.
+    against it under a newer release. The same applies to any later column
+    added to the schema (e.g. 'machine') -- listed alongside 'source' below.
 
     Unlike checkpoints/events, condor_history has no incremental ingestion
     state (no byte offsets or mtimes to preserve) -- every row is fully
@@ -195,11 +198,13 @@ def _drop_stale_condor_history(conn: sqlite3.Connection) -> None:
     rebuild of checkpoints/events too.
     """
     columns = {row[1] for row in conn.execute("PRAGMA table_info(condor_history)")}
-    if columns and "source" not in columns:
+    missing = {"source", "machine", "glidein_resource_name"} - columns
+    if columns and missing:
         logger.warning(
-            "condor_history predates the current schema (missing 'source' column); "
+            "condor_history predates the current schema (missing %s); "
             "dropping and recreating it -- rerun db enrich-history/enrich-jobad or "
-            "scan --db to repopulate it."
+            "scan --db to repopulate it.",
+            sorted(missing),
         )
         conn.execute("DROP TABLE condor_history")
 
