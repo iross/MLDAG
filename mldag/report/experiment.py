@@ -30,7 +30,8 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 class ExperimentAnalyzer:
     """Main class for analyzing experiment data and generating reports."""
 
-    def __init__(self, csv_file: str, output_dir: str = "reports", hours: Optional[int] = None):
+    def __init__(self, csv_file: str, output_dir: str = "reports", hours: Optional[int] = None,
+                 start_date: Optional[str] = None, end_date: Optional[str] = None):
         """Initialize the analyzer with data file and output directory."""
         self.csv_file = Path(csv_file)
         self.output_dir = Path(output_dir)
@@ -45,6 +46,10 @@ class ExperimentAnalyzer:
         if hours is not None:
             self.df = self._filter_recent(self.df, hours)
             print(f"Filtered to jobs active in the last {hours} hours: {len(self.df)} attempts")
+
+        if start_date is not None or end_date is not None:
+            self.df = self._filter_date_range(self.df, start_date, end_date)
+            print(f"Filtered to jobs active between {start_date} and {end_date}: {len(self.df)} attempts")
 
         self.validate_data()
 
@@ -108,6 +113,23 @@ class ExperimentAnalyzer:
         mask = pd.Series(False, index=df.index)
         for col in present_cols:
             mask |= df[col].notna() & (df[col] >= cutoff)
+        return df[mask].copy()
+
+    def _filter_date_range(self, df: pd.DataFrame, start_date: Optional[str],
+                            end_date: Optional[str]) -> pd.DataFrame:
+        """Return rows where any timing column falls within [start_date, end_date]."""
+        start = pd.to_datetime(start_date) if start_date else pd.Timestamp.min
+        end = pd.to_datetime(end_date) if end_date else pd.Timestamp.max
+        if start_date and end_date and start > end:
+            raise ValueError(f"start_date ({start_date}) must not be after end_date ({end_date})")
+        # Include the entire end_date day.
+        if end_date:
+            end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        activity_cols = ['Submit Time', 'Start Time', 'End Time']
+        present_cols = [c for c in activity_cols if c in df.columns]
+        mask = pd.Series(False, index=df.index)
+        for col in present_cols:
+            mask |= df[col].notna() & (df[col] >= start) & (df[col] <= end)
         return df[mask].copy()
 
     def validate_data(self):
@@ -2188,6 +2210,9 @@ Examples:
 
   # Generate monthly reports for September with custom output
   python experiment_report.py job_summary.csv --month 9 --output-dir september_reports/
+
+  # Generate reports for a custom date range
+  python experiment_report.py --start-date 2025-10-01 --end-date 2026-09-30 --output-dir fy26_reports/
         """
     )
 
@@ -2199,14 +2224,22 @@ Examples:
                        help="Generate monthly reports for specific month (1-12, e.g., 10 for October)")
     parser.add_argument("--hours", type=int, metavar="N",
                        help="Restrict analysis to jobs active in the last N hours (e.g., 24)")
+    parser.add_argument("--start-date", metavar="DATE",
+                       help="Restrict analysis to jobs active on or after this date (e.g., 2025-10-01)")
+    parser.add_argument("--end-date", metavar="DATE",
+                       help="Restrict analysis to jobs active on or before this date (e.g., 2026-09-30)")
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Enable verbose output")
 
     args = parser.parse_args()
 
+    if args.hours is not None and (args.start_date or args.end_date):
+        parser.error("--hours cannot be combined with --start-date/--end-date")
+
     try:
         # Create analyzer and generate reports
-        analyzer = ExperimentAnalyzer(args.input_file, args.output_dir, hours=args.hours)
+        analyzer = ExperimentAnalyzer(args.input_file, args.output_dir, hours=args.hours,
+                                       start_date=args.start_date, end_date=args.end_date)
         analyzer.generate_all_reports(monthly_report_month=args.month)
 
     except FileNotFoundError as e:
