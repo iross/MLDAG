@@ -69,7 +69,7 @@ generate-report-dated pool="ospool":
 # Complete workflow: generate CSV and dated report
 full-report pool="ospool":
     just _csv-{{ pool }}
-    uv run mldag-report full_{{ pool }}.csv --output-dir `date +"%Y-%m-%d"`
+    uv run mldag-report full_{{ pool }}.csv --output-dir {{ pool }}_`date +"%Y-%m-%d"`
 
 # Summarize the last 24 hours of job activity
 daily-summary pool="ospool":
@@ -94,7 +94,12 @@ hourly-site hours="24":
 # Monthly report (e.g. just monthly-report chtc 10)
 monthly-report pool="ospool" month=MONTH:
     just _csv-{{ pool }}
-    uv run mldag-report full_{{ pool }}.csv --month {{ month }} --output-dir month_{{ month }}_reports
+    uv run mldag-report full_{{ pool }}.csv --month {{ month }} --output-dir {{ pool }}_month_{{ month }}_reports
+
+# Report for a custom date range (e.g. just date-range-report 2025-10-01 2026-09-30 ospool)
+date-range-report start end pool="ospool":
+    just _csv-{{ pool }}
+    uv run mldag-report full_{{ pool }}.csv --start-date {{ start }} --end-date {{ end }} --output-dir {{ pool }}_{{ start }}_to_{{ end }}_reports
 
 _csv-global-pretraining:
     uv run mldag-csv \
