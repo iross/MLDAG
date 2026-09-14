@@ -37,19 +37,24 @@ class Experiment(BaseModel):
     def __init__(self, **data) -> None:
       super().__init__(**data)
 
-    def _add_var_permutations(self):
-        """ 
-        Get all the combinations of the vars dictionary and return a list of dict holding the values for each combination.
+    def _add_var_permutations(self, resources: Optional[list[Resource]] = None):
         """
+        Get all the combinations of the vars dictionary and return a list of dict holding the values for each combination.
+        Resources are assigned round-robin across the generated training runs, cycling within
+        a run across its epoch stages, so a resources.yaml passed in here actually gets used.
+        """
+        resources = resources or [Resource(name="default")]
         var_names = list(self.vars.keys())
         value_lists = [self.vars[var] if isinstance(self.vars[var], list) else [self.vars[var]] for var in var_names]
 
         # Use itertools.product to generate all combinations
         from itertools import product
-        for values in product(*value_lists):
+        for run_index, values in enumerate(product(*value_lists)):
             # Create dict mapping var names to values for this combination
             var_dict = dict(zip(var_names, values))
-            self.training_runs.append(TrainingRun(**{"resources": [Resource(name="default")], "epochs": var_dict['epochs'], "epochs_per_job": var_dict['epochs_per_job'], "vars": var_dict}))
+            num_stages = max(1, var_dict['epochs'] // var_dict['epochs_per_job'])
+            run_resources = [resources[(run_index + stage) % len(resources)] for stage in range(num_stages)]
+            self.training_runs.append(TrainingRun(**{"resources": run_resources, "epochs": var_dict['epochs'], "epochs_per_job": var_dict['epochs_per_job'], "vars": var_dict}))
 
     def _add_resource_permutations(self, resources: list[Resource]) -> list[TrainingRun]:
         """
