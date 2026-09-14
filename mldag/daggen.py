@@ -235,15 +235,10 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     Path(PROVENANCE_DIR).mkdir(parents=True, exist_ok=True)
 
     # Grab the resources, if targeting is desired
-    resources = []
-#    resources = get_ospool_resources()
-    resources += get_resources_from_yaml()
+    resources = get_resources_from_yaml()
 
     # Create experiment permutations and expansion
-    # TODO: It doesn't really make sense to do both resource and var expansions,
-    # but should be mulled over a bit
-    # experiment._add_var_permutations()
-    experiment._add_var_permutations()
+    experiment._add_var_permutations(resources)
 
     # Create job descriptions for each resource.
     resources = []
