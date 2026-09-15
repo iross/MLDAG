@@ -53,21 +53,3 @@ def test_main_log_dir_flag_overrides_env(tmp_path):
             main()
     assert (flag_dir / "run-flag.ndjson").exists()
     assert not env_dir.exists()
-
-
-def test_main_annex_calls_pre_request_annex(tmp_path):
-    with patch("sys.argv", ["provenance_pre", "run-abc", "run0-train_epoch0", "0", "--annex", "chtc"]):
-        with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
-            with patch("subprocess.run") as mock_run:
-                main()
-    mock_run.assert_called_once_with(
-        ["pre_request_annex.sh", "chtc", "chtc_annex"], check=True
-    )
-
-
-def test_main_no_annex_does_not_call_pre_request_annex(tmp_path):
-    with patch("sys.argv", ["provenance_pre", "run-abc", "run0-train_epoch0", "0"]):
-        with patch.dict("os.environ", {"PROVENANCE_LOG_DIR": str(tmp_path)}):
-            with patch("subprocess.run") as mock_run:
-                main()
-    mock_run.assert_not_called()

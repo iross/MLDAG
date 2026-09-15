@@ -114,10 +114,6 @@ def get_script(
     # --log-dir is baked in here rather than left to PROVENANCE_LOG_DIR so
     # pre.py can never resolve a different directory than log_monitor does.
     pre_args = f'{job.run_uuid} {job.name} {job.epoch} --log-dir {PROVENANCE_DIR}'
-    if resource.resource_type == ResourceType.ANNEX and resource.annex:
-        # --annex tells pre.py to chain pre_request_annex.sh via subprocess.
-        # DAGMan allows only one SCRIPT PRE per node.
-        pre_args += f' --annex {resource.name}'
     # --run-id, --log-dir, and --fields-file must come before --post-hook
     # because --post-hook uses REMAINDER. --fields-file is baked in here for
     # the same reason --log-dir is: post.py should never have to guess which
