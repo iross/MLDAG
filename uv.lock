@@ -316,6 +316,16 @@ wheels = [
 ]
 
 [[package]]
+name = "htprovenance"
+version = "0.1.0rc1"
+source = { git = "https://github.com/iross/htprovenance.git?rev=v0.1.0rc1#9c86a67f26b71f31f7c1641cb0bff5c923d2c892" }
+dependencies = [
+    { name = "htcondor", marker = "sys_platform == 'linux'" },
+    { name = "pyyaml" },
+    { name = "typer" },
+]
+
+[[package]]
 name = "idna"
 version = "3.11"
 source = { registry = "https://pypi.org/simple" }
@@ -551,6 +561,7 @@ dependencies = [
     { name = "elasticsearch", version = "9.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "elasticsearch", version = "9.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "htcondor", marker = "sys_platform == 'linux'" },
+    { name = "htprovenance" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
@@ -573,6 +584,7 @@ dev = [
 requires-dist = [
     { name = "elasticsearch", specifier = ">=9.1.2" },
     { name = "htcondor", marker = "sys_platform == 'linux'", specifier = ">=25.8.2" },
+    { name = "htprovenance", git = "https://github.com/iross/htprovenance.git?rev=v0.1.0rc1" },
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "pandas", specifier = ">=2.3.2" },

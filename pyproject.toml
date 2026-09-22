@@ -9,6 +9,10 @@ description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    # Provenance capture/querying, split out of this repo (task-31). Pinned to a
+    # git tag until htprovenance is published to an index, matching how this
+    # package itself is currently consumed.
+    "htprovenance @ git+https://github.com/iross/htprovenance.git@v0.1.0rc1",
     "elasticsearch>=9.1.2",
     "matplotlib>=3.9.4",
     "numpy>=2.0.2",
