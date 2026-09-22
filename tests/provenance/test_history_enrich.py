@@ -403,6 +403,21 @@ def test_condor_history_write_does_not_erase_event_log_only_fields(tmp_path, mon
     assert row == ("iross", "gpu02.example.edu", "run0-epoch0", "condor_history,event_log")
 
 
+def test_enrich_from_condor_history_captures_job_batch_name(tmp_path, monkeypatch):
+    db_path = _seed_db(tmp_path, [703])
+    schedd = _FakeSchedd({703: _ad(703, JobBatchName="gb1-pretrain")})
+    monkeypatch.setattr(
+        "mldag.provenance.history_enrich._get_schedd", lambda *a, **k: schedd
+    )
+
+    enrich_from_condor_history(db_path)
+
+    (job_batch_name,) = _query(
+        db_path, "SELECT job_batch_name FROM condor_history WHERE cluster_id = 703"
+    )[0]
+    assert job_batch_name == "gb1-pretrain"
+
+
 def test_second_condor_history_write_updates_changed_fields(tmp_path, monkeypatch):
     """A later condor_history write (e.g. job finished) updates fields it has new data for."""
     db_path = _seed_db(tmp_path, [702])
@@ -433,6 +448,7 @@ def test_enrich_from_jobad_events_writes_condor_history_row(tmp_path):
         resource_name="Local Job",
         glidein_resource_name="CHTC-Spark-CE1",
         machine="gpu08.chtc.wisc.edu",
+        job_batch_name="gb1-pretrain",
         arguments="pretrain_local.sh 30 run-jobad 42",
         request_cpus=4,
         request_memory=65536,
@@ -444,12 +460,12 @@ def test_enrich_from_jobad_events_writes_condor_history_row(tmp_path):
     assert written == 1
     row = _query(
         db_path,
-        "SELECT run_id, resource_name, glidein_resource_name, machine, arguments, "
-        "request_cpus, request_memory, request_gpus, source "
+        "SELECT run_id, resource_name, glidein_resource_name, machine, job_batch_name, "
+        "arguments, request_cpus, request_memory, request_gpus, source "
         "FROM condor_history WHERE cluster_id = 800",
     )[0]
     assert row == (
-        "run-jobad", "Local Job", "CHTC-Spark-CE1", "gpu08.chtc.wisc.edu",
+        "run-jobad", "Local Job", "CHTC-Spark-CE1", "gpu08.chtc.wisc.edu", "gb1-pretrain",
         "pretrain_local.sh 30 run-jobad 42", 4, 65536, 1, "jobad",
     )
 

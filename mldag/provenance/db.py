@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS condor_history (
     resource_name     TEXT,
     glidein_resource_name TEXT,
     machine           TEXT,
+    job_batch_name    TEXT,
     site              TEXT,
     status            TEXT,
     hold_reason       TEXT,
@@ -198,7 +199,7 @@ def _drop_stale_condor_history(conn: sqlite3.Connection) -> None:
     rebuild of checkpoints/events too.
     """
     columns = {row[1] for row in conn.execute("PRAGMA table_info(condor_history)")}
-    missing = {"source", "machine", "glidein_resource_name"} - columns
+    missing = {"source", "machine", "glidein_resource_name", "job_batch_name"} - columns
     if columns and missing:
         logger.warning(
             "condor_history predates the current schema (missing %s); "

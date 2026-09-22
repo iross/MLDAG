@@ -57,6 +57,7 @@ _DEFAULT_FIELD_MAPPING = {
     "RequestCpus": "request_cpus",
     "RequestMemory": "request_memory",
     "RequestGPUs": "request_gpus",
+    "JobBatchName": "job_batch_name",
 }
 
 
