@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mldag"
-version = "0.1.0rc26"
+version = "0.1.0rc27"
 description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -41,6 +41,17 @@ Repository = "https://github.com/iross/MLDAG"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mldag"]
+
+# Installs a .pth file that imports mldag.provenance._autorun at the start of
+# every Python process in this environment -- the zero-config auto-capture
+# hook (see mldag/provenance/_autorun.py and autocapture.py). hatch-autorun
+# is a build-time-only dependency (used by hatchling while building the
+# wheel, never installed alongside mldag itself) maintained by hatchling's
+# own author specifically for this .pth-injection pattern, avoiding the
+# editable-install/load-ordering pitfalls of hand-writing a custom build hook.
+[tool.hatch.build.targets.wheel.hooks.autorun]
+dependencies = ["hatch-autorun==1.1.0"]
+code = "import mldag.provenance._autorun"
 
 [tool.ruff]
 target-version = "py39"
