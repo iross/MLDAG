@@ -54,6 +54,7 @@ _DEFAULT_FIELD_MAPPING = {
     "MachineAttrGLIDEIN_ResourceName0": "glidein_resource_name",
     "MachineAttrMachine0": "machine",
     "Args": "arguments",
+    "Cmd": "cmd",
     "RequestCpus": "request_cpus",
     "RequestMemory": "request_memory",
     "RequestGPUs": "request_gpus",

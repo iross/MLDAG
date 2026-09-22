@@ -37,6 +37,7 @@ SAMPLE_AD = {
     "MachineAttrGLIDEIN_ResourceName0": "CHTC-Spark-CE1",
     "MachineAttrMachine0": "gpu08.chtc.wisc.edu",
     "JobBatchName": "gb1-pretrain",
+    "Cmd": "/bin/bash",
     "Environment": "PROVENANCE_RUN_ID=run-abc123 OTHER=val",
 }
 
@@ -117,6 +118,7 @@ def test_resource_fields_all_present(tmp_path):
     assert fields["glidein_resource_name"] == "CHTC-Spark-CE1"
     assert fields["machine"] == "gpu08.chtc.wisc.edu"
     assert fields["job_batch_name"] == "gb1-pretrain"
+    assert fields["cmd"] == "/bin/bash"
 
 
 def test_resource_fields_no_gpu(tmp_path):

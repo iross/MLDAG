@@ -20,92 +20,60 @@ pip install --quiet --no-deps --target="$PWD/.mldag" "git+https://github.com/iro
 export PYTHONPATH="$PWD/.mldag${PYTHONPATH:+:$PYTHONPATH}"
 
 _provenance_capture_and_emit() {
+    # Best-effort: mldag.provenance.autocapture.capture_and_emit() never
+    # raises internally, but this wraps the whole thing anyway (torch
+    # itself might be missing) so a broken capture step can never abort the
+    # training job -- unlike the old inline heredoc this replaced, which ran
+    # under `|| exit 1` and would fail the whole job over e.g. a torch
+    # import error. GPU info is detected here via torch.cuda (more precise
+    # than autocapture's own nvidia-smi/proc fallback, which is used when no
+    # override is passed) and handed to capture_and_emit as an override.
     python3 - <<'PYEOF'
-import glob, json, os, re, subprocess, sys
-from datetime import datetime, timezone
-from pathlib import Path
-import torch
-from mldag.provenance.jobad import capture_job_ad_fields
-
-def run(cmd):
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    return r.stdout.strip() if r.returncode == 0 else ""
-
-gpu_count = torch.cuda.device_count()
-gpu_model = torch.cuda.get_device_name(0) if gpu_count > 0 else "none"
-cuda = torch.version.cuda or "unknown"
 try:
-    gpu_id = str(torch.cuda.get_device_properties(0).uuid) if gpu_count > 0 else "none"
-except AttributeError:
-    infos = glob.glob("/proc/driver/nvidia/gpus/*/information")
-    m = re.search(r"GPU UUID:\s+(\S+)", open(infos[0]).read()) if infos else None
-    gpu_id = m.group(1) if m else "unknown"
-hostname = run(["hostname", "-f"]) or run(["hostname"]) or "unknown"
-python_ver = run([sys.executable, "--version"]).replace("Python ", "")
-commit = run(["git", "rev-parse", "--short", "HEAD"]) or "unknown"
-slot = os.environ.get("_CONDOR_SLOT", "unknown")
-run_id = os.environ.get("PROVENANCE_RUN_ID", "unknown")
-mldag_version = os.environ.get("MLDAG_VERSION", "unknown")
-log_dir = Path(os.environ.get("PROVENANCE_LOG_DIR", "output/provenance"))
+    from mldag.provenance.autocapture import capture_and_emit
 
-site_info = {
-    "hostname": hostname,
-    "slot": slot,
-    "gpu_model": gpu_model,
-    "gpu_count": gpu_count,
-    "gpu_id": gpu_id,
-}
-env_info = {
-    "python": python_ver,
-    "cuda": cuda,
-    "code_commit": commit,
-    "mldag_version": mldag_version,
-}
-# Static submit-time attributes (Arguments, Request*, GLIDEIN_ResourceName)
-# from HTCondor's own per-job ClassAd snapshot -- best-effort, {} if
-# $_CONDOR_JOB_AD isn't set. See mldag.provenance.jobad's docstring for why
-# this must happen from within the job rather than in post.py.
-job_ad_fields = capture_job_ad_fields()
+    gpu_info = None
+    try:
+        import torch
 
-Path("site_info.json").write_text(
-    json.dumps({**site_info, **env_info, **job_ad_fields}, indent=2)
-)
+        gpu_count = torch.cuda.device_count()
+        gpu_info = {
+            "gpu_count": gpu_count,
+            "gpu_model": torch.cuda.get_device_name(0) if gpu_count > 0 else "none",
+        }
+        try:
+            if gpu_count > 0:
+                gpu_info["gpu_id"] = str(torch.cuda.get_device_properties(0).uuid)
+        except AttributeError:
+            from mldag.provenance.autocapture import default_gpu_info
 
-log_dir.mkdir(parents=True, exist_ok=True)
-event = {
-    "schema_version": "1.0",
-    "type": "job.assigned",
-    "run_id": run_id,
-    "ts": datetime.now(timezone.utc).isoformat(),
-    "source": "execute_node",
-    "site_info_source": "torch_cuda",
-    **site_info,
-    **env_info,
-    **job_ad_fields,
-}
-log_path = log_dir / f"{run_id}.ndjson"
-with open(log_path, "a") as f:
-    f.write(json.dumps(event, separators=(",", ":")) + "\n")
+            gpu_info["gpu_id"] = default_gpu_info()[0]["gpu_id"]
+    except ImportError:
+        pass
 
-cluster_id = os.environ.get("CONDOR_CLUSTERID", "")
-if cluster_id:
-    (log_dir / f"{cluster_id}.run_id").write_text(run_id)
+    capture_and_emit(gpu_info=gpu_info)
+except Exception:
+    pass
 PYEOF
 }
 
-_provenance_capture_and_emit || exit 1
+_provenance_capture_and_emit
 
-#echo "Copying ${dataset_name} dataset"
-# cp "/staging/iaross/processed-${dataset_name}.tar.gz" .
-#echo "Untarring ${dataset_name} dataset"
-#mkdir -p ${dataset_name}
-#tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
-
-#unzip cleaned_data_test.zip -d precleaned
-#rm "processed-${dataset_name}.tar.gz"
 echo "Looking around a bit"
 pwd
 ls
+
+#echo "Copying ${dataset_name} dataset"
+# cp "/staging/iaross/processed-${dataset_name}.tar.gz" .
+echo "Untarring ${dataset_name} dataset"
+mkdir -p ${dataset_name}
+tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
+
+#unzip cleaned_data_test.zip -d precleaned
+rm "processed-${dataset_name}.tar.gz"
+echo "Looking around a bit"
+pwd
+ls -l
 
 ln -s /workspace/metl/data/
 
