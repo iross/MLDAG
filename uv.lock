@@ -316,6 +316,20 @@ wheels = [
 ]
 
 [[package]]
+name = "htprovenance"
+version = "0.1.0rc1"
+source = { registry = "https://test.pypi.org/simple/" }
+dependencies = [
+    { name = "htcondor", marker = "sys_platform == 'linux'" },
+    { name = "pyyaml" },
+    { name = "typer" },
+]
+sdist = { url = "https://test-files.pythonhosted.org/packages/a7/52/c22af47070c948a81c6047c13b74733e5c488e540e5fdabc9a6c76a893f4/htprovenance-0.1.0rc1.tar.gz", hash = "sha256:b4aae703127034a40959ece6c9d790cf242fbc5f95f7f140db2ea148aa246467", size = 88915, upload-time = "2026-09-23T01:58:32.619Z" }
+wheels = [
+    { url = "https://test-files.pythonhosted.org/packages/95/3d/41f341cfd4f767887877713368bc8e4005c72f67cb6f57857a32f01045b6/htprovenance-0.1.0rc1-py3-none-any.whl", hash = "sha256:316f0aac58f1a30935ff6a22efd64c3e5eff93635e573860f33e5024ad0695b7", size = 50231, upload-time = "2026-09-23T01:58:31.063Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.11"
 source = { registry = "https://pypi.org/simple" }
@@ -551,6 +565,7 @@ dependencies = [
     { name = "elasticsearch", version = "9.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "elasticsearch", version = "9.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "htcondor", marker = "sys_platform == 'linux'" },
+    { name = "htprovenance" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
@@ -573,6 +588,7 @@ dev = [
 requires-dist = [
     { name = "elasticsearch", specifier = ">=9.1.2" },
     { name = "htcondor", marker = "sys_platform == 'linux'", specifier = ">=25.8.2" },
+    { name = "htprovenance", specifier = ">=0.1.0rc1", index = "https://test.pypi.org/simple/" },
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "pandas", specifier = ">=2.3.2" },
