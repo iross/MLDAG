@@ -9,10 +9,12 @@ description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    # Provenance capture/querying, split out of this repo (task-31). Pinned to a
-    # git tag until htprovenance is published to an index, matching how this
-    # package itself is currently consumed.
-    "htprovenance @ git+https://github.com/iross/htprovenance.git@v0.1.0rc1",
+    # Provenance capture/querying, split out of this repo (task-31). Kept as a
+    # plain version spec rather than a git URL: a direct reference in
+    # project.dependencies makes the built metadata unpublishable to an index,
+    # which would break this package's own TestPyPI release on the next tag.
+    # See [[tool.uv.index]] below for where it is resolved from.
+    "htprovenance>=0.1.0rc1",
     "elasticsearch>=9.1.2",
     "matplotlib>=3.9.4",
     "numpy>=2.0.2",
@@ -56,6 +58,20 @@ packages = ["mldag"]
 [tool.hatch.build.targets.wheel.hooks.autorun]
 dependencies = ["hatch-autorun==1.1.0"]
 code = "import mldag.provenance._autorun"
+
+# htprovenance is published to TestPyPI only for now (as is this package).
+# `explicit = true` plus the source pin below means ONLY htprovenance is
+# resolved from TestPyPI -- everything else still comes from PyPI proper,
+# rather than resolving the whole dependency tree against a test index.
+# This is uv-only config and never reaches the built metadata, so the
+# published package stays installable from a normal index.
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+explicit = true
+
+[tool.uv.sources]
+htprovenance = { index = "testpypi" }
 
 [tool.ruff]
 target-version = "py39"
