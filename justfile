@@ -91,7 +91,7 @@ hourly-site hours="24":
     git -C site commit -m "Update dashboard $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     git -C site push --force https://github.com/iross/MLDAG.git HEAD:gh-pages
 
-# Monthly report (e.g. just monthly-report chtc 10)
+# Monthly report (e.g. just monthly-report chtc 2025-10, or a bare 10 for the most recent October)
 monthly-report pool="ospool" month=MONTH:
     just _csv-{{ pool }}
     uv run mldag-report full_{{ pool }}.csv --month {{ month }} --output-dir {{ pool }}_month_{{ month }}_reports
