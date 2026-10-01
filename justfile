@@ -31,9 +31,12 @@ _refresh-chtc:
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/path_supplement_march_runs/experiment_devices.dag*" .
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_gpu_device_constrained/metl.log" metl_single_protein_models_gpu_device_constrained.log
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_gpu_device_constrained/many_protein_pretraining_with_ospool_device_constrained_runs.dag*" .
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_gpu_device_constrained/many_protein_pretraining_with_ospool_device_constrained_runs_run2.dag*" .
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_with_ospool/metl.log" metl_single_protein_models_with_ospool.log
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_with_ospool/many_protein_pretraining_with_ospool.dag*" .
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_with_ospool/many_protein_pretraining_with_ospool_run2.dag*" .
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_metl_updates/metl.log" metl_single_protein_models_metl_updates.log
+    scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_metl_updates/many_protein_pretraining_updated_metl.dag*" .
 
 _csv-ospool:
     uv run mldag-csv \
@@ -53,9 +56,10 @@ _csv-ospool-grand-total:
 
 _csv-chtc:
     uv run mldag-csv \
-        --dag-files experiment_devices.dag* trainingrun*.dag* many_protein_pretraining_with_ospool.dag* many_protein_pretraining_with_ospool_device_constrained_runs.dag* many_protein_pretraining_with_ospool_run2.dag* \
+        --dag-files experiment_devices.dag* trainingrun*.dag* many_protein_pretraining_with_ospool.dag* many_protein_pretraining_with_ospool_device_constrained_runs.dag* many_protein_pretraining_with_ospool_run2.dag* many_protein_pretraining_with_ospool_device_constrained_runs_run2.dag* \
+                    many_protein_pretraining_updated_metl.dag* \
         --metl-logs metl_control.log metl_experiment_devices.log metl_single_protein_models_gpu_device_constrained.log \
-            metl_single_protein_models_with_ospool.log \
+            metl_single_protein_models_with_ospool.log metl_single_protein_models_metl_updates.log \
         --output full_chtc.csv
 
 # Refresh data from remote (pool=ospool or pool=chtc)
