@@ -15,7 +15,9 @@ _refresh-ospool:
     scp ap40:"/home/ian.ross/MLDAG_fixed_global/global_pretraining.dag*" .
     scp ap40:"/home/ian.ross/MLDAG_fixed_global/bigger_global_pretraining.dag*" .
     scp ap40:"/home/ian.ross/MLDAG_fixed_global/ospool_pretraining.dag*" .
+    scp ap40:"/home/ian.ross/single_proteins/many_protein_pretraining_with_delta.dag*" .
     scp ap40:/home/ian.ross/MLDAG_fixed_global/metl.log .
+    scp ap40:"/home/ian.ross/single_proteins/metl.log" metl_delta.log
 
 _refresh-ospool-grand-total:
     scp ap40:/ospool/ap40/data/ian.ross/MLDAG/global_pretraining_with_ospool.dag global_pretraining_with_ospool_misconfigured.dag
@@ -31,8 +33,8 @@ _refresh-chtc:
 _csv-ospool:
     uv run mldag-csv \
         --dag-files bigger_global_pretraining.dag global_pretraining.dag \
-                    ospool_pretraining.dag \
-        --metl-logs metl.log \
+                    ospool_pretraining.dag many_protein_pretraining_with_delta.dag \
+        --metl-logs metl.log metl_delta.log \
         --output full_ospool.csv
 
 _csv-ospool-grand-total:
@@ -91,7 +93,7 @@ hourly-site hours="24":
     git -C site commit -m "Update dashboard $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     git -C site push --force https://github.com/iross/MLDAG.git HEAD:gh-pages
 
-# Monthly report (e.g. just monthly-report chtc 10)
+# Monthly report (e.g. just monthly-report chtc 2025-10, or a bare 10 for the most recent October)
 monthly-report pool="ospool" month=MONTH:
     just _csv-{{ pool }}
     uv run mldag-report full_{{ pool }}.csv --month {{ month }} --output-dir {{ pool }}_month_{{ month }}_reports

@@ -6,15 +6,17 @@ Generates comprehensive analysis and visualizations of HPC experiment results
 from CSV data produced by post_experiment_csv.py.
 
 Usage:
-    python experiment_report.py [input.csv] [--output-dir reports/] [--month 1-12]
+    python experiment_report.py [input.csv] [--output-dir reports/] [--month YYYY-MM|M]
 
 Examples:
     python experiment_report.py                          # All data, default output
-    python experiment_report.py --month 10               # Include October monthly report
-    python experiment_report.py --month 9 --output-dir sep_reports/
+    python experiment_report.py --month 2025-10          # October 2025 only
+    python experiment_report.py --month 9 --output-dir sep_reports/  # Most recent September
 """
 
 import argparse
+import calendar
+from datetime import date
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -36,6 +38,8 @@ class ExperimentAnalyzer:
         self.csv_file = Path(csv_file)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
+        self.start_date = start_date
+        self.end_date = end_date
 
         # Set up consistent styling
         self.setup_plotting_style()
@@ -1181,143 +1185,6 @@ class ExperimentAnalyzer:
         # Print date range
         print(f"Time period: {min_date} to {max_date} ({(max_date - min_date).days + 1} days)")
 
-    def plot_epochs_completed_over_time_monthly(self, month: int):
-        """Generate cumulative epochs completed over time visualization for a specific month.
-
-        Args:
-            month: Month number (1-12) to filter data for
-        """
-        month_names = {
-            1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
-            7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
-        }
-        month_name = month_names.get(month, f'Month-{month}')
-
-        # Filter for successfully completed jobs with end times and epoch information
-        completed_data = self.df[
-            (self.df['Final Status'].isin(['completed', 'checkpointed'])) &
-            (self.df['End Time'].notna()) &
-            (self.df['Epoch'].notna()) &
-            (self.df['Epochs Completed'].notna()) &
-            (self.df['Epochs Completed'] > 0)
-        ].copy()
-
-        if completed_data.empty:
-            print("No completed epoch data found for time series analysis")
-            return
-
-        # Convert End Time to datetime and extract date
-        completed_data['End Date'] = completed_data['End Time'].dt.date
-
-        # Filter for specified month only (any year, but typically 2024)
-        completed_data = completed_data[
-            (completed_data['End Time'].dt.month == month)
-        ].copy()
-
-        if completed_data.empty:
-            print(f"No completed epoch data found for {month_name}")
-            return
-
-        completed_data['Targeted Resource'] = completed_data['Targeted Resource'].fillna('Unknown')
-
-        # For each job completion, count the epochs completed on that day
-        daily_epochs = completed_data.groupby(['End Date', 'Targeted Resource'])['Epochs Completed'].sum().reset_index()
-
-        # Get date range for September
-        min_date = daily_epochs['End Date'].min()
-        max_date = daily_epochs['End Date'].max()
-        date_range = pd.date_range(start=min_date, end=max_date, freq='D')
-
-        # Create complete date series for each resource
-        resources = daily_epochs['Targeted Resource'].unique()
-
-        # Create figure
-        fig, ax = plt.subplots(1, 1, figsize=(14, 8))
-
-        # Get consistent colors for resources
-        colors = self.get_resource_colors(resources)
-
-        cumulative_data = {}
-        total_daily_epochs = pd.Series(0, index=date_range)
-
-        for i, resource in enumerate(resources):
-            resource_data = daily_epochs[daily_epochs['Targeted Resource'] == resource]
-
-            # Create a complete date series with zeros for missing dates
-            resource_series = pd.Series(0, index=date_range)
-
-            # Fill in actual epoch counts
-            for _, row in resource_data.iterrows():
-                resource_series[pd.Timestamp(row['End Date'])] = row['Epochs Completed']
-
-            # Add to total daily epochs
-            total_daily_epochs += resource_series
-
-            # Calculate cumulative sum
-            cumulative_epochs = resource_series.cumsum()
-            cumulative_data[resource] = cumulative_epochs
-
-            # Plot the line
-            formatted_resource = self.format_resource_name(resource)
-            ax.plot(cumulative_epochs.index, cumulative_epochs.values,
-                   label=formatted_resource, color=colors[i], linewidth=2, marker='o', markersize=3, alpha=0.7)
-
-        # Calculate and plot total cumulative epochs
-        total_cumulative = total_daily_epochs.cumsum()
-        ax.plot(total_cumulative.index, total_cumulative.values,
-               label='Total (All Resources)', color='black', linewidth=3.5, marker='s', markersize=5)
-
-        # Customize the plot
-        ax.set_title(f'Cumulative Epochs Completed Over Time by Resource ({month_name})', fontsize=16, pad=20, fontweight='bold')
-        ax.set_xlabel('Date', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Cumulative Epochs Completed', fontsize=14, fontweight='bold')
-
-        # Format x-axis
-        ax.tick_params(axis='x', rotation=45, labelsize=11)
-        ax.tick_params(axis='y', labelsize=11)
-
-        # Add grid
-        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
-        ax.set_axisbelow(True)
-
-        # Add legend
-        legend = ax.legend(bbox_to_anchor=(1.02, 1), loc='upper left',
-                          frameon=True, fancybox=True, shadow=True, fontsize=11)
-        legend.get_title().set_fontweight('bold')
-
-        # Format dates on x-axis
-        import matplotlib.dates as mdates
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(date_range)//10)))
-
-        # Enhance plot borders
-        for spine in ax.spines.values():
-            spine.set_linewidth(1.5)
-            spine.set_color('darkgray')
-
-        plt.tight_layout()
-        plt.subplots_adjust(right=0.85)  # Make room for legend
-
-        # Save with month name in filename
-        filename = f'epochs_completed_over_time_{month_name.lower()}'
-        self.save_figure(fig, filename)
-
-        # Print summary statistics
-        print(f"\nEpochs Completed Over Time Summary ({month_name}):")
-        total_epochs_by_resource = {}
-        for resource in resources:
-            if resource in cumulative_data:
-                total_epochs = cumulative_data[resource].iloc[-1]
-                total_epochs_by_resource[resource] = total_epochs
-                formatted_resource = self.format_resource_name(resource)
-                print(f"{formatted_resource}: {int(total_epochs)} total epochs completed")
-
-        total_all_epochs = int(total_cumulative.iloc[-1])
-        print(f"Total across all resources: {total_all_epochs} epochs completed")
-
-        # Print date range
-        print(f"Time period: {min_date} to {max_date} ({(max_date - min_date).days + 1} days)")
-
     def plot_epochs_trained_per_day(self):
         """Generate bar plot showing the number of epochs trained per day."""
         # Filter for successfully completed jobs with end times and epoch information
@@ -1529,146 +1396,6 @@ class ExperimentAnalyzer:
 
         # Print summary statistics
         print("\nGPU Hours Over Time Summary:")
-        total_gpu_hours_by_resource = {}
-        for resource in resources:
-            if resource in cumulative_data:
-                total_hours = cumulative_data[resource].iloc[-1]
-                total_gpu_hours_by_resource[resource] = total_hours
-                formatted_resource = self.format_resource_name(resource)
-                print(f"{formatted_resource}: {total_hours:.1f} total GPU hours utilized")
-
-        total_all_gpu_hours = total_cumulative.iloc[-1]
-        print(f"Total across all resources: {total_all_gpu_hours:.1f} GPU hours utilized")
-
-        # Print date range and efficiency metrics
-        print(f"Time period: {min_date} to {max_date} ({(max_date - min_date).days + 1} days)")
-        avg_daily_gpu_hours = total_all_gpu_hours / ((max_date - min_date).days + 1)
-        print(f"Average daily GPU hours: {avg_daily_gpu_hours:.1f} GPU hours/day")
-
-    def plot_gpu_hours_over_time_monthly(self, month: int):
-        """Generate cumulative GPU hours utilized over time visualization for a specific month.
-
-        Args:
-            month: Month number (1-12) to filter data for
-        """
-        month_names = {
-            1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
-            7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
-        }
-        month_name = month_names.get(month, f'Month-{month}')
-
-        # Filter for GPU jobs with execution time data
-        gpu_data = self.df[
-            (self.df['Number of GPUs'] > 0) &
-            (self.df['End Time'].notna()) &
-            (self.df['Execution Duration (seconds)'].notna()) &
-            (self.df['Execution Duration (seconds)'] > 0) &
-            (self.df['Final Status'].isin(['completed', 'checkpointed', 'held', 'evicted']))  # Include all jobs that used GPU time
-        ].copy()
-
-        if gpu_data.empty:
-            print("No GPU usage data found for time series analysis")
-            return
-
-        # Calculate GPU hours for each job (execution time * number of GPUs)
-        gpu_data['GPU Hours'] = (gpu_data['Execution Duration (seconds)'] / 3600) * gpu_data['Number of GPUs']
-
-        # Convert End Time to datetime and extract date
-        gpu_data['End Date'] = gpu_data['End Time'].dt.date
-
-        # Filter for specified month only (any year, but typically 2024)
-        gpu_data = gpu_data[
-            (gpu_data['End Time'].dt.month == month)
-        ].copy()
-
-        if gpu_data.empty:
-            print(f"No GPU usage data found for {month_name}")
-            return
-
-        gpu_data['Targeted Resource'] = gpu_data['Targeted Resource'].fillna('Unknown')
-
-        # For each job completion, sum the GPU hours used on that day
-        daily_gpu_hours = gpu_data.groupby(['End Date', 'Targeted Resource'])['GPU Hours'].sum().reset_index()
-
-        # Get date range
-        min_date = daily_gpu_hours['End Date'].min()
-        max_date = daily_gpu_hours['End Date'].max()
-        date_range = pd.date_range(start=min_date, end=max_date, freq='D')
-
-        # Create complete date series for each resource
-        resources = daily_gpu_hours['Targeted Resource'].unique()
-
-        # Create figure
-        fig, ax = plt.subplots(1, 1, figsize=(14, 8))
-
-        # Get consistent colors for resources
-        colors = self.get_resource_colors(resources)
-
-        cumulative_data = {}
-        total_daily_gpu_hours = pd.Series(0, index=date_range)
-
-        for i, resource in enumerate(resources):
-            resource_data = daily_gpu_hours[daily_gpu_hours['Targeted Resource'] == resource]
-
-            # Create a complete date series with zeros for missing dates
-            resource_series = pd.Series(0, index=date_range)
-
-            # Fill in actual GPU hours
-            for _, row in resource_data.iterrows():
-                resource_series[pd.Timestamp(row['End Date'])] = row['GPU Hours']
-
-            # Add to total daily GPU hours
-            total_daily_gpu_hours += resource_series
-
-            # Calculate cumulative sum
-            cumulative_gpu_hours = resource_series.cumsum()
-            cumulative_data[resource] = cumulative_gpu_hours
-
-            # Plot the line
-            formatted_resource = self.format_resource_name(resource)
-            ax.plot(cumulative_gpu_hours.index, cumulative_gpu_hours.values,
-                   label=formatted_resource, color=colors[i], linewidth=2, marker='o', markersize=3, alpha=0.7)
-
-        # Calculate and plot total cumulative GPU hours
-        total_cumulative = total_daily_gpu_hours.cumsum()
-        ax.plot(total_cumulative.index, total_cumulative.values,
-               label='Total (All Resources)', color='black', linewidth=3.5, marker='s', markersize=5)
-
-        # Customize the plot
-        ax.set_title(f'Cumulative GPU Hours Utilized Over Time by Resource ({month_name})', fontsize=16, pad=20, fontweight='bold')
-        ax.set_xlabel('Date', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Cumulative GPU Hours', fontsize=14, fontweight='bold')
-
-        # Format x-axis
-        ax.tick_params(axis='x', rotation=45, labelsize=11)
-        ax.tick_params(axis='y', labelsize=11)
-
-        # Add grid
-        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
-        ax.set_axisbelow(True)
-
-        # Add legend inside the plot area
-        legend = ax.legend(loc='upper left', frameon=True, fancybox=True, shadow=True, fontsize=11)
-        legend.get_title().set_fontweight('bold')
-
-        # Format dates on x-axis
-        import matplotlib.dates as mdates
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(date_range)//10)))
-
-        # Enhance plot borders
-        for spine in ax.spines.values():
-            spine.set_linewidth(1.5)
-            spine.set_color('darkgray')
-
-        plt.tight_layout()
-
-        # Save with month name in filename
-        filename = f'gpu_hours_over_time_{month_name.lower()}'
-        self.save_figure(fig, filename)
-
-        # Print summary statistics
-        print(f"\nGPU Hours Over Time Summary ({month_name}):")
         total_gpu_hours_by_resource = {}
         for resource in resources:
             if resource in cumulative_data:
@@ -1978,10 +1705,18 @@ class ExperimentAnalyzer:
 
         submit_min = self.df['Submit Time'].dropna().min()
         submit_max = self.df['Submit Time'].dropna().max()
-        period_str = (
-            f"{submit_min.strftime('%Y-%m-%d %H:%M')} to {submit_max.strftime('%Y-%m-%d %H:%M')}"
-            if pd.notna(submit_min) else "unknown"
-        )
+        if self.start_date or self.end_date:
+            period_str = (
+                f"{self.start_date or 'start'} to {self.end_date or 'end'} "
+                "(jobs submitted, started, or ended in this window)"
+            )
+        elif pd.notna(submit_min):
+            period_str = (
+                f"{submit_min.strftime('%Y-%m-%d %H:%M')} to "
+                f"{submit_max.strftime('%Y-%m-%d %H:%M')}"
+            )
+        else:
+            period_str = "unknown"
 
         report_lines = [
             title,
@@ -2093,39 +1828,8 @@ class ExperimentAnalyzer:
         print(f"Summary report saved: {report_file}")
         print("\n" + report_text)
 
-    def generate_monthly_summary_report(self, month: int):
-        """Generate a text summary report filtered to a single month."""
-        month_names = {
-            1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
-            7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
-        }
-        month_name = month_names.get(month, f'Month-{month}')
-
-        original_df = self.df
-        try:
-            self.df = original_df[original_df['End Time'].dt.month == month].copy()
-            if self.df.empty:
-                print(f"No data found for {month_name} — skipping monthly summary report")
-                return
-            title = f"EXPERIMENT ANALYSIS SUMMARY REPORT — {month_name.upper()}"
-            report_lines = self._build_summary_report_lines(title)
-        finally:
-            self.df = original_df
-
-        report_text = "\n".join(report_lines)
-        report_file = self.output_dir / f"experiment_summary_report_{month_name.lower()}.txt"
-        with open(report_file, 'w') as f:
-            f.write(report_text)
-
-        print(f"Monthly summary report saved: {report_file}")
-        print("\n" + report_text)
-
-    def generate_all_reports(self, monthly_report_month: Optional[int] = None):
-        """Generate all analysis reports and visualizations.
-
-        Args:
-            monthly_report_month: Optional month (1-12) for generating monthly-specific reports
-        """
+    def generate_all_reports(self):
+        """Generate all analysis reports and visualizations."""
         print("\nGenerating experiment analysis reports...")
 
         try:
@@ -2147,24 +1851,11 @@ class ExperimentAnalyzer:
             print("\n5. Generating epochs completed over time plot...")
             self.plot_epochs_completed_over_time()
 
-            if monthly_report_month is not None:
-                month_names = {
-                    1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
-                    7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
-                }
-                month_name = month_names.get(monthly_report_month, f'Month-{monthly_report_month}')
-                print(f"\n5b. Generating epochs completed over time plot ({month_name} only)...")
-                self.plot_epochs_completed_over_time_monthly(monthly_report_month)
-
             print("\n5c. Generating epochs trained per day plot...")
             self.plot_epochs_trained_per_day()
 
             print("\n6. Generating GPU hours over time plot...")
             self.plot_gpu_hours_over_time()
-
-            if monthly_report_month is not None:
-                print(f"\n6b. Generating GPU hours over time plot ({month_name} only)...")
-                self.plot_gpu_hours_over_time_monthly(monthly_report_month)
 
             print("\n7. Generating data transfer analysis plots...")
             self.plot_data_transfer_analysis()
@@ -2178,15 +1869,39 @@ class ExperimentAnalyzer:
             print("\n9. Generating summary report...")
             self.generate_summary_report()
 
-            if monthly_report_month is not None:
-                print(f"\n9b. Generating monthly summary report ({month_name} only)...")
-                self.generate_monthly_summary_report(monthly_report_month)
-
             print(f"\n✅ All reports generated successfully in {self.output_dir}/")
 
         except Exception as e:
             print(f"❌ Error during report generation: {e}")
             raise
+
+
+def _parse_month(value: str, today: Optional[date] = None) -> Tuple[str, str]:
+    """Convert a --month value into an inclusive (start_date, end_date) ISO date pair.
+
+    Args:
+        value: "YYYY-MM", or a bare month number "1".."12" meaning its most recent
+            occurrence on or before today.
+        today: Reference date for resolving a bare month; defaults to today.
+
+    Returns:
+        (first day of month, last day of month) as ISO strings.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a valid month.
+    """
+    today = today or date.today()
+    match = re.fullmatch(r"(?:(\d{4})-)?(\d{1,2})", value.strip())
+    month = int(match.group(2)) if match else 0
+    if not 1 <= month <= 12:
+        raise argparse.ArgumentTypeError(
+            f"invalid month {value!r}: expected YYYY-MM (e.g. 2025-10) or 1-12")
+    if match.group(1):
+        year = int(match.group(1))
+    else:
+        year = today.year if month <= today.month else today.year - 1
+    last_day = calendar.monthrange(year, month)[1]
+    return date(year, month, 1).isoformat(), date(year, month, last_day).isoformat()
 
 
 def main():
@@ -2205,10 +1920,10 @@ Examples:
   # Specify custom output directory
   python experiment_report.py --output-dir /path/to/reports/
 
-  # Generate monthly reports for October
-  python experiment_report.py --month 10
+  # Generate reports for October 2025 only
+  python experiment_report.py --month 2025-10
 
-  # Generate monthly reports for September with custom output
+  # Generate reports for the most recent September, with custom output
   python experiment_report.py job_summary.csv --month 9 --output-dir september_reports/
 
   # Generate reports for a custom date range
@@ -2220,8 +1935,9 @@ Examples:
                        help="Input CSV file path (default: job_summary.csv)")
     parser.add_argument("--output-dir", default="reports",
                        help="Output directory for reports (default: reports)")
-    parser.add_argument("--month", type=int, choices=range(1, 13), metavar="1-12",
-                       help="Generate monthly reports for specific month (1-12, e.g., 10 for October)")
+    parser.add_argument("--month", type=_parse_month, metavar="YYYY-MM|M",
+                       help="Restrict analysis to one calendar month, e.g. 2025-10. A bare month "
+                            "number (e.g. 10) means its most recent occurrence up to today.")
     parser.add_argument("--hours", type=int, metavar="N",
                        help="Restrict analysis to jobs active in the last N hours (e.g., 24)")
     parser.add_argument("--start-date", metavar="DATE",
@@ -2233,14 +1949,18 @@ Examples:
 
     args = parser.parse_args()
 
+    if args.month is not None and (args.hours is not None or args.start_date or args.end_date):
+        parser.error("--month cannot be combined with --hours/--start-date/--end-date")
     if args.hours is not None and (args.start_date or args.end_date):
         parser.error("--hours cannot be combined with --start-date/--end-date")
+    if args.month is not None:
+        args.start_date, args.end_date = args.month
 
     try:
         # Create analyzer and generate reports
         analyzer = ExperimentAnalyzer(args.input_file, args.output_dir, hours=args.hours,
                                        start_date=args.start_date, end_date=args.end_date)
-        analyzer.generate_all_reports(monthly_report_month=args.month)
+        analyzer.generate_all_reports()
 
     except FileNotFoundError as e:
         print(f"❌ Error: {e}")

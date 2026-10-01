@@ -7,7 +7,7 @@ name = "mldag"
 version = "0.1.0rc27"
 description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     # Provenance capture/querying, split out of this repo (task-31). Kept as a
     # plain version spec rather than a git URL: a direct reference in
