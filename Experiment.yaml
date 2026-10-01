@@ -5,32 +5,30 @@
 # know that it's a good requirement.
 # Conceptually the current separation makes sense, since some are dependent on
 # externalities like the target resource, but it needs cleaner definitions.
-name: "GB1 Pretraining"
+name: "Many Protein Pretraining With Delta"
 submit_template: |
   universe = container
-  container_image = file:///staging/iaross/metl_gb1.sif
+  container_image = osdf:///ospool/ap40/data/ian.ross/metl_local.sif
+
 
   epoch = $(epoch:1)
 
-  request_disk = 40GB
+  request_disk = 60GB
   request_memory = 20000
   retry_request_memory = 60000
-  request_cpus = 4
+  request_cpus = 2
   request_gpus = 1
-  gpus_minimum_memory = 32000
 
   environment = "WANDB_API_KEY=a1bbea51509891a9a9fb5d9b301a31a5e146bcdf"
 
-  +WantGPULab = true
-  #+is_resumable = true
-  +JobDurationCategory = "Short"
-  #+ProjectName = "PATh_MLSupplement"
+  +JobDurationCategory = "Medium"
+  +ProjectName = "PATh_MLSupplement"
 
   executable = /bin/bash
   transfer_executable = false
-  arguments = pretrain_local.sh $(epoch) $(run_uuid) $(random_seed)
+  arguments = pretrain_local.sh $(epoch) $(run_uuid) $(random_seed) $(protein)
   preserve_relative_paths = true
-  transfer_input_files = pretrain_local.sh, osdf:///chtc/staging/iaross/processed-gb1.tar.gz?pack=auto
+  transfer_input_files = pretrain_local.sh, osdf:///ospool/ap40/data/ian.ross/rosetta_datasets/processed-$(protein).tar.gz
   if defined continue_from_checkpoint
       transfer_input_files = $(transfer_input_files), output/training_logs/$(run_uuid)
   endif
@@ -46,6 +44,8 @@ submit_template: |
   priority = $(epoch)
 
   queue
+post_script: /home/ian.ross/single_proteins/sync_and_clean.sh /ospool/ap40/data/ian.ross/single_protein_checkpoints/
+
 
 vars:
   epochs:
@@ -57,6 +57,18 @@ vars:
     type: value
     description: "Number of epochs to train in each job"
   run_number:
-    stop: 1
+    stop: 5
     type: range
     description: "Number of runs to generate"
+  protein:
+    value:
+      - avgfp
+#      - dlg4
+#      - gb1
+#      - grb2
+#      - pab1
+#      - pten
+#      - tem-1
+#      - ube4b
+    type: value
+    description: "Protein"
