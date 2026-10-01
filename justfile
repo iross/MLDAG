@@ -38,6 +38,24 @@ _refresh-chtc:
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_metl_updates/metl.log" metl_single_protein_models_metl_updates.log
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/single_protein_models_metl_updates/many_protein_pretraining_updated_metl.dag*" .
 
+_db-build-chtc dir db checkpoint_dir:
+    ssh iaross@ap2002.chtc.wisc.edu 'cd /home/iaross/{{ dir }} && ~/.local/bin/uv run mldag-query db build --db {{ db }} --checkpoint-dir {{ checkpoint_dir }}'
+
+# Build each CHTC run's provenance DB on ap2002 from its /staging checkpoints
+db-build-chtc:
+    just _db-build-chtc single_protein_models_with_ospool with_ospool.db /staging/i/iaross/single_protein_checkpoints_with_ospool
+    just _db-build-chtc single_protein_models_gpu_device_constrained gpu_device_constrained.db /staging/i/iaross/single_protein_models_gpu_device_constrained
+    just _db-build-chtc single_protein_models_dgxspark dgxspark.db /staging/i/iaross/single_protein_models_dgxspark
+    just _db-build-chtc single_protein_models_metl_updates metl_updates.db /staging/i/iaross/single_protein_models_metl_updates
+
+# Copy the CHTC provenance DBs built by db-build-chtc into chtc_dbs/
+fetch-dbs-chtc:
+    mkdir -p chtc_dbs
+    scp iaross@ap2002.chtc.wisc.edu:/home/iaross/single_protein_models_with_ospool/with_ospool.db chtc_dbs/
+    scp iaross@ap2002.chtc.wisc.edu:/home/iaross/single_protein_models_gpu_device_constrained/gpu_device_constrained.db chtc_dbs/
+    scp iaross@ap2002.chtc.wisc.edu:/home/iaross/single_protein_models_dgxspark/dgxspark.db chtc_dbs/
+    scp iaross@ap2002.chtc.wisc.edu:/home/iaross/single_protein_models_metl_updates/metl_updates.db chtc_dbs/
+
 _csv-ospool:
     uv run mldag-csv \
         --dag-files bigger_global_pretraining.dag global_pretraining.dag \
