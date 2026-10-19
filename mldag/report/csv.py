@@ -8,6 +8,7 @@ CSV reports of all job execution attempts with proper job-to-DAG mapping.
 
 import csv
 import re
+import sys
 import argparse
 from datetime import datetime
 from pathlib import Path
@@ -132,6 +133,7 @@ class SimpleCSVGenerator:
             Tuple of (job_to_dag_mapping, (job_name, dag_source)_to_resource_mapping, (job_name, dag_source)_to_run_uuid_mapping)
         """
         job_to_dag = {}
+        job_to_dag_files: Dict[str, Set[str]] = {}
         job_dag_to_resource = {}
         job_dag_to_run_uuid = {}
 
@@ -149,6 +151,7 @@ class SimpleCSVGenerator:
                         if len(parts) >= 2:
                             job_name = parts[1]
                             job_to_dag[job_name] = dag_source
+                            job_to_dag_files.setdefault(job_name, set()).add(dag_file)
 
                 # Parse VARS lines to extract ResourceName and run_uuid for this specific DAG
                 vars_pattern = r'VARS\s+(\S+)\s+(.+)'
@@ -167,10 +170,36 @@ class SimpleCSVGenerator:
                     if uuid_match:
                         job_dag_to_run_uuid[(job_name, dag_source)] = uuid_match.group(1)
 
+        self._warn_ambiguous_job_names(job_to_dag_files)
         print(f"Found {len(job_to_dag)} jobs across {len(self.dag_files)} DAG files")
         print(f"Found {len(job_dag_to_resource)} job-DAG resource mappings")
         print(f"Found {len(job_dag_to_run_uuid)} job-DAG run UUID mappings")
         return job_to_dag, job_dag_to_resource, job_dag_to_run_uuid
+
+    def _warn_ambiguous_job_names(self, job_to_dag_files: Dict[str, Set[str]]) -> None:
+        """Warn when a job name is shared by DAGs that lack a .dagman.out file.
+
+        Without .dagman.out, clusters are attributed to a DAG by job name alone, so every
+        attempt of a shared job name lands in whichever DAG was listed last.
+        """
+        unmapped_dags = {
+            dag_file
+            for dag_files in job_to_dag_files.values() if len(dag_files) > 1
+            for dag_file in dag_files if f"{dag_file}.dagman.out" not in self.dagman_out_files
+        }
+        if not unmapped_dags:
+            return
+        shared = sorted(
+            job_name for job_name, dag_files in job_to_dag_files.items()
+            if len(dag_files) > 1 and dag_files & unmapped_dags
+        )
+        print(
+            f"WARNING: {len(shared)} job names (e.g. {', '.join(shared[:3])}) are shared across "
+            f"DAG files, and these have no .dagman.out: {', '.join(sorted(unmapped_dags))}. "
+            f"Their attempts will be attributed to the last DAG listed. "
+            f"Copy <dag>.dagman.out next to each DAG file to fix.",
+            file=sys.stderr,
+        )
 
     def parse_dagman_out_files(self) -> Dict[str, Dict[int, str]]:
         """Parse DAGMan output files to create node-to-jobid mapping for each DAG.
