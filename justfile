@@ -20,9 +20,18 @@ _refresh-ospool:
     scp ap40:"/home/ian.ross/single_proteins/metl.log" metl_delta.log
 
 _refresh-ospool-grand-total:
-    scp ap40:/ospool/ap40/data/ian.ross/MLDAG/global_pretraining_with_ospool.dag global_pretraining_with_ospool_misconfigured.dag
-    scp ap40:/ospool/ap40/data/ian.ross/MLDAG/global_pretraining_with_ospool_w_anvil.dag global_pretraining_with_ospool_w_anvil_misconfigured.dag
-    scp ap40:/ospool/ap40/data/ian.ross/MLDAG/metl.log metl_misconfigured.log
+    #!/usr/bin/env bash
+    set -euo pipefail
+    remote=/ospool/ap40/data/ian.ross/MLDAG
+    for dag in global_pretraining_with_ospool global_pretraining_with_ospool_w_anvil; do
+        tmp=$(mktemp -d)
+        scp ap40:"$remote/$dag.dag*" "$tmp/"
+        for f in "$tmp"/*; do
+            mv "$f" "${dag}_misconfigured.dag${f##*/$dag.dag}"
+        done
+        rmdir "$tmp"
+    done
+    scp ap40:"$remote/metl.log" metl_misconfigured.log
 
 _refresh-chtc:
     scp iaross@ap2002.chtc.wisc.edu:"/home/iaross/nairr_config_in_chtc/metl.log" metl_control.log
@@ -52,6 +61,7 @@ _csv-ospool-grand-total:
                     global_pretraining_with_ospool_misconfigured.dag \
                     global_pretraining_with_ospool_w_anvil_misconfigured.dag \
         --metl-logs metl.log metl_misconfigured.log \
+        --include-standalone \
         --output full_ospool-grand-total.csv
 
 _csv-chtc:
