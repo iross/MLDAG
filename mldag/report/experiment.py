@@ -1715,33 +1715,79 @@ class ExperimentAnalyzer:
         start, end = self.period
         return df[(df['End Time'] >= start) & (df['End Time'] <= end)]
 
-    def _headline_totals(self, df: pd.DataFrame) -> Tuple[int, int, float]:
-        """Return (completed epochs, completed models, GPU hours) for the given attempts."""
-        return (
-            self._count_completed_epochs(df),
-            self._count_completed_models(df),
-            float(self._gpu_usage_rows(df)['GPU Hours'].sum()),
-        )
+    @staticmethod
+    def _gpu_device_label(name) -> str:
+        """Return a readable GPU model name; slot IDs like 'GPUs_MIG_<uuid>' carry no model."""
+        if pd.isna(name) or name == '':
+            return 'Unknown GPU'
+        if name.startswith('GPUs_MIG_'):
+            return 'MIG slice (model not recorded)'
+        if name.startswith('GPUs_'):
+            return 'Unknown GPU'
+        return name
+
+    @staticmethod
+    def _site_label(row: pd.Series) -> str:
+        """Return the GLIDEIN site when recorded, else the targeted resource."""
+        glidein = row['GLIDEIN Resource Name']
+        if pd.notna(glidein) and glidein != '':
+            return glidein
+        resource = row['Targeted Resource']
+        if pd.isna(resource) or resource == '':
+            return 'Unknown'
+        if resource.lower() == 'ospool':
+            return 'ospool (site not recorded)'
+        return resource
+
+    def _headline_totals(self, df: pd.DataFrame) -> dict:
+        """Return headline counts and the GPU devices and sites behind the GPU hours."""
+        gpu_rows = self._gpu_usage_rows(df)
+        if gpu_rows.empty:
+            devices, sites = set(), set()
+        else:
+            devices = set(gpu_rows['GPU Device Name'].map(self._gpu_device_label))
+            sites = set(gpu_rows.apply(self._site_label, axis=1))
+        return {
+            'counts': {
+                'Completed Epochs': self._count_completed_epochs(df),
+                f'Completed Models ({EPOCHS_PER_MODEL} epochs done)':
+                    self._count_completed_models(df),
+                'GPU Hours': float(gpu_rows['GPU Hours'].sum()),
+                'GPU Device Types': len(devices),
+                'Sites': len(sites),
+            },
+            'GPU Devices': devices,
+            'Sites': sites,
+        }
+
+    @staticmethod
+    def _listing_lines(title: str, all_time: set, this_period: Optional[set]) -> list[str]:
+        """List all-time items, marking those also used in the period when there is one."""
+        lines = ["", f"{title}:"]
+        for item in sorted(all_time):
+            marker = "  [this period]" if this_period is not None and item in this_period else ""
+            lines.append(f"  • {item}{marker}")
+        return lines
 
     def _build_executive_summary_lines(self) -> list[str]:
         """Build the executive summary: headline totals for the period and for all time."""
         lines = ["EXECUTIVE SUMMARY:", "-" * 18]
-        labels = [
-            "Completed Epochs",
-            f"Completed Models ({EPOCHS_PER_MODEL} epochs done)",
-            "GPU Hours",
-        ]
         all_time = self._headline_totals(self.all_df)
+        this_period = None
         if self.period is None:
-            for label, value in zip(labels, all_time):
+            for label, value in all_time['counts'].items():
                 lines.append(f"{label}: {value:,.0f}")
-            return lines
+        else:
+            this_period = self._headline_totals(self._ended_in_period(self.all_df))
+            width = max(len(label) for label in all_time['counts'])
+            lines.append(f"{'':<{width}}  {'This Period':>12}  {'All Time':>12}")
+            for label, total_value in all_time['counts'].items():
+                period_value = this_period['counts'][label]
+                lines.append(f"{label:<{width}}  {period_value:>12,.0f}  {total_value:>12,.0f}")
 
-        this_period = self._headline_totals(self._ended_in_period(self.all_df))
-        width = max(len(label) for label in labels)
-        lines.append(f"{'':<{width}}  {'This Period':>12}  {'All Time':>12}")
-        for label, period_value, total_value in zip(labels, this_period, all_time):
-            lines.append(f"{label:<{width}}  {period_value:>12,.0f}  {total_value:>12,.0f}")
+        for key in ('GPU Devices', 'Sites'):
+            period_items = this_period[key] if this_period is not None else None
+            lines.extend(self._listing_lines(key, all_time[key], period_items))
         return lines
 
     @staticmethod

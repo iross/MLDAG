@@ -180,3 +180,36 @@ def test_month_counts_attempts_by_end_time(tmp_path):
     assert len(analyzer.df) == 1
     assert "Total Completed Epochs: 0" in lines
     assert "Completed Models (30 epochs done): 0" in lines
+
+
+def test_executive_summary_lists_gpu_devices_and_sites(tmp_path):
+    csv_path = write_jobs_csv(
+        tmp_path / "jobs.csv",
+        [
+            ("run0-train_epoch0", "2026-08-20 10:00", "2026-08-20 12:00"),
+            ("run0-train_epoch1", "2026-09-10 10:00", "2026-09-10 12:00"),
+            ("run0-train_epoch2", "2026-09-11 10:00", "2026-09-11 12:00"),
+        ],
+    )
+    df = pd.read_csv(csv_path)
+    df["Number of GPUs"] = 1
+    df["GPU Device Name"] = ["NVIDIA A100", "GPUs_MIG_25b92ee8", "NVIDIA H200"]
+    df["Targeted Resource"] = ["delta", "ospool", "ospool"]
+    df["GLIDEIN Resource Name"] = [None, None, "UCSD-NRP"]
+    df.to_csv(csv_path, index=False)
+
+    start, end = _parse_month("2026-09")
+    analyzer = ExperimentAnalyzer(
+        str(csv_path), str(tmp_path / "out"), start_date=start, end_date=end
+    )
+    lines = analyzer._build_executive_summary_lines()
+
+    assert [line.split()[-2:] for line in lines if line.startswith("GPU Device Types")] == [
+        ["2", "3"]
+    ]
+    assert [line.split()[-2:] for line in lines if line.startswith("Sites ")] == [["2", "3"]]
+    assert "  • NVIDIA A100" in lines
+    assert "  • MIG slice (model not recorded)  [this period]" in lines
+    assert "  • UCSD-NRP  [this period]" in lines
+    assert "  • delta" in lines
+    assert "  • ospool (site not recorded)  [this period]" in lines
