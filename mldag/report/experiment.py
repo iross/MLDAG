@@ -29,6 +29,8 @@ import warnings
 # Suppress future warnings from pandas/seaborn
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+EPOCHS_PER_MODEL = 30
+
 class ExperimentAnalyzer:
     """Main class for analyzing experiment data and generating reports."""
 
@@ -46,13 +48,17 @@ class ExperimentAnalyzer:
 
         # Load and validate data
         self.df = self.load_data()
+        self.all_df = self.df
+        self.period: Optional[Tuple[pd.Timestamp, pd.Timestamp]] = None
 
         if hours is not None:
-            self.df = self._filter_recent(self.df, hours)
+            self.period = self._recent_bounds(hours)
+            self.df = self._filter_active(self.df, *self.period)
             print(f"Filtered to jobs active in the last {hours} hours: {len(self.df)} attempts")
 
         if start_date is not None or end_date is not None:
-            self.df = self._filter_date_range(self.df, start_date, end_date)
+            self.period = self._date_range_bounds(start_date, end_date)
+            self.df = self._filter_active(self.df, *self.period)
             print(f"Filtered to jobs active between {start_date} and {end_date}: {len(self.df)} attempts")
 
         self.validate_data()
@@ -108,27 +114,27 @@ class ExperimentAnalyzer:
 
         return df
 
-    def _filter_recent(self, df: pd.DataFrame, hours: int) -> pd.DataFrame:
-        """Return rows where any timing column falls within the last `hours` hours."""
-        from datetime import datetime, timezone, timedelta
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
-        activity_cols = ['Submit Time', 'Start Time', 'End Time']
-        present_cols = [c for c in activity_cols if c in df.columns]
-        mask = pd.Series(False, index=df.index)
-        for col in present_cols:
-            mask |= df[col].notna() & (df[col] >= cutoff)
-        return df[mask].copy()
+    @staticmethod
+    def _recent_bounds(hours: int) -> Tuple[pd.Timestamp, pd.Timestamp]:
+        """Return (now - hours, max) bounds in naive UTC, matching the CSV timestamps."""
+        cutoff = pd.Timestamp.now(tz='UTC').tz_localize(None) - pd.Timedelta(hours=hours)
+        return cutoff, pd.Timestamp.max
 
-    def _filter_date_range(self, df: pd.DataFrame, start_date: Optional[str],
-                            end_date: Optional[str]) -> pd.DataFrame:
-        """Return rows where any timing column falls within [start_date, end_date]."""
+    @staticmethod
+    def _date_range_bounds(start_date: Optional[str],
+                           end_date: Optional[str]) -> Tuple[pd.Timestamp, pd.Timestamp]:
+        """Return inclusive bounds for [start_date, end_date], covering the whole end day."""
         start = pd.to_datetime(start_date) if start_date else pd.Timestamp.min
         end = pd.to_datetime(end_date) if end_date else pd.Timestamp.max
         if start_date and end_date and start > end:
             raise ValueError(f"start_date ({start_date}) must not be after end_date ({end_date})")
-        # Include the entire end_date day.
         if end_date:
             end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        return start, end
+
+    @staticmethod
+    def _filter_active(df: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+        """Return rows where any of submit/start/end time falls within [start, end]."""
         activity_cols = ['Submit Time', 'Start Time', 'End Time']
         present_cols = [c for c in activity_cols if c in df.columns]
         mask = pd.Series(False, index=df.index)
@@ -1296,21 +1302,11 @@ class ExperimentAnalyzer:
 
     def plot_gpu_hours_over_time(self):
         """Generate cumulative GPU hours utilized over time visualization."""
-        # Filter for GPU jobs with execution time data
-        gpu_data = self.df[
-            (self.df['Number of GPUs'] > 0) &
-            (self.df['End Time'].notna()) &
-            (self.df['Execution Duration (seconds)'].notna()) &
-            (self.df['Execution Duration (seconds)'] > 0) &
-            (self.df['Final Status'].isin(['completed', 'checkpointed', 'held', 'evicted']))  # Include all jobs that used GPU time
-        ].copy()
+        gpu_data = self._gpu_usage_rows(self.df)
 
         if gpu_data.empty:
             print("No GPU usage data found for time series analysis")
             return
-
-        # Calculate GPU hours for each job (execution time * number of GPUs)
-        gpu_data['GPU Hours'] = (gpu_data['Execution Duration (seconds)'] / 3600) * gpu_data['Number of GPUs']
 
         # Convert End Time to datetime and extract date
         gpu_data['End Date'] = gpu_data['End Time'].dt.date
@@ -1694,6 +1690,74 @@ class ExperimentAnalyzer:
         )
         return int(df.loc[mask, 'Epochs Completed'].sum())
 
+    @staticmethod
+    def _gpu_usage_rows(df: pd.DataFrame) -> pd.DataFrame:
+        """Return attempts that used GPU time, with a 'GPU Hours' column (duration x GPUs)."""
+        gpu_data = df[
+            (df['Number of GPUs'] > 0)
+            & df['End Time'].notna()
+            & (df['Execution Duration (seconds)'] > 0)
+            & df['Final Status'].isin(['completed', 'checkpointed', 'held', 'evicted'])
+        ].copy()
+        gpu_data['GPU Hours'] = (
+            gpu_data['Execution Duration (seconds)'] / 3600 * gpu_data['Number of GPUs']
+        )
+        return gpu_data
+
+    def _ended_in_period(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Restrict to attempts that ended within the report period (all rows if unfiltered).
+
+        Attributing work by end time keeps per-month totals from double counting attempts
+        that span a month boundary.
+        """
+        if self.period is None:
+            return df
+        start, end = self.period
+        return df[(df['End Time'] >= start) & (df['End Time'] <= end)]
+
+    def _headline_totals(self, df: pd.DataFrame) -> Tuple[int, int, float]:
+        """Return (completed epochs, completed models, GPU hours) for the given attempts."""
+        return (
+            self._count_completed_epochs(df),
+            self._count_completed_models(df),
+            float(self._gpu_usage_rows(df)['GPU Hours'].sum()),
+        )
+
+    def _build_executive_summary_lines(self) -> list[str]:
+        """Build the executive summary: headline totals for the period and for all time."""
+        lines = ["EXECUTIVE SUMMARY:", "-" * 18]
+        labels = [
+            "Completed Epochs",
+            f"Completed Models ({EPOCHS_PER_MODEL} epochs done)",
+            "GPU Hours",
+        ]
+        all_time = self._headline_totals(self.all_df)
+        if self.period is None:
+            for label, value in zip(labels, all_time):
+                lines.append(f"{label}: {value:,.0f}")
+            return lines
+
+        this_period = self._headline_totals(self._ended_in_period(self.all_df))
+        width = max(len(label) for label in labels)
+        lines.append(f"{'':<{width}}  {'This Period':>12}  {'All Time':>12}")
+        for label, period_value, total_value in zip(labels, this_period, all_time):
+            lines.append(f"{label:<{width}}  {period_value:>12,.0f}  {total_value:>12,.0f}")
+        return lines
+
+    @staticmethod
+    def _count_completed_models(df: pd.DataFrame) -> int:
+        """Count models whose final epoch (index EPOCHS_PER_MODEL - 1) has a successful attempt.
+
+        A model is one training run within a DAG, identified by DAG Source plus the job-name
+        prefix before the epoch suffix (e.g. ``run3`` in ``run3-train_epoch29``).
+        """
+        final_epoch = df[
+            df['Final Status'].isin(['completed', 'checkpointed'])
+            & (df['Epoch'] == EPOCHS_PER_MODEL - 1)
+        ]
+        run_names = final_epoch['Job Name'].str.replace(r'-[^-]*epoch\d+$', '', regex=True)
+        return len(set(zip(final_epoch['DAG Source'], run_names)))
+
     def _build_summary_report_lines(self, title: str) -> list[str]:
         """Build summary report lines using the current self.df."""
         epoch_stats = self.extract_epoch_stats()
@@ -1701,7 +1765,7 @@ class ExperimentAnalyzer:
         transfer_analysis = self.analyze_data_transfer()
 
         has_completions = not epoch_stats.empty
-        total_completed_epochs = self._count_completed_epochs(self.df)
+        total_completed_epochs = self._count_completed_epochs(self._ended_in_period(self.df))
 
         submit_min = self.df['Submit Time'].dropna().min()
         submit_max = self.df['Submit Time'].dropna().max()
@@ -1726,6 +1790,8 @@ class ExperimentAnalyzer:
             f"Total Job Attempts: {len(self.df):,}",
             f"Unique Jobs: {self.df['Job Name'].nunique():,}",
             f"Total Completed Epochs: {total_completed_epochs:,}",
+            f"Completed Models ({EPOCHS_PER_MODEL} epochs done): "
+            f"{self._count_completed_models(self._ended_in_period(self.df)):,}",
             "",
             "RESOURCE UTILIZATION:",
             "-" * 20,
@@ -1775,7 +1841,7 @@ class ExperimentAnalyzer:
             report_lines.extend([
                 "GPU UTILIZATION:",
                 "-" * 16,
-                f"Total GPU Hours: {gpu_analysis['total_gpu_hours']:,.1f}",
+                f"Hours on Longest Attempt per Job: {gpu_analysis['total_gpu_hours']:,.1f}",
                 f"GPU Types Used: {len(gpu_analysis['efficiency'])}",
                 ""
             ])
@@ -1815,6 +1881,7 @@ class ExperimentAnalyzer:
                     f"mean {row['Mean (min)']:.1f} min ({int(row['Job Count'])} jobs)"
                 )
 
+        report_lines.extend(["", *self._build_executive_summary_lines()])
         return report_lines
 
     def generate_summary_report(self):
@@ -1825,7 +1892,11 @@ class ExperimentAnalyzer:
         with open(report_file, 'w') as f:
             f.write(report_text)
 
+        executive_file = self.output_dir / "executive_summary.txt"
+        executive_file.write_text("\n".join(self._build_executive_summary_lines()) + "\n")
+
         print(f"Summary report saved: {report_file}")
+        print(f"Executive summary saved: {executive_file}")
         print("\n" + report_text)
 
     def generate_all_reports(self):

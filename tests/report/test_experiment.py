@@ -94,3 +94,89 @@ def test_summary_period_shows_requested_window(tmp_path):
     lines = analyzer._build_summary_report_lines("TITLE")
 
     assert any(line.startswith("Analysis Period: 2026-09-01 to 2026-09-30") for line in lines)
+
+
+def test_summary_counts_models_with_final_epoch_done(tmp_path):
+    csv_path = write_jobs_csv(
+        tmp_path / "jobs.csv",
+        [
+            ("run0-train_epoch29", "2026-09-01 10:00", "2026-09-01 12:00"),
+            ("run0-train_epoch29", "2026-09-02 10:00", "2026-09-02 12:00"),
+            ("run1-train_epoch28", "2026-09-01 10:00", "2026-09-01 12:00"),
+            ("run2-train_epoch29", "2026-09-01 10:00", "2026-09-01 12:00"),
+        ],
+    )
+    df = pd.read_csv(csv_path)
+    df.loc[3, "Final Status"] = "failed"
+    df.to_csv(csv_path, index=False)
+
+    analyzer = ExperimentAnalyzer(str(csv_path), str(tmp_path / "out"))
+    lines = analyzer._build_summary_report_lines("TITLE")
+
+    assert "Completed Models (30 epochs done): 1" in lines
+
+
+def _set_gpus(csv_path, gpus):
+    df = pd.read_csv(csv_path)
+    df["Number of GPUs"] = gpus
+    df.to_csv(csv_path, index=False)
+
+
+def test_executive_summary_unfiltered_shows_all_time_totals(tmp_path):
+    csv_path = write_jobs_csv(
+        tmp_path / "jobs.csv",
+        [
+            ("run0-train_epoch28", "2026-09-01 10:00", "2026-09-01 12:00"),
+            ("run0-train_epoch29", "2026-09-02 10:00", "2026-09-02 12:00"),
+        ],
+    )
+    _set_gpus(csv_path, [1, 2])
+
+    analyzer = ExperimentAnalyzer(str(csv_path), str(tmp_path / "out"))
+    lines = analyzer._build_executive_summary_lines()
+
+    assert "Completed Epochs: 2" in lines
+    assert "Completed Models (30 epochs done): 1" in lines
+    assert "GPU Hours: 6" in lines
+
+
+def test_executive_summary_month_splits_period_from_all_time(tmp_path):
+    csv_path = write_jobs_csv(
+        tmp_path / "jobs.csv",
+        [
+            ("run0-train_epoch29", "2026-08-20 10:00", "2026-08-20 12:00"),
+            ("run1-train_epoch28", "2026-08-31 22:00", "2026-09-01 02:00"),
+            ("run1-train_epoch29", "2026-09-10 10:00", "2026-09-10 12:00"),
+        ],
+    )
+    _set_gpus(csv_path, [1, 1, 1])
+
+    start, end = _parse_month("2026-09")
+    analyzer = ExperimentAnalyzer(
+        str(csv_path), str(tmp_path / "out"), start_date=start, end_date=end
+    )
+    rows = {
+        line.split("  ")[0].strip(): line.split()[-2:]
+        for line in analyzer._build_executive_summary_lines()[3:]
+    }
+
+    assert rows["Completed Epochs"] == ["2", "3"]
+    assert rows["Completed Models (30 epochs done)"] == ["1", "2"]
+    assert rows["GPU Hours"] == ["4", "6"]
+
+
+def test_month_counts_attempts_by_end_time(tmp_path):
+    csv_path = write_jobs_csv(
+        tmp_path / "jobs.csv",
+        [("run0-train_epoch29", "2026-08-31 22:00", "2026-09-01 02:00")],
+    )
+
+    start, end = _parse_month("2026-08")
+    analyzer = ExperimentAnalyzer(
+        str(csv_path), str(tmp_path / "out"), start_date=start, end_date=end
+    )
+    lines = analyzer._build_summary_report_lines("TITLE")
+
+    assert len(analyzer.df) == 1
+    assert "Total Completed Epochs: 0" in lines
+    assert "Completed Models (30 epochs done): 0" in lines
