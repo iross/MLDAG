@@ -29,6 +29,8 @@ import warnings
 # Suppress future warnings from pandas/seaborn
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+EPOCHS_PER_MODEL = 30
+
 class ExperimentAnalyzer:
     """Main class for analyzing experiment data and generating reports."""
 
@@ -1694,6 +1696,20 @@ class ExperimentAnalyzer:
         )
         return int(df.loc[mask, 'Epochs Completed'].sum())
 
+    @staticmethod
+    def _count_completed_models(df: pd.DataFrame) -> int:
+        """Count models whose final epoch (index EPOCHS_PER_MODEL - 1) has a successful attempt.
+
+        A model is one training run within a DAG, identified by DAG Source plus the job-name
+        prefix before the epoch suffix (e.g. ``run3`` in ``run3-train_epoch29``).
+        """
+        final_epoch = df[
+            df['Final Status'].isin(['completed', 'checkpointed'])
+            & (df['Epoch'] == EPOCHS_PER_MODEL - 1)
+        ]
+        run_names = final_epoch['Job Name'].str.replace(r'-[^-]*epoch\d+$', '', regex=True)
+        return len(set(zip(final_epoch['DAG Source'], run_names)))
+
     def _build_summary_report_lines(self, title: str) -> list[str]:
         """Build summary report lines using the current self.df."""
         epoch_stats = self.extract_epoch_stats()
@@ -1726,6 +1742,8 @@ class ExperimentAnalyzer:
             f"Total Job Attempts: {len(self.df):,}",
             f"Unique Jobs: {self.df['Job Name'].nunique():,}",
             f"Total Completed Epochs: {total_completed_epochs:,}",
+            f"Completed Models ({EPOCHS_PER_MODEL} epochs done): "
+            f"{self._count_completed_models(self.df):,}",
             "",
             "RESOURCE UTILIZATION:",
             "-" * 20,

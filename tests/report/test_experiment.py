@@ -94,3 +94,23 @@ def test_summary_period_shows_requested_window(tmp_path):
     lines = analyzer._build_summary_report_lines("TITLE")
 
     assert any(line.startswith("Analysis Period: 2026-09-01 to 2026-09-30") for line in lines)
+
+
+def test_summary_counts_models_with_final_epoch_done(tmp_path):
+    csv_path = write_jobs_csv(
+        tmp_path / "jobs.csv",
+        [
+            ("run0-train_epoch29", "2026-09-01 10:00", "2026-09-01 12:00"),
+            ("run0-train_epoch29", "2026-09-02 10:00", "2026-09-02 12:00"),
+            ("run1-train_epoch28", "2026-09-01 10:00", "2026-09-01 12:00"),
+            ("run2-train_epoch29", "2026-09-01 10:00", "2026-09-01 12:00"),
+        ],
+    )
+    df = pd.read_csv(csv_path)
+    df.loc[3, "Final Status"] = "failed"
+    df.to_csv(csv_path, index=False)
+
+    analyzer = ExperimentAnalyzer(str(csv_path), str(tmp_path / "out"))
+    lines = analyzer._build_summary_report_lines("TITLE")
+
+    assert "Completed Models (30 epochs done): 1" in lines
