@@ -14,13 +14,14 @@ fi
 
 export PROVENANCE_RUN_ID="$run_uuid"
 
-# Install mldag at the exact version baked in at DAG generation time.
-# --no-deps: provenance modules are pure stdlib; avoids pulling in pandas/polars/etc.
-pip install --quiet --no-deps --target="$PWD/.mldag" "git+https://github.com/iross/MLDAG@v${MLDAG_VERSION:?MLDAG_VERSION not set}"
-export PYTHONPATH="$PWD/.mldag${PYTHONPATH:+:$PYTHONPATH}"
+# Install htprovenance at the exact version baked in at DAG generation time.
+# --no-deps: the job-side provenance modules only need the standard library.
+pip install --quiet --no-deps --target="$PWD/.htprovenance" \
+    "git+https://github.com/iross/htprovenance@v${HTPROVENANCE_VERSION:?HTPROVENANCE_VERSION not set}"
+export PYTHONPATH="$PWD/.htprovenance${PYTHONPATH:+:$PYTHONPATH}"
 
 _provenance_capture_and_emit() {
-    # Best-effort: mldag.provenance.autocapture.capture_and_emit() never
+    # Best-effort: htprovenance.autocapture.capture_and_emit() never
     # raises internally, but this wraps the whole thing anyway (torch
     # itself might be missing) so a broken capture step can never abort the
     # training job -- unlike the old inline heredoc this replaced, which ran
@@ -30,7 +31,7 @@ _provenance_capture_and_emit() {
     # override is passed) and handed to capture_and_emit as an override.
     python3 - <<'PYEOF'
 try:
-    from mldag.provenance.autocapture import capture_and_emit
+    from htprovenance.autocapture import capture_and_emit
 
     gpu_info = None
     try:
@@ -45,7 +46,7 @@ try:
             if gpu_count > 0:
                 gpu_info["gpu_id"] = str(torch.cuda.get_device_properties(0).uuid)
         except AttributeError:
-            from mldag.provenance.autocapture import default_gpu_info
+            from htprovenance.autocapture import default_gpu_info
 
             gpu_info["gpu_id"] = default_gpu_info()[0]["gpu_id"]
     except ImportError:
@@ -106,4 +107,4 @@ python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain
 
 _watcher_args=(--one-shot --start-time "$_TRAIN_START")
 [ -f disk_bench.json ] && _watcher_args+=(--extra-sidecar-json disk_bench.json)
-python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" "${_watcher_args[@]}"
+python3 -m htprovenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" "${_watcher_args[@]}"

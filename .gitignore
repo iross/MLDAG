@@ -53,7 +53,7 @@ slow_transfers
 global_checkpoint_files
 csv_resources.txt
 
-# Generated provenance database (mldag-query db build)
+# Generated provenance database (htprovenance-query db build)
 *.db
 
 # HTCondor cluster output directories (8-digit cluster IDs)

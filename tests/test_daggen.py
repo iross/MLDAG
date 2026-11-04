@@ -1,9 +1,18 @@
+import importlib.util
+import re
+
 import pytest
 
 pytest.importorskip("htcondor2", reason="htcondor2 is a Linux-only dependency; daggen.py is untestable elsewhere")
 
-from mldag.constants import DEFAULT_CLASSAD_FIELDS_FILE
-from mldag.daggen import Job, get_ospool_submit_description, get_script, get_submit_description
+from htprovenance.constants import DEFAULT_CLASSAD_FIELDS_FILE
+from mldag.daggen import (
+    Job,
+    get_ospool_submit_description,
+    get_script,
+    get_service,
+    get_submit_description,
+)
 from mldag.models.experiment import Experiment
 from mldag.models.resource import Resource
 
@@ -53,3 +62,21 @@ def test_get_ospool_submit_description_does_not_add_job_ad_file():
     assert "transfer_input_files = pretrain.sh\n" in submit
     assert "job_ad_file" not in submit
     assert ".keep" not in submit
+
+
+def test_baked_module_paths_resolve():
+    baked = get_script(_job(), Resource(), config={}) + get_service()
+    modules = re.findall(r"-m (\S+)", baked)
+
+    assert sorted(modules) == ["htprovenance.log_monitor", "htprovenance.post", "htprovenance.pre"]
+    for module in modules:
+        assert importlib.util.find_spec(module) is not None, module
+
+
+def test_submit_description_bakes_htprovenance_version():
+    description = get_submit_description(
+        None, Resource(), config={}, experiment=_experiment("queue"), htprovenance_version="1.2.3"
+    )
+
+    assert "HTPROVENANCE_VERSION=1.2.3" in description
+    assert "MLDAG_VERSION" not in description

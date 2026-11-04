@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 
 import importlib.metadata
-import subprocess
 import sys
 from pathlib import Path
 import typer
 from typing_extensions import Annotated
 import textwrap
 import htcondor2 as htcondor
-import random
 from pydantic import BaseModel
 import yaml
-from mldag.constants import DEFAULT_CLASSAD_FIELDS_FILE
+from htprovenance.constants import DEFAULT_CLASSAD_FIELDS_FILE
 from mldag.models.resource import Resource, ResourceType, get_resources_from_yaml
 from mldag.models.training_run import TrainingRun
 from mldag.models.experiment import Experiment, read_from_config
@@ -27,18 +25,10 @@ EVAL=False
 PROVENANCE_DIR = "output/provenance"
 
 
-def _mldag_version() -> str:
-    try:
-        return importlib.metadata.version("mldag")
-    except importlib.metadata.PackageNotFoundError:
-        # Fallback during development before the package is installed
-        try:
-            return subprocess.run(
-                ["git", "rev-parse", "--short", "HEAD"],
-                capture_output=True, text=True, check=True,
-            ).stdout.strip()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return "unknown"
+def _htprovenance_version() -> str:
+    # Baked into each job's environment so the job installs the same
+    # htprovenance release that wrote this DAG's PRE/POST/SERVICE lines.
+    return importlib.metadata.version("htprovenance")
 
 class Job(BaseModel):
     name: str # combination of epoch and type
@@ -127,8 +117,8 @@ def get_script(
         # Available POST macros: $NODE $RETURN $JOBID $CLUSTERID $RETRY
         # $MAX_RETRIES $SUCCESS $PRE_SCRIPT_RETURN $EXIT_CODES $DAGID $DAG_STATUS
         post_args += f' --post-hook {post_hook}'
-    script_txt = f'SCRIPT PRE  {job.name} {python} -m mldag.provenance.pre {pre_args}\n'
-    script_txt += f'SCRIPT POST {job.name} {python} -m mldag.provenance.post {post_args}\n'
+    script_txt = f'SCRIPT PRE  {job.name} {python} -m htprovenance.pre {pre_args}\n'
+    script_txt += f'SCRIPT POST {job.name} {python} -m htprovenance.post {post_args}\n'
     return script_txt
 
 def get_service(python_exe: str = "python3") -> str:
@@ -138,7 +128,7 @@ def get_service(python_exe: str = "python3") -> str:
     SUBMIT-DESCRIPTION provenance_monitor.sub {{
         universe = local
         executable = {python_exe}
-        arguments = -m mldag.provenance.log_monitor --log-file metl.log --classad-dir {PROVENANCE_DIR} --event-dir {PROVENANCE_DIR}
+        arguments = -m htprovenance.log_monitor --log-file metl.log --classad-dir {PROVENANCE_DIR} --event-dir {PROVENANCE_DIR}
         queue
     }}
     SERVICE provenance_monitor provenance_monitor.sub
@@ -150,7 +140,7 @@ class EvaluationRun:
         raise NotImplementedError("EvaluationRun is not implemented")
 
 
-def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment, mldag_version: str = "unknown") -> str:
+def get_submit_description(job: Job, resource: Resource, config: dict, experiment: Experiment, htprovenance_version: str = "unknown") -> str:
     inner_txt = experiment.submit_template.format(resource = resource)
 
     # Hacky. Fix this.
@@ -162,7 +152,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
         inner_txt += f'MY.TargetAnnexName = "{resource.name}_annex"\n'
     env_vars = [
         "PROVENANCE_RUN_ID=$(run_uuid)",
-        f"MLDAG_VERSION={mldag_version}",
+        f"HTPROVENANCE_VERSION={htprovenance_version}",
         f"PROVENANCE_LOG_DIR={PROVENANCE_DIR}",
     ]
     if "wandb" in config:
@@ -177,7 +167,7 @@ def get_submit_description(job: Job, resource: Resource, config: dict, experimen
     dag_txt += "}\n"
     return dag_txt
 
-def get_ospool_submit_description(config: dict, experiment: Experiment, mldag_version: str = "unknown") -> str:
+def get_ospool_submit_description(config: dict, experiment: Experiment, htprovenance_version: str = "unknown") -> str:
     """Create a shared submit description for OSPool resources"""
     inner_txt = experiment.submit_template.format(resource=Resource(name="ospool", resource_type=ResourceType.OSPOOL))
 
@@ -190,7 +180,7 @@ def get_ospool_submit_description(config: dict, experiment: Experiment, mldag_ve
 
     env_vars = [
         "PROVENANCE_RUN_ID=$(run_uuid)",
-        f"MLDAG_VERSION={mldag_version}",
+        f"HTPROVENANCE_VERSION={htprovenance_version}",
         f"PROVENANCE_LOG_DIR={PROVENANCE_DIR}",
     ]
     if "wandb" in config:
@@ -212,7 +202,7 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     experiment = read_from_config("Experiment.yaml")
     ename = experiment.name.replace(' ', '_').lower()
     dag_txt = ''
-    mldag_version = _mldag_version()
+    htprovenance_version = _htprovenance_version()
 
     num_epoch = experiment.vars['epochs']
     epochs_per_job = experiment.vars['epochs_per_job']
@@ -242,7 +232,8 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
     ospool_resources = []
     for tr in experiment.training_runs:
         for resource in tr.resources:
-            if resource.name in resource_names: continue
+            if resource.name in resource_names:
+                continue
             resources.append(resource)
             resource_names.add(resource.name)
             if resource.resource_type == ResourceType.OSPOOL:
@@ -250,12 +241,12 @@ def main(config: Annotated[str, typer.Argument(help="Path to YAML config file")]
 
     # Generate shared ospool submit description if there are any ospool resources
     if ospool_resources:
-        dag_txt += get_ospool_submit_description(config, experiment, mldag_version)
+        dag_txt += get_ospool_submit_description(config, experiment, htprovenance_version)
 
     # Generate individual submit descriptions for non-ospool resources
     for resource in resources:
         if resource.resource_type != ResourceType.OSPOOL:
-            dag_txt += get_submit_description(None, resource, config, experiment, mldag_version)
+            dag_txt += get_submit_description(None, resource, config, experiment, htprovenance_version)
 
     i = 0
     for tr in experiment.training_runs: # for each shishkabob

@@ -13,8 +13,15 @@ fi
 
 #echo "Copying global dataset"
 # cp /staging/iaross/processed-global.tar.gz .
+
+# Install htprovenance at the exact version baked in at DAG generation time.
+# --no-deps: the job-side provenance modules only need the standard library.
+pip install --quiet --no-deps --target="$PWD/.htprovenance" \
+    "git+https://github.com/iross/htprovenance@v${HTPROVENANCE_VERSION:?HTPROVENANCE_VERSION not set}"
+export PYTHONPATH="$PWD/.htprovenance${PYTHONPATH:+:$PYTHONPATH}"
+
 _provenance_capture_and_emit() {
-    # Best-effort: mldag.provenance.autocapture.capture_and_emit() never
+    # Best-effort: htprovenance.autocapture.capture_and_emit() never
     # raises internally, but this wraps the whole thing anyway (torch
     # itself might be missing) so a broken capture step can never abort the
     # training job -- unlike the old inline heredoc this replaced, which ran
@@ -24,7 +31,7 @@ _provenance_capture_and_emit() {
     # override is passed) and handed to capture_and_emit as an override.
     python3 - <<'PYEOF'
 try:
-    from mldag.provenance.autocapture import capture_and_emit
+    from htprovenance.autocapture import capture_and_emit
 
     gpu_info = None
     try:
@@ -39,7 +46,7 @@ try:
             if gpu_count > 0:
                 gpu_info["gpu_id"] = str(torch.cuda.get_device_properties(0).uuid)
         except AttributeError:
-            from mldag.provenance.autocapture import default_gpu_info
+            from htprovenance.autocapture import default_gpu_info
 
             gpu_info["gpu_id"] = default_gpu_info()[0]["gpu_id"]
     except ImportError:
@@ -59,7 +66,7 @@ tar xzvf processed-global.tar.gz
 #unzip cleaned_data_test.zip -d precleaned
 rm processed-global.tar.gz
 
-ln -s /workspace/metl/data/
+ln -s /workspace/metl/data/ .
 
 pwd
 env
@@ -75,11 +82,11 @@ env
 _TRAIN_START=$(python3 -c "import time; print(time.time())")
 
 python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_global.txt \
-    --ds_fn $PWD/global/global.db   \
-    --split_dir $PWD/global/splits/standard_tr0.9_tu0.05_te0.05_w2a93d88bac32_r2098 \
-    --max_epochs $epochs --uuid=$run_uuid  \
-    --random_seed $random_seed
+    --ds_fn "$PWD/global/global.db"   \
+    --split_dir "$PWD/global/splits/standard_tr0.9_tu0.05_te0.05_w2a93d88bac32_r2098" \
+    --max_epochs "$epochs" --uuid="$run_uuid"  \
+    --random_seed "$random_seed"
 
-python3 -m mldag.provenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" \
+python3 -m htprovenance.watcher "$PWD" "${PROVENANCE_RUN_ID:-$run_uuid}" \
     --one-shot --start-time "$_TRAIN_START"
 
