@@ -1,11 +1,11 @@
 ---
 id: TASK-22
 title: 'Investigate and fix persistent unknown:<cluster_id> provenance files'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-05 16:18'
-updated_date: '2026-08-05 16:46'
+updated_date: '2026-11-04 19:16'
 labels: []
 dependencies: []
 ---
@@ -88,4 +88,6 @@ The remaining 814 are confirmed **not** a tool limitation: their job names (e.g.
 This result narrows down which hypothesis was more likely dominant, though it doesn't prove it outright: 956 of 1770 (54%) were resolvable via a **batch, post-hoc** cross-reference once a complete `metl.log` existed, using `cluster_id -> job_name` and `job_name -> run_id` data that was, in the end, discoverable somewhere in local files. That's consistent with H2 (the O(n) rescan) rather than H1 (directory mismatch): if `pre.py`/`post.py` and `log_monitor` had simply been writing to two different directories the whole time (H1), the job_name/run_id records this repair pass found would not have existed in `output/provenance/` at all -- but they did. A more likely explanation is that `log_monitor`'s per-lookup full-directory rescan fell behind during the live run (job turnover on OSPool is fast relative to an O(total history) scan repeated every poll), so by the time a cluster_id's mapping was finally resolved, several of that cluster's early events had already been emitted with the `unknown:` fallback -- explaining both why the data was recoverable after the fact and why it wasn't resolved live. This is inference from the repair results, not a direct observation of the live monitor process; confirming it with certainty would need instrumenting `log_monitor` during an actual run. Both the H1 and H2 code fixes remain justified regardless -- they were found by direct code review of real structural weaknesses, not dependent on which one dominated historically -- and the H2 fix in particular directly addresses the mechanism this evidence points to.
 
 Cleanup performed with explicit user confirmation: deleted the stale `provenance/` directory (byte-identical subset of `output/provenance/`) and the superseded root-level `recover_unknown_provenance.py`.
+
+2026-11-04: Closing. The DAGNodeName regex fix and AP-side <cluster_id>.run_id writes are in log_monitor.py, and mldag-repair handles existing unknown:<cluster_id>.ndjson files.
 <!-- SECTION:NOTES:END -->
