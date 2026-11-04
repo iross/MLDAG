@@ -61,24 +61,27 @@ _provenance_capture_and_emit
 
 echo "Looking around a bit"
 pwd
-ls
-
-#echo "Copying ${dataset_name} dataset"
-# cp "/staging/iaross/processed-${dataset_name}.tar.gz" .
-echo "Untarring ${dataset_name} dataset"
-mkdir -p ${dataset_name}
-tar -xvzf processed-${dataset_name}.tar.gz -C "${dataset_name}" --strip-components=1
-
-#unzip cleaned_data_test.zip -d precleaned
-rm "processed-${dataset_name}.tar.gz"
-echo "Looking around a bit"
-pwd
 ls -l
 
-ln -s /workspace/metl/data/
+ln -s /workspace/metl/data/ .
 
-split_dir=$(find "${dataset_name}/splits" -mindepth 1 -maxdepth 1 -type d | head -1)
-[[ -n "$split_dir" ]] || { echo "No splits subdirectory found in ${dataset_name}/splits" >&2; exit 1; }
+dataset_tarball="processed-${dataset_name}.tar.gz"
+if [[ -f "$dataset_tarball" ]]; then
+    echo "Untarring ${dataset_name} dataset"
+    mkdir -p "${dataset_name}"
+    tar -xzf "$dataset_tarball" -C "${dataset_name}" --strip-components=1
+    rm "$dataset_tarball"
+fi
+
+shopt -s nullglob
+split_dirs=("${dataset_name}"/splits/standard_*/)
+shopt -u nullglob
+if [[ ${#split_dirs[@]} -ne 1 ]]; then
+    echo "Expected exactly one standard_* split in ${dataset_name}/splits, found ${#split_dirs[@]}" >&2
+    ls -la "${dataset_name}/splits" >&2
+    exit 1
+fi
+split_dir="${split_dirs[0]%/}"
 
 echo "Using $split_dir as split path"
 
@@ -98,8 +101,8 @@ _TRAIN_START=$(python3 -c "import time; print(time.time())")
 python /workspace/metl/code/train_source_model.py @/workspace/metl/args/pretrain_local.txt \
     --ds_fn "$PWD/${dataset_name}/${dataset_name}.db"   \
     --split_dir "$PWD/${split_dir}" \
-    --max_epochs $epochs --uuid=$run_uuid  \
-    --random_seed $random_seed
+    --max_epochs "$epochs" --uuid="$run_uuid"  \
+    --random_seed "$random_seed"
 
 _watcher_args=(--one-shot --start-time "$_TRAIN_START")
 [ -f disk_bench.json ] && _watcher_args+=(--extra-sidecar-json disk_bench.json)
