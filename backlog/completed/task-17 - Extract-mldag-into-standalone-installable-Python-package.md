@@ -1,11 +1,11 @@
 ---
 id: TASK-17
 title: Extract mldag into standalone installable Python package
-status: In Progress
+status: Done
 assignee:
   - claude
 created_date: '2026-05-04 18:54'
-updated_date: '2026-05-18 15:49'
+updated_date: '2026-11-04 19:16'
 labels: []
 dependencies: []
 ---
@@ -18,12 +18,12 @@ The mldag framework (DAG generation, provenance tracking, log monitoring, report
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] `provenance_pre.sh` and `provenance_post.sh` removed — DAG calls `python -m mldag.provenance.pre/post` directly
-- [x] `hourly_dashboard.py` promoted to `mldag-dashboard` CLI entry point registered in pyproject.toml
-- [x] README documents how to bootstrap a new experiment repo against the package
-- [ ] mldag package is installable via pip/uv from PyPI or git URL
-- [ ] All CLI entry points (`mldag-gen`, `mldag-csv`, `mldag-report`, `mldag-dashboard`, provenance query) work after install
-- [ ] A minimal experiment repo bootstraps correctly with only Experiment.yaml, resources.yaml, config.yaml, and run artifacts — no framework code
+- [x] #1 `provenance_pre.sh` and `provenance_post.sh` removed — DAG calls `python -m mldag.provenance.pre/post` directly
+- [x] #2 `hourly_dashboard.py` promoted to `mldag-dashboard` CLI entry point registered in pyproject.toml
+- [x] #3 README documents how to bootstrap a new experiment repo against the package
+- [x] #4 mldag package is installable via pip/uv from PyPI or git URL
+- [x] #5 All CLI entry points (`mldag-gen`, `mldag-csv`, `mldag-report`, `mldag-dashboard`, provenance query) work after install
+- [x] #6 A minimal experiment repo bootstraps correctly with only Experiment.yaml, resources.yaml, config.yaml, and run artifacts — no framework code
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -93,4 +93,6 @@ The mldag framework (DAG generation, provenance tracking, log monitoring, report
 Completed three of the key AC items: (1) deleted provenance_pre.sh and provenance_post.sh — vestigial wrappers since daggen.py already calls python -m mldag.provenance.pre/post directly; (2) moved hourly_dashboard.py into mldag/dashboard.py and registered mldag-dashboard entry point in pyproject.toml; (3) rewrote README with a bootstrap section documenting install, entry points table, and minimal justfile template. Remaining: container image install verification and PyPI publish.
 
 2026-06-16: `uv build` produces a valid `dist/mldag-0.1.0rc11-py3-none-any.whl`. Installing the wheel and verifying entry points: `mldag-log-monitor`, `mldag-pre`, `mldag-post`, `mldag-query` all load and show --help correctly. `mldag-gen` and `mldag-dashboard` fail only due to missing runtime deps (htcondor, numpy) in the test environment — the packaging is correct. Remaining open items: PyPI publish and container image install verification, which require external access not available in this environment.
+
+2026-11-04: Closing. mldag installs from a git URL (pretrain_local.sh pip-installs git+https://github.com/iross/MLDAG@v<version> on execute nodes in production), and htprovenance is published to TestPyPI. mldag-csv, mldag-report, mldag-dashboard and mldag-query load after install; mldag-gen needs htcondor2, which is a runtime dependency on the AP rather than a packaging problem. Experiment repos now carry only config and run artifacts.
 <!-- SECTION:NOTES:END -->

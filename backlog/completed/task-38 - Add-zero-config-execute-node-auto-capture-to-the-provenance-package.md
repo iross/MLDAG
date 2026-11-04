@@ -3,10 +3,10 @@ id: TASK-38
 title: >-
   Add zero-config execute-node auto-capture (site info, GPU, jobad fields) to
   the provenance package
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-11 01:43'
-updated_date: '2026-09-22 15:52'
+updated_date: '2026-11-04 19:16'
 labels: []
 dependencies:
   - TASK-31
@@ -74,4 +74,6 @@ Recommended follow-up (not blocking, but not done here): submit one real test jo
 
 Files added: mldag/provenance/autocapture.py, mldag/provenance/_autorun.py, tests/provenance/test_autocapture.py, tests/provenance/test_autorun.py.
 Files modified: mldag/provenance/post.py (Cmd mapping), pretrain_local.sh, pretrain.sh, pyproject.toml (hatch-autorun build hook), tests/provenance/test_post.py, tests/provenance/test_jobad.py (Cmd coverage).
+
+2026-11-04: Closing. Shipped in PR #36.
 <!-- SECTION:NOTES:END -->
