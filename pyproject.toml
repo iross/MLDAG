@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mldag"
-version = "0.1.0rc29"
+version = "0.1.0rc30"
 description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,7 @@ dependencies = [
     # project.dependencies makes the built metadata unpublishable to an index,
     # which would break this package's own TestPyPI release on the next tag.
     # See [[tool.uv.index]] below for where it is resolved from.
-    "htprovenance>=0.1.0rc1",
+    "htprovenance>=0.1.0rc2",
     "elasticsearch>=9.1.2",
     "matplotlib>=3.9.4",
     "numpy>=2.0.2",

@@ -252,16 +252,16 @@ wheels = [
 
 [[package]]
 name = "htprovenance"
-version = "0.1.0rc1"
+version = "0.1.0rc2"
 source = { registry = "https://test.pypi.org/simple/" }
 dependencies = [
     { name = "htcondor", marker = "sys_platform == 'linux'" },
     { name = "pyyaml" },
     { name = "typer" },
 ]
-sdist = { url = "https://test-files.pythonhosted.org/packages/a7/52/c22af47070c948a81c6047c13b74733e5c488e540e5fdabc9a6c76a893f4/htprovenance-0.1.0rc1.tar.gz", hash = "sha256:b4aae703127034a40959ece6c9d790cf242fbc5f95f7f140db2ea148aa246467", size = 88915, upload-time = "2026-09-23T01:58:32.619Z" }
+sdist = { url = "https://test-files.pythonhosted.org/packages/54/12/fe12222b37dc28a1cc516621114b0f7590244a647d0c58f20821494709ce/htprovenance-0.1.0rc2.tar.gz", hash = "sha256:9acd453b57bed7776af2deeaf3bbff31d44ca9c5a2bbd1649865b5d1255834c2", size = 92534, upload-time = "2026-11-04T20:29:19.729Z" }
 wheels = [
-    { url = "https://test-files.pythonhosted.org/packages/95/3d/41f341cfd4f767887877713368bc8e4005c72f67cb6f57857a32f01045b6/htprovenance-0.1.0rc1-py3-none-any.whl", hash = "sha256:316f0aac58f1a30935ff6a22efd64c3e5eff93635e573860f33e5024ad0695b7", size = 50231, upload-time = "2026-09-23T01:58:31.063Z" },
+    { url = "https://test-files.pythonhosted.org/packages/a3/2a/3b0e64cb95aedbd0f3ce92b8038c7f9889af161429992592e95a1fc5dc93/htprovenance-0.1.0rc2-py3-none-any.whl", hash = "sha256:4149d8b07c0baf0feb25ccb11912db7bbe03c98413bdc94a92aef68aa3de9980", size = 53042, upload-time = "2026-11-04T20:29:17.793Z" },
 ]
 
 [[package]]
@@ -434,7 +434,7 @@ wheels = [
 
 [[package]]
 name = "mldag"
-version = "0.1.0rc29"
+version = "0.1.0rc30"
 source = { editable = "." }
 dependencies = [
     { name = "elasticsearch" },
@@ -464,7 +464,7 @@ dev = [
 requires-dist = [
     { name = "elasticsearch", specifier = ">=9.1.2" },
     { name = "htcondor", marker = "sys_platform == 'linux'", specifier = ">=25.8.2" },
-    { name = "htprovenance", specifier = ">=0.1.0rc1", index = "https://test.pypi.org/simple/" },
+    { name = "htprovenance", specifier = ">=0.1.0rc2", index = "https://test.pypi.org/simple/" },
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "pandas", specifier = ">=2.3.2" },
