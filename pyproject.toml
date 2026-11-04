@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mldag"
-version = "0.1.0rc27"
+version = "0.1.0rc28"
 description = "HTCondor ML training DAG generation, monitoring, and reporting"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,8 +19,8 @@ dependencies = [
     "matplotlib>=3.9.4",
     "numpy>=2.0.2",
     "pandas>=2.3.2",
-    "polars>=1.36.1",
     "pydantic>=2.11.7",
+    "rich>=14.0.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.2",
     "seaborn>=0.13.2",
@@ -34,12 +34,7 @@ mldag-gen     = "mldag.daggen:app"
 mldag-csv     = "mldag.report.csv:main"
 mldag-report  = "mldag.report.experiment:main"
 mldag-monitor = "mldag.monitor.htcondor:main"
-mldag-pre         = "mldag.provenance.pre:main"
-mldag-log-monitor = "mldag.provenance.log_monitor:main"
-mldag-post    = "mldag.provenance.post:main"
-mldag-query       = "mldag.provenance.query:main"
-mldag-repair      = "mldag.provenance.repair:main"
-mldag-dashboard   = "mldag.dashboard:main"
+mldag-dashboard = "mldag.dashboard:main"
 
 [project.urls]
 Homepage = "https://github.com/iross/MLDAG"
@@ -47,17 +42,6 @@ Repository = "https://github.com/iross/MLDAG"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mldag"]
-
-# Installs a .pth file that imports mldag.provenance._autorun at the start of
-# every Python process in this environment -- the zero-config auto-capture
-# hook (see mldag/provenance/_autorun.py and autocapture.py). hatch-autorun
-# is a build-time-only dependency (used by hatchling while building the
-# wheel, never installed alongside mldag itself) maintained by hatchling's
-# own author specifically for this .pth-injection pattern, avoiding the
-# editable-install/load-ordering pitfalls of hand-writing a custom build hook.
-[tool.hatch.build.targets.wheel.hooks.autorun]
-dependencies = ["hatch-autorun==1.1.0"]
-code = "import mldag.provenance._autorun"
 
 # htprovenance is published to TestPyPI only for now (as is this package).
 # `explicit = true` plus the source pin below means ONLY htprovenance is
@@ -79,4 +63,6 @@ target-version = "py39"
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    # Used only by the standalone scripts in analysis/, not by the mldag package.
+    "polars>=1.36.1",
 ]
